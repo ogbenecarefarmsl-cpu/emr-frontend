@@ -1,0 +1,944 @@
+import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
+import {
+  useAdmission,
+  useFluidBalance,
+  useRecordVitals,
+  useRecordMedication,
+  useRecordFluid,
+  useAddNursingNote,
+  useAddCarePlanItem,
+  useResolveCarePlanItem,
+  useReportIncident,
+  useTransferAdmission,
+  useDischargeAdmission,
+} from '@/hooks/useAdmissions';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
+
+import {
+  Activity, Pill, Droplet, FileText, ClipboardList, AlertTriangle,
+  LogOut, ArrowRightLeft, Heart, Plus, Loader2, Save, Send, User,
+  CheckCircle, Clock, Stethoscope, BedDouble,
+} from 'lucide-react';
+
+interface Props {
+  admissionId: string;
+  onClose?: () => void;
+  onDischarged?: () => void;
+}
+
+type TabKey = 'overview' | 'vitals' | 'meds' | 'fluids' | 'notes' | 'care-plan' | 'incidents';
+
+export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props) {
+  const { data: admission, isLoading } = useAdmission(admissionId);
+  const { data: fluidBalance } = useFluidBalance(admissionId);
+
+  const recordVitals = useRecordVitals(admissionId);
+  const recordMedication = useRecordMedication(admissionId);
+  const recordFluid = useRecordFluid(admissionId);
+  const addNote = useAddNursingNote(admissionId);
+  const addCarePlan = useAddCarePlanItem(admissionId);
+  const resolveCarePlan = useResolveCarePlanItem(admissionId);
+  const reportIncident = useReportIncident(admissionId);
+  const transfer = useTransferAdmission(admissionId);
+  const discharge = useDischargeAdmission(admissionId);
+
+  const [tab, setTab] = useState<TabKey>('overview');
+
+  // Modal states
+  const [vitalsOpen, setVitalsOpen] = useState(false);
+  const [medsOpen, setMedsOpen] = useState(false);
+  const [fluidOpen, setFluidOpen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [carePlanOpen, setCarePlanOpen] = useState(false);
+  const [incidentOpen, setIncidentOpen] = useState(false);
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [dischargeOpen, setDischargeOpen] = useState(false);
+
+  // Forms
+  const [vitalsForm, setVitalsForm] = useState({
+    temperature: '', bloodPressure: '', heartRate: '', respiratoryRate: '',
+    oxygenSaturation: '', painScale: '', bloodGlucose: '', consciousnessLevel: '', notes: '',
+  });
+  const [medForm, setMedForm] = useState({
+    medicationName: '', dosage: '', route: 'PO', refused: false, refusalReason: '', notes: '',
+  });
+  const [fluidForm, setFluidForm] = useState({
+    direction: 'intake' as 'intake' | 'output',
+    fluidType: '', volumeMl: '', route: '', notes: '',
+  });
+  const [noteForm, setNoteForm] = useState({ subjective: '', objective: '', assessment: '', plan: '', narrative: '' });
+  const [carePlanForm, setCarePlanForm] = useState({
+    problem: '', goal: '', interventions: '', evaluation: '',
+  });
+  const [incidentForm, setIncidentForm] = useState({
+    incidentType: 'fall', description: '', severity: 'minor', actionTaken: '',
+  });
+  const [transferForm, setTransferForm] = useState({ wardType: '', bedNumber: '', notes: '' });
+  const [dischargeForm, setDischargeForm] = useState({ dischargeDiagnosis: '', dischargeInstructions: '', dischargeNotes: '' });
+
+  if (isLoading || !admission) {
+    return (
+      <div className="bg-card border rounded-xl shadow-sm flex items-center justify-center h-96">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  const patient = admission.patientId;
+  const vitalsLog = admission.vitalsLog || [];
+  const medsLog = admission.medicationLog || [];
+  const fluidsLog = admission.fluidBalance || [];
+  const nursingNotes = admission.nursingNotes || [];
+  const carePlan = admission.carePlan || [];
+  const incidents = admission.incidents || [];
+
+  // Helpers
+  const latestVitals = vitalsLog[vitalsLog.length - 1];
+  const activeCarePlanItems = carePlan.filter((c: any) => c.status === 'active');
+
+  const fmtTime = (d: string | Date) => {
+    if (!d) return '—';
+    const date = new Date(d);
+    return date.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  };
+
+  // Submit handlers
+  const submitVitals = async () => {
+    try {
+      await recordVitals.mutateAsync({
+        temperature: vitalsForm.temperature ? parseFloat(vitalsForm.temperature) : undefined,
+        bloodPressure: vitalsForm.bloodPressure || undefined,
+        heartRate: vitalsForm.heartRate ? parseInt(vitalsForm.heartRate) : undefined,
+        respiratoryRate: vitalsForm.respiratoryRate ? parseInt(vitalsForm.respiratoryRate) : undefined,
+        oxygenSaturation: vitalsForm.oxygenSaturation ? parseInt(vitalsForm.oxygenSaturation) : undefined,
+        painScale: vitalsForm.painScale ? parseInt(vitalsForm.painScale) : undefined,
+        bloodGlucose: vitalsForm.bloodGlucose ? parseFloat(vitalsForm.bloodGlucose) : undefined,
+        consciousnessLevel: vitalsForm.consciousnessLevel || undefined,
+        notes: vitalsForm.notes || undefined,
+      });
+      toast.success('Vitals recorded');
+      setVitalsOpen(false);
+      setVitalsForm({ temperature: '', bloodPressure: '', heartRate: '', respiratoryRate: '', oxygenSaturation: '', painScale: '', bloodGlucose: '', consciousnessLevel: '', notes: '' });
+    } catch { toast.error('Failed to record vitals'); }
+  };
+
+  const submitMed = async () => {
+    try {
+      await recordMedication.mutateAsync(medForm);
+      toast.success(medForm.refused ? 'Refusal recorded' : 'Medication administered');
+      setMedsOpen(false);
+      setMedForm({ medicationName: '', dosage: '', route: 'PO', refused: false, refusalReason: '', notes: '' });
+    } catch { toast.error('Failed to record administration'); }
+  };
+
+  const submitFluid = async () => {
+    try {
+      await recordFluid.mutateAsync({
+        direction: fluidForm.direction,
+        fluidType: fluidForm.fluidType,
+        volumeMl: parseInt(fluidForm.volumeMl),
+        route: fluidForm.route || undefined,
+        notes: fluidForm.notes || undefined,
+      });
+      toast.success('Fluid entry recorded');
+      setFluidOpen(false);
+      setFluidForm({ direction: fluidForm.direction, fluidType: '', volumeMl: '', route: '', notes: '' });
+    } catch { toast.error('Failed to record fluid'); }
+  };
+
+  const submitNote = async () => {
+    try {
+      await addNote.mutateAsync(noteForm);
+      toast.success('Nursing note saved');
+      setNoteOpen(false);
+      setNoteForm({ subjective: '', objective: '', assessment: '', plan: '', narrative: '' });
+    } catch { toast.error('Failed to save note'); }
+  };
+
+  const submitCarePlan = async () => {
+    try {
+      await addCarePlan.mutateAsync({
+        problem: carePlanForm.problem,
+        goal: carePlanForm.goal || undefined,
+        interventions: carePlanForm.interventions.split('\n').map(s => s.trim()).filter(Boolean),
+        evaluation: carePlanForm.evaluation || undefined,
+      });
+      toast.success('Care plan item added');
+      setCarePlanOpen(false);
+      setCarePlanForm({ problem: '', goal: '', interventions: '', evaluation: '' });
+    } catch { toast.error('Failed to add care plan'); }
+  };
+
+  const submitIncident = async () => {
+    try {
+      await reportIncident.mutateAsync(incidentForm);
+      toast.success('Incident reported');
+      setIncidentOpen(false);
+      setIncidentForm({ incidentType: 'fall', description: '', severity: 'minor', actionTaken: '' });
+    } catch { toast.error('Failed to report incident'); }
+  };
+
+  const submitTransfer = async () => {
+    try {
+      await transfer.mutateAsync({
+        wardType: transferForm.wardType || undefined,
+        bedNumber: transferForm.bedNumber || undefined,
+        notes: transferForm.notes || undefined,
+      });
+      toast.success('Patient transferred');
+      setTransferOpen(false);
+    } catch { toast.error('Failed to transfer'); }
+  };
+
+  const submitDischarge = async () => {
+    try {
+      await discharge.mutateAsync(dischargeForm);
+      toast.success('Patient discharged');
+      setDischargeOpen(false);
+      onDischarged?.();
+    } catch { toast.error('Failed to discharge'); }
+  };
+
+  return (
+    <div className="bg-card border rounded-xl shadow-sm">
+      {/* Header: patient banner */}
+      <div className="px-5 py-4 border-b bg-gradient-to-r from-primary/5 to-transparent">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <User className="w-5 h-5 text-primary" />
+              <h2 className="text-lg font-semibold">
+                {patient?.firstName} {patient?.lastName}
+              </h2>
+              <Badge variant="outline">{admission.admissionNumber}</Badge>
+              <Badge className="bg-primary/80 capitalize">
+                {admission.wardType}{admission.bedNumber ? ` · ${admission.bedNumber}` : ''}
+              </Badge>
+              {admission.codeStatus && admission.codeStatus !== 'full_code' && (
+                <Badge variant="destructive" className="uppercase">{admission.codeStatus}</Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
+              <span>{patient?.patientId}</span>
+              <span>·</span>
+              <span>{patient?.gender || 'N/A'}</span>
+              <span>·</span>
+              <span>{patient?.age ? `${patient.age} yrs` : 'Age N/A'}</span>
+              <span>·</span>
+              <span>Admitted {fmtTime(admission.admittedAt)}</span>
+            </div>
+            {(admission.allergies?.length > 0 || patient?.allergies?.length > 0) && (
+              <div className="flex items-center gap-1 mt-2">
+                <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
+                <span className="text-xs text-red-600 font-medium">
+                  Allergies: {[...(admission.allergies || []), ...(patient?.allergies || [])].filter((v, i, a) => a.indexOf(v) === i).join(', ')}
+                </span>
+              </div>
+            )}
+            {admission.precautions?.length > 0 && (
+              <div className="flex items-center gap-1 mt-1">
+                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                <span className="text-xs text-amber-700 font-medium">
+                  Precautions: {admission.precautions.join(', ')}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 flex-shrink-0">
+            <Button size="sm" variant="outline" onClick={() => setTransferOpen(true)}>
+              <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" />
+              Transfer
+            </Button>
+            <Button size="sm" variant="destructive" onClick={() => setDischargeOpen(true)}>
+              <LogOut className="w-3.5 h-3.5 mr-1.5" />
+              Discharge
+            </Button>
+            {onClose && (
+              <Button size="sm" variant="ghost" onClick={onClose}>Close</Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)}>
+        <div className="px-5 pt-3 border-b overflow-x-auto">
+          <TabsList className="bg-transparent h-auto p-0 gap-1">
+            <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+              <Activity className="w-3.5 h-3.5 mr-1.5" />Overview
+            </TabsTrigger>
+            <TabsTrigger value="vitals" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+              <Heart className="w-3.5 h-3.5 mr-1.5" />Vitals
+              {vitalsLog.length > 0 && <Badge variant="secondary" className="ml-1.5 h-4 min-w-4 text-[10px]">{vitalsLog.length}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="meds" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+              <Pill className="w-3.5 h-3.5 mr-1.5" />MAR
+              {medsLog.length > 0 && <Badge variant="secondary" className="ml-1.5 h-4 min-w-4 text-[10px]">{medsLog.length}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="fluids" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+              <Droplet className="w-3.5 h-3.5 mr-1.5" />Fluids
+            </TabsTrigger>
+            <TabsTrigger value="notes" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+              <FileText className="w-3.5 h-3.5 mr-1.5" />Notes
+              {nursingNotes.length > 0 && <Badge variant="secondary" className="ml-1.5 h-4 min-w-4 text-[10px]">{nursingNotes.length}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="care-plan" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+              <ClipboardList className="w-3.5 h-3.5 mr-1.5" />Care Plan
+              {activeCarePlanItems.length > 0 && <Badge className="ml-1.5 h-4 min-w-4 text-[10px] bg-amber-500">{activeCarePlanItems.length}</Badge>}
+            </TabsTrigger>
+            <TabsTrigger value="incidents" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+              <AlertTriangle className="w-3.5 h-3.5 mr-1.5" />Incidents
+              {incidents.length > 0 && <Badge variant="destructive" className="ml-1.5 h-4 min-w-4 text-[10px]">{incidents.length}</Badge>}
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* ---------- Overview ---------- */}
+        <TabsContent value="overview" className="p-5 mt-0 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="border rounded-lg p-4 bg-card">
+              <p className="text-xs text-muted-foreground">Admission Reason</p>
+              <p className="text-sm font-medium mt-1">{admission.admissionReason}</p>
+              {admission.diagnosis && (
+                <>
+                  <p className="text-xs text-muted-foreground mt-3">Diagnosis</p>
+                  <p className="text-sm mt-1">{admission.diagnosis}</p>
+                </>
+              )}
+            </div>
+            <div className="border rounded-lg p-4 bg-card">
+              <p className="text-xs text-muted-foreground">Latest Vitals</p>
+              {latestVitals ? (
+                <div className="mt-2 space-y-1 text-sm">
+                  {latestVitals.temperature != null && <div>T: <span className="font-medium">{latestVitals.temperature}°C</span></div>}
+                  {latestVitals.bloodPressure && <div>BP: <span className="font-medium">{latestVitals.bloodPressure}</span></div>}
+                  {latestVitals.heartRate != null && <div>HR: <span className="font-medium">{latestVitals.heartRate} bpm</span></div>}
+                  {latestVitals.oxygenSaturation != null && <div>SpO2: <span className="font-medium">{latestVitals.oxygenSaturation}%</span></div>}
+                  <p className="text-xs text-muted-foreground mt-1">{fmtTime(latestVitals.recordedAt)}</p>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-2">No vitals recorded</p>
+              )}
+            </div>
+            <div className="border rounded-lg p-4 bg-card">
+              <p className="text-xs text-muted-foreground">Fluid Balance (24h)</p>
+              {fluidBalance ? (
+                <div className="mt-2 space-y-1 text-sm">
+                  <div>Intake: <span className="font-medium text-green-600">+{fluidBalance.totalIntakeMl} mL</span></div>
+                  <div>Output: <span className="font-medium text-blue-600">-{fluidBalance.totalOutputMl} mL</span></div>
+                  <Separator className="my-1" />
+                  <div>Net: <span className={cn('font-semibold', (fluidBalance.netMl ?? 0) >= 0 ? 'text-green-600' : 'text-red-600')}>
+                    {(fluidBalance.netMl ?? 0) >= 0 ? '+' : ''}{fluidBalance.netMl} mL
+                  </span></div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground mt-2">No entries</p>
+              )}
+            </div>
+          </div>
+
+          {/* Quick actions */}
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => setVitalsOpen(true)}><Heart className="w-3.5 h-3.5 mr-1.5" />Record Vitals</Button>
+            <Button size="sm" variant="outline" onClick={() => setMedsOpen(true)}><Pill className="w-3.5 h-3.5 mr-1.5" />Administer Med</Button>
+            <Button size="sm" variant="outline" onClick={() => setFluidOpen(true)}><Droplet className="w-3.5 h-3.5 mr-1.5" />Record Fluid</Button>
+            <Button size="sm" variant="outline" onClick={() => setNoteOpen(true)}><FileText className="w-3.5 h-3.5 mr-1.5" />Add Note</Button>
+            <Button size="sm" variant="outline" onClick={() => setCarePlanOpen(true)}><ClipboardList className="w-3.5 h-3.5 mr-1.5" />Add Care Plan</Button>
+            <Button size="sm" variant="outline" onClick={() => setIncidentOpen(true)}><AlertTriangle className="w-3.5 h-3.5 mr-1.5" />Report Incident</Button>
+          </div>
+
+          {activeCarePlanItems.length > 0 && (
+            <div className="border rounded-lg p-4">
+              <p className="text-sm font-semibold mb-2">Active Care Plan</p>
+              <ul className="space-y-2">
+                {activeCarePlanItems.slice(0, 3).map((item: any, i: number) => (
+                  <li key={i} className="text-sm">
+                    <span className="font-medium">{item.problem}</span>
+                    {item.goal && <span className="text-muted-foreground"> — goal: {item.goal}</span>}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ---------- Vitals ---------- */}
+        <TabsContent value="vitals" className="p-5 mt-0">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-semibold text-sm">Vital Signs Log</h3>
+            <Button size="sm" onClick={() => setVitalsOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />Record
+            </Button>
+          </div>
+          {vitalsLog.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No vitals recorded yet</div>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Temp</TableHead>
+                    <TableHead>BP</TableHead>
+                    <TableHead>HR</TableHead>
+                    <TableHead>RR</TableHead>
+                    <TableHead>SpO2</TableHead>
+                    <TableHead>Pain</TableHead>
+                    <TableHead>Glucose</TableHead>
+                    <TableHead>LOC</TableHead>
+                    <TableHead>By</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...vitalsLog].reverse().map((v: any, i: number) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-xs whitespace-nowrap">{fmtTime(v.recordedAt)}</TableCell>
+                      <TableCell>{v.temperature != null ? `${v.temperature}°` : '—'}</TableCell>
+                      <TableCell>{v.bloodPressure || '—'}</TableCell>
+                      <TableCell>{v.heartRate ?? '—'}</TableCell>
+                      <TableCell>{v.respiratoryRate ?? '—'}</TableCell>
+                      <TableCell>{v.oxygenSaturation != null ? `${v.oxygenSaturation}%` : '—'}</TableCell>
+                      <TableCell>{v.painScale ?? '—'}</TableCell>
+                      <TableCell>{v.bloodGlucose ?? '—'}</TableCell>
+                      <TableCell>{v.consciousnessLevel || '—'}</TableCell>
+                      <TableCell className="text-xs">{v.recordedBy?.full_name || '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ---------- Medication Administration Record ---------- */}
+        <TabsContent value="meds" className="p-5 mt-0">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="font-semibold text-sm">Medication Administration Record (MAR)</h3>
+            <Button size="sm" onClick={() => setMedsOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />Administer
+            </Button>
+          </div>
+          {medsLog.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No medications administered yet</div>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Medication</TableHead>
+                    <TableHead>Dose</TableHead>
+                    <TableHead>Route</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead>By</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...medsLog].reverse().map((m: any, i: number) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-xs whitespace-nowrap">{fmtTime(m.administeredAt)}</TableCell>
+                      <TableCell className="font-medium">{m.medicationName}</TableCell>
+                      <TableCell>{m.dosage}</TableCell>
+                      <TableCell><Badge variant="outline">{m.route || '—'}</Badge></TableCell>
+                      <TableCell>
+                        {m.refused ? (
+                          <Badge variant="destructive">Refused</Badge>
+                        ) : (
+                          <Badge className="bg-green-500">Given</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs max-w-xs truncate">
+                        {m.refused ? m.refusalReason : m.notes || '—'}
+                      </TableCell>
+                      <TableCell className="text-xs">{m.administeredBy?.full_name || '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ---------- Fluid Balance ---------- */}
+        <TabsContent value="fluids" className="p-5 mt-0 space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="font-semibold text-sm">Intake / Output Chart</h3>
+            <Button size="sm" onClick={() => setFluidOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />Add Entry
+            </Button>
+          </div>
+
+          {fluidBalance && (
+            <div className="grid grid-cols-3 gap-3">
+              <div className="border rounded-lg p-4 bg-green-50">
+                <p className="text-xs text-green-700">Total Intake</p>
+                <p className="text-xl font-semibold text-green-700">+{fluidBalance.totalIntakeMl} mL</p>
+              </div>
+              <div className="border rounded-lg p-4 bg-blue-50">
+                <p className="text-xs text-blue-700">Total Output</p>
+                <p className="text-xl font-semibold text-blue-700">-{fluidBalance.totalOutputMl} mL</p>
+              </div>
+              <div className={cn(
+                'border rounded-lg p-4',
+                (fluidBalance.netMl ?? 0) >= 0 ? 'bg-emerald-50' : 'bg-red-50',
+              )}>
+                <p className={cn('text-xs', (fluidBalance.netMl ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700')}>Net Balance</p>
+                <p className={cn(
+                  'text-xl font-semibold',
+                  (fluidBalance.netMl ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700',
+                )}>
+                  {(fluidBalance.netMl ?? 0) >= 0 ? '+' : ''}{fluidBalance.netMl} mL
+                </p>
+              </div>
+            </div>
+          )}
+
+          {fluidsLog.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No fluid entries yet</div>
+          ) : (
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Direction</TableHead>
+                    <TableHead>Fluid</TableHead>
+                    <TableHead className="text-right">Volume</TableHead>
+                    <TableHead>Route</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead>By</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {[...fluidsLog].reverse().map((f: any, i: number) => (
+                    <TableRow key={i}>
+                      <TableCell className="text-xs whitespace-nowrap">{fmtTime(f.recordedAt)}</TableCell>
+                      <TableCell>
+                        <Badge className={cn(f.direction === 'intake' ? 'bg-green-500' : 'bg-blue-500')}>
+                          {f.direction}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{f.fluidType}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {f.direction === 'intake' ? '+' : '-'}{f.volumeMl} mL
+                      </TableCell>
+                      <TableCell>{f.route || '—'}</TableCell>
+                      <TableCell className="text-xs max-w-xs truncate">{f.notes || '—'}</TableCell>
+                      <TableCell className="text-xs">{f.recordedBy?.full_name || '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ---------- Nursing Notes (SOAP) ---------- */}
+        <TabsContent value="notes" className="p-5 mt-0 space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="font-semibold text-sm">Nursing Notes</h3>
+            <Button size="sm" onClick={() => setNoteOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />Add Note
+            </Button>
+          </div>
+          {nursingNotes.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No notes yet</div>
+          ) : (
+            <ScrollArea className="max-h-[500px]">
+              <div className="space-y-3 pr-2">
+                {[...nursingNotes].reverse().map((n: any, i: number) => (
+                  <div key={i} className="border rounded-lg p-4 bg-muted/10">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-muted-foreground">{fmtTime(n.authoredAt)}</p>
+                      <p className="text-xs font-medium">{n.authoredBy?.full_name || ''}</p>
+                    </div>
+                    {n.narrative ? (
+                      <p className="text-sm whitespace-pre-line">{n.narrative}</p>
+                    ) : (
+                      <div className="space-y-2 text-sm">
+                        {n.subjective && <div><span className="font-semibold text-blue-600">S:</span> {n.subjective}</div>}
+                        {n.objective && <div><span className="font-semibold text-green-600">O:</span> {n.objective}</div>}
+                        {n.assessment && <div><span className="font-semibold text-purple-600">A:</span> {n.assessment}</div>}
+                        {n.plan && <div><span className="font-semibold text-orange-600">P:</span> {n.plan}</div>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </TabsContent>
+
+        {/* ---------- Care Plan ---------- */}
+        <TabsContent value="care-plan" className="p-5 mt-0 space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="font-semibold text-sm">Nursing Care Plan</h3>
+            <Button size="sm" onClick={() => setCarePlanOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />Add Item
+            </Button>
+          </div>
+          {carePlan.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No care plan items yet</div>
+          ) : (
+            <div className="space-y-3">
+              {carePlan.map((item: any, i: number) => (
+                <div key={i} className={cn(
+                  'border rounded-lg p-4',
+                  item.status === 'resolved' && 'bg-muted/30 opacity-70',
+                )}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-sm">{item.problem}</p>
+                        <Badge variant={item.status === 'resolved' ? 'outline' : 'default'} className={cn(
+                          item.status === 'active' && 'bg-amber-500',
+                          item.status === 'ongoing' && 'bg-blue-500',
+                        )}>{item.status}</Badge>
+                      </div>
+                      {item.goal && <p className="text-sm text-muted-foreground mt-1">Goal: {item.goal}</p>}
+                      {item.interventions?.length > 0 && (
+                        <ul className="mt-2 space-y-0.5 text-sm">
+                          {item.interventions.map((intv: string, j: number) => (
+                            <li key={j} className="text-muted-foreground">• {intv}</li>
+                          ))}
+                        </ul>
+                      )}
+                      {item.evaluation && (
+                        <p className="text-sm mt-2 italic text-muted-foreground">Evaluation: {item.evaluation}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Added {fmtTime(item.createdAt)} by {item.createdBy?.full_name || '—'}
+                      </p>
+                    </div>
+                    {item.status !== 'resolved' && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="flex-shrink-0"
+                        onClick={async () => {
+                          const evaluation = prompt('Evaluation (optional):') || undefined;
+                          try {
+                            await resolveCarePlan.mutateAsync({ index: i, evaluation });
+                            toast.success('Item resolved');
+                          } catch { toast.error('Failed'); }
+                        }}
+                      >
+                        <CheckCircle className="w-3.5 h-3.5 mr-1.5" />Resolve
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ---------- Incidents ---------- */}
+        <TabsContent value="incidents" className="p-5 mt-0 space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="font-semibold text-sm">Incident Reports</h3>
+            <Button size="sm" variant="destructive" onClick={() => setIncidentOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />Report Incident
+            </Button>
+          </div>
+          {incidents.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No incidents reported</div>
+          ) : (
+            <div className="space-y-3">
+              {[...incidents].reverse().map((inc: any, i: number) => (
+                <div key={i} className={cn(
+                  'border-l-4 border rounded-lg p-4',
+                  inc.severity === 'severe' && 'border-l-red-600 bg-red-50',
+                  inc.severity === 'moderate' && 'border-l-amber-500 bg-amber-50',
+                  inc.severity === 'minor' && 'border-l-blue-500 bg-blue-50',
+                )}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <Badge className={cn(
+                        inc.severity === 'severe' && 'bg-red-600',
+                        inc.severity === 'moderate' && 'bg-amber-500',
+                        inc.severity === 'minor' && 'bg-blue-500',
+                      )}>{inc.severity}</Badge>
+                      <span className="text-sm font-semibold capitalize">{inc.incidentType.replace(/_/g, ' ')}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">{fmtTime(inc.occurredAt)}</p>
+                  </div>
+                  <p className="text-sm">{inc.description}</p>
+                  {inc.actionTaken && (
+                    <p className="text-sm text-muted-foreground mt-2">Action: {inc.actionTaken}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Reported by {inc.reportedBy?.full_name || '—'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* ---------- Modals ---------- */}
+      {/* Vitals */}
+      <Dialog open={vitalsOpen} onOpenChange={setVitalsOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Record Vital Signs</DialogTitle></DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label className="text-xs">Temperature (°C)</Label><Input value={vitalsForm.temperature} onChange={(e) => setVitalsForm({...vitalsForm, temperature: e.target.value})} placeholder="36.5" className="h-8" /></div>
+            <div><Label className="text-xs">Blood Pressure</Label><Input value={vitalsForm.bloodPressure} onChange={(e) => setVitalsForm({...vitalsForm, bloodPressure: e.target.value})} placeholder="120/80" className="h-8" /></div>
+            <div><Label className="text-xs">Heart Rate</Label><Input value={vitalsForm.heartRate} onChange={(e) => setVitalsForm({...vitalsForm, heartRate: e.target.value})} placeholder="72" className="h-8" /></div>
+            <div><Label className="text-xs">Resp. Rate</Label><Input value={vitalsForm.respiratoryRate} onChange={(e) => setVitalsForm({...vitalsForm, respiratoryRate: e.target.value})} placeholder="16" className="h-8" /></div>
+            <div><Label className="text-xs">SpO2 (%)</Label><Input value={vitalsForm.oxygenSaturation} onChange={(e) => setVitalsForm({...vitalsForm, oxygenSaturation: e.target.value})} placeholder="98" className="h-8" /></div>
+            <div><Label className="text-xs">Pain (0-10)</Label><Input value={vitalsForm.painScale} onChange={(e) => setVitalsForm({...vitalsForm, painScale: e.target.value})} placeholder="0" className="h-8" /></div>
+            <div><Label className="text-xs">Blood Glucose (mmol/L)</Label><Input value={vitalsForm.bloodGlucose} onChange={(e) => setVitalsForm({...vitalsForm, bloodGlucose: e.target.value})} placeholder="5.5" className="h-8" /></div>
+            <div>
+              <Label className="text-xs">LOC (AVPU or GCS)</Label>
+              <Select value={vitalsForm.consciousnessLevel} onValueChange={(v) => setVitalsForm({...vitalsForm, consciousnessLevel: v})}>
+                <SelectTrigger className="h-8"><SelectValue placeholder="Alert" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Alert">Alert</SelectItem>
+                  <SelectItem value="Voice">Voice responsive</SelectItem>
+                  <SelectItem value="Pain">Pain responsive</SelectItem>
+                  <SelectItem value="Unresponsive">Unresponsive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div><Label className="text-xs">Notes</Label><Textarea value={vitalsForm.notes} onChange={(e) => setVitalsForm({...vitalsForm, notes: e.target.value})} rows={2} /></div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setVitalsOpen(false)}>Cancel</Button>
+            <Button onClick={submitVitals} disabled={recordVitals.isPending}>
+              {recordVitals.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}Record
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Medications */}
+      <Dialog open={medsOpen} onOpenChange={setMedsOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Administer Medication</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Medication</Label><Input value={medForm.medicationName} onChange={(e) => setMedForm({...medForm, medicationName: e.target.value})} placeholder="e.g., Paracetamol 500mg" /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Dose</Label><Input value={medForm.dosage} onChange={(e) => setMedForm({...medForm, dosage: e.target.value})} placeholder="500mg" /></div>
+              <div>
+                <Label>Route</Label>
+                <Select value={medForm.route} onValueChange={(v) => setMedForm({...medForm, route: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="PO">PO (oral)</SelectItem>
+                    <SelectItem value="IV">IV</SelectItem>
+                    <SelectItem value="IM">IM</SelectItem>
+                    <SelectItem value="SC">SC</SelectItem>
+                    <SelectItem value="PR">PR (rectal)</SelectItem>
+                    <SelectItem value="topical">Topical</SelectItem>
+                    <SelectItem value="inhalation">Inhalation</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-3 border rounded-lg">
+              <input type="checkbox" id="refused" checked={medForm.refused} onChange={(e) => setMedForm({...medForm, refused: e.target.checked})} />
+              <Label htmlFor="refused" className="cursor-pointer">Patient refused / not given</Label>
+            </div>
+            {medForm.refused && (
+              <div><Label>Reason for refusal</Label><Input value={medForm.refusalReason} onChange={(e) => setMedForm({...medForm, refusalReason: e.target.value})} /></div>
+            )}
+            <div><Label>Notes</Label><Textarea value={medForm.notes} onChange={(e) => setMedForm({...medForm, notes: e.target.value})} rows={2} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMedsOpen(false)}>Cancel</Button>
+            <Button onClick={submitMed} disabled={recordMedication.isPending || !medForm.medicationName || !medForm.dosage}>
+              {recordMedication.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Pill className="w-4 h-4 mr-2" />}Record
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Fluid */}
+      <Dialog open={fluidOpen} onOpenChange={setFluidOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Record Fluid</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>Direction</Label>
+              <div className="grid grid-cols-2 gap-2 mt-1">
+                <button type="button" onClick={() => setFluidForm({...fluidForm, direction: 'intake'})} className={cn('px-4 py-2 rounded-lg border-2 text-sm font-medium', fluidForm.direction === 'intake' ? 'bg-green-500 text-white border-transparent' : 'border-border')}>Intake</button>
+                <button type="button" onClick={() => setFluidForm({...fluidForm, direction: 'output'})} className={cn('px-4 py-2 rounded-lg border-2 text-sm font-medium', fluidForm.direction === 'output' ? 'bg-blue-500 text-white border-transparent' : 'border-border')}>Output</button>
+              </div>
+            </div>
+            <div><Label>Fluid Type</Label><Input value={fluidForm.fluidType} onChange={(e) => setFluidForm({...fluidForm, fluidType: e.target.value})} placeholder={fluidForm.direction === 'intake' ? 'e.g., Normal saline IV, oral water' : 'e.g., urine, vomitus'} /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Volume (mL)</Label><Input type="number" value={fluidForm.volumeMl} onChange={(e) => setFluidForm({...fluidForm, volumeMl: e.target.value})} placeholder="250" /></div>
+              <div><Label>Route</Label><Input value={fluidForm.route} onChange={(e) => setFluidForm({...fluidForm, route: e.target.value})} placeholder="PO / IV / urinary" /></div>
+            </div>
+            <div><Label>Notes</Label><Textarea value={fluidForm.notes} onChange={(e) => setFluidForm({...fluidForm, notes: e.target.value})} rows={2} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setFluidOpen(false)}>Cancel</Button>
+            <Button onClick={submitFluid} disabled={recordFluid.isPending || !fluidForm.fluidType || !fluidForm.volumeMl}>
+              {recordFluid.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Droplet className="w-4 h-4 mr-2" />}Record
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Nursing note */}
+      <Dialog open={noteOpen} onOpenChange={setNoteOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Nursing Note</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">Use SOAP format or narrative. Either is saved.</p>
+            <div><Label className="text-blue-600">S — Subjective</Label><Textarea value={noteForm.subjective} onChange={(e) => setNoteForm({...noteForm, subjective: e.target.value})} rows={2} placeholder="What patient reports/complains of..." /></div>
+            <div><Label className="text-green-600">O — Objective</Label><Textarea value={noteForm.objective} onChange={(e) => setNoteForm({...noteForm, objective: e.target.value})} rows={2} placeholder="Observable findings, vitals trend, behaviour..." /></div>
+            <div><Label className="text-purple-600">A — Assessment</Label><Textarea value={noteForm.assessment} onChange={(e) => setNoteForm({...noteForm, assessment: e.target.value})} rows={2} placeholder="Clinical judgment, priority..." /></div>
+            <div><Label className="text-orange-600">P — Plan</Label><Textarea value={noteForm.plan} onChange={(e) => setNoteForm({...noteForm, plan: e.target.value})} rows={2} placeholder="Interventions, monitoring plan..." /></div>
+            <Separator />
+            <div><Label>Or narrative note</Label><Textarea value={noteForm.narrative} onChange={(e) => setNoteForm({...noteForm, narrative: e.target.value})} rows={3} placeholder="Free-text narrative..." /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNoteOpen(false)}>Cancel</Button>
+            <Button onClick={submitNote} disabled={addNote.isPending}>
+              {addNote.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}Save Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Care plan */}
+      <Dialog open={carePlanOpen} onOpenChange={setCarePlanOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Add Care Plan Item</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Problem / Diagnosis *</Label><Input value={carePlanForm.problem} onChange={(e) => setCarePlanForm({...carePlanForm, problem: e.target.value})} placeholder="e.g., Risk of pressure ulcer" /></div>
+            <div><Label>Goal</Label><Input value={carePlanForm.goal} onChange={(e) => setCarePlanForm({...carePlanForm, goal: e.target.value})} placeholder="e.g., Skin remains intact throughout admission" /></div>
+            <div><Label>Interventions (one per line)</Label>
+              <Textarea
+                value={carePlanForm.interventions}
+                onChange={(e) => setCarePlanForm({...carePlanForm, interventions: e.target.value})}
+                rows={4}
+                placeholder={'Turn patient every 2h\nInspect skin daily\nKeep linens dry'}
+              /></div>
+            <div><Label>Evaluation</Label><Input value={carePlanForm.evaluation} onChange={(e) => setCarePlanForm({...carePlanForm, evaluation: e.target.value})} placeholder="Optional" /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCarePlanOpen(false)}>Cancel</Button>
+            <Button onClick={submitCarePlan} disabled={addCarePlan.isPending || !carePlanForm.problem}>
+              {addCarePlan.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}Add
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Incident */}
+      <Dialog open={incidentOpen} onOpenChange={setIncidentOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Report Incident</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Type</Label>
+                <Select value={incidentForm.incidentType} onValueChange={(v) => setIncidentForm({...incidentForm, incidentType: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="fall">Fall</SelectItem>
+                    <SelectItem value="medication_error">Medication error</SelectItem>
+                    <SelectItem value="pressure_ulcer">Pressure ulcer</SelectItem>
+                    <SelectItem value="equipment_failure">Equipment failure</SelectItem>
+                    <SelectItem value="aggression">Aggression</SelectItem>
+                    <SelectItem value="elopement">Elopement</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Severity</Label>
+                <Select value={incidentForm.severity} onValueChange={(v) => setIncidentForm({...incidentForm, severity: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="minor">Minor</SelectItem>
+                    <SelectItem value="moderate">Moderate</SelectItem>
+                    <SelectItem value="severe">Severe</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div><Label>Description *</Label><Textarea value={incidentForm.description} onChange={(e) => setIncidentForm({...incidentForm, description: e.target.value})} rows={3} /></div>
+            <div><Label>Action Taken</Label><Textarea value={incidentForm.actionTaken} onChange={(e) => setIncidentForm({...incidentForm, actionTaken: e.target.value})} rows={2} placeholder="Who was informed, what was done..." /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIncidentOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={submitIncident} disabled={reportIncident.isPending || !incidentForm.description}>
+              {reportIncident.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <AlertTriangle className="w-4 h-4 mr-2" />}Report
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Transfer */}
+      <Dialog open={transferOpen} onOpenChange={setTransferOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader><DialogTitle>Transfer Patient</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label>New Ward (optional)</Label>
+              <Select value={transferForm.wardType} onValueChange={(v) => setTransferForm({...transferForm, wardType: v})}>
+                <SelectTrigger><SelectValue placeholder="Keep current" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="general">General</SelectItem>
+                  <SelectItem value="private">Private</SelectItem>
+                  <SelectItem value="icu">ICU</SelectItem>
+                  <SelectItem value="maternity">Maternity</SelectItem>
+                  <SelectItem value="pediatric">Pediatric</SelectItem>
+                  <SelectItem value="isolation">Isolation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div><Label>New Bed Number</Label><Input value={transferForm.bedNumber} onChange={(e) => setTransferForm({...transferForm, bedNumber: e.target.value})} /></div>
+            <div><Label>Reason / Handoff</Label><Textarea value={transferForm.notes} onChange={(e) => setTransferForm({...transferForm, notes: e.target.value})} rows={3} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTransferOpen(false)}>Cancel</Button>
+            <Button onClick={submitTransfer} disabled={transfer.isPending}>
+              {transfer.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <ArrowRightLeft className="w-4 h-4 mr-2" />}Transfer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Discharge */}
+      <Dialog open={dischargeOpen} onOpenChange={setDischargeOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader><DialogTitle>Discharge Patient</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div><Label>Discharge Diagnosis</Label><Input value={dischargeForm.dischargeDiagnosis} onChange={(e) => setDischargeForm({...dischargeForm, dischargeDiagnosis: e.target.value})} /></div>
+            <div><Label>Discharge Instructions (for patient)</Label><Textarea value={dischargeForm.dischargeInstructions} onChange={(e) => setDischargeForm({...dischargeForm, dischargeInstructions: e.target.value})} rows={4} placeholder="Medication, follow-up, activity restrictions, warning signs..." /></div>
+            <div><Label>Internal Notes</Label><Textarea value={dischargeForm.dischargeNotes} onChange={(e) => setDischargeForm({...dischargeForm, dischargeNotes: e.target.value})} rows={2} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDischargeOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={submitDischarge} disabled={discharge.isPending}>
+              {discharge.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LogOut className="w-4 h-4 mr-2" />}Discharge
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

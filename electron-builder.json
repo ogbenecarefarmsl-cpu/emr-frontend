@@ -1,0 +1,37 @@
+{
+  "appId": "com.hobour.diagnostics",
+  "productName": "Hobour Diagnostics LIS",
+  "directories": {
+    "output": "release"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*"
+  ],
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "icon": "public/favicon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": true,
+    "allowToChangeInstallationDirectory": true,
+    "installerIcon": "public/favicon.ico",
+    "uninstallerIcon": "public/favicon.ico",
+    "shortcutName": "Hobour LIS"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "icon": "public/favicon.ico",
+    "category": "Office"
+  },
+  "mac": {
+    "target": ["dmg"],
+    "icon": "public/favicon.ico"
+  }
+}

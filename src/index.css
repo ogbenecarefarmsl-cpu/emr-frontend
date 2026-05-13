@@ -1,0 +1,233 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Clinical blue theme */
+    --background: 210 20% 98%;
+    --foreground: 215 25% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 25% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 25% 15%;
+
+    --primary: 210 75% 42%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 20% 94%;
+    --secondary-foreground: 215 25% 25%;
+
+    --muted: 210 15% 92%;
+    --muted-foreground: 215 15% 45%;
+
+    --accent: 210 25% 90%;
+    --accent-foreground: 210 75% 35%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 210 20% 88%;
+    --input: 210 20% 88%;
+    --ring: 210 75% 42%;
+
+    --radius: 0.5rem;
+
+    /* LIS-specific semantic colors */
+    --status-normal: 142 71% 45%;
+    --status-normal-foreground: 0 0% 100%;
+    --status-warning: 38 92% 50%;
+    --status-warning-foreground: 0 0% 100%;
+    --status-critical: 0 84% 60%;
+    --status-critical-foreground: 0 0% 100%;
+    --status-pending: 210 40% 60%;
+    --status-pending-foreground: 0 0% 100%;
+
+    /* Machine status */
+    --machine-online: 142 71% 45%;
+    --machine-offline: 0 0% 60%;
+    --machine-error: 0 84% 60%;
+    --machine-processing: 210 75% 50%;
+
+    --sidebar-background: 215 28% 17%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-primary: 210 75% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 25% 25%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 215 25% 25%;
+    --sidebar-ring: 210 75% 55%;
+  }
+
+  .dark {
+    --background: 215 28% 10%;
+    --foreground: 210 20% 95%;
+
+    --card: 215 25% 14%;
+    --card-foreground: 210 20% 95%;
+
+    --popover: 215 25% 14%;
+    --popover-foreground: 210 20% 95%;
+
+    --primary: 210 75% 55%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 215 25% 20%;
+    --secondary-foreground: 210 20% 90%;
+
+    --muted: 215 25% 18%;
+    --muted-foreground: 210 15% 60%;
+
+    --accent: 215 25% 22%;
+    --accent-foreground: 210 75% 60%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 215 25% 22%;
+    --input: 215 25% 22%;
+    --ring: 210 75% 55%;
+
+    --sidebar-background: 215 30% 8%;
+    --sidebar-foreground: 210 20% 92%;
+    --sidebar-primary: 210 75% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 215 25% 15%;
+    --sidebar-accent-foreground: 210 20% 92%;
+    --sidebar-border: 215 25% 18%;
+    --sidebar-ring: 210 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Hide elements when printing */
+  @media print {
+    .no-print {
+      display: none !important;
+    }
+  }
+}
+
+@layer components {
+  .status-badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium;
+  }
+
+  .status-normal {
+    @apply bg-[hsl(var(--status-normal))] text-[hsl(var(--status-normal-foreground))];
+  }
+
+  .status-warning {
+    @apply bg-[hsl(var(--status-warning))] text-[hsl(var(--status-warning-foreground))];
+  }
+
+  .status-critical {
+    @apply bg-[hsl(var(--status-critical))] text-[hsl(var(--status-critical-foreground))];
+  }
+
+  .status-pending {
+    @apply bg-[hsl(var(--status-pending))] text-[hsl(var(--status-pending-foreground))];
+  }
+
+  .machine-indicator {
+    @apply w-2.5 h-2.5 rounded-full;
+  }
+
+  .machine-online {
+    @apply bg-[hsl(var(--machine-online))];
+    animation: pulse-green 2s infinite;
+  }
+
+  .machine-offline {
+    @apply bg-[hsl(var(--machine-offline))];
+  }
+
+  .machine-error {
+    @apply bg-[hsl(var(--machine-error))];
+    animation: pulse-red 1s infinite;
+  }
+
+  .machine-processing {
+    @apply bg-[hsl(var(--machine-processing))];
+    animation: pulse-blue 1.5s infinite;
+  }
+
+  .data-table {
+    @apply w-full text-sm;
+  }
+
+  .data-table th {
+    @apply text-left font-medium text-muted-foreground px-4 py-3 border-b bg-muted/30;
+  }
+
+  .data-table td {
+    @apply px-4 py-3 border-b;
+  }
+
+  .data-table tr:hover td {
+    @apply bg-muted/20;
+  }
+
+  .metric-card {
+    @apply bg-card rounded-lg border p-5 shadow-sm;
+  }
+
+  .metric-value {
+    @apply text-3xl font-bold text-foreground;
+  }
+
+  .metric-label {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+}
+
+@layer utilities {
+  @keyframes pulse-green {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 hsl(var(--machine-online) / 0.4);
+    }
+    50% {
+      opacity: 0.8;
+      box-shadow: 0 0 0 4px hsl(var(--machine-online) / 0);
+    }
+  }
+
+  @keyframes pulse-red {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.5;
+    }
+  }
+
+  @keyframes pulse-blue {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 0 0 hsl(var(--machine-processing) / 0.4);
+    }
+    50% {
+      opacity: 0.8;
+      box-shadow: 0 0 0 4px hsl(var(--machine-processing) / 0);
+    }
+  }
+}

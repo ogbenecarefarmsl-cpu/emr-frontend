@@ -1,0 +1,3 @@
+/* App-level styles — intentionally minimal.
+   Layout, spacing, and typography are handled by Tailwind + index.css design tokens.
+   Only add truly global, non-Tailwind styles here. */
