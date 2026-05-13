@@ -131,14 +131,14 @@ export default function Login() {
           <div className="flex justify-center mb-8">
             <img 
               src="/logo_resized.png" 
-              alt="Carefam EMR Logo" 
+              alt="Harbour Clinicals Logo" 
               className="h-16 object-contain"
             />
           </div>
 
           {/* Welcome Text */}
           <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-900">Carefam EMR</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Harbour Clinicals</h1>
             <p className="mt-2 text-sm text-gray-500">Sign in to continue</p>
           </div>
 
@@ -230,7 +230,7 @@ export default function Login() {
           <div className="mt-8 flex justify-center">
             <img 
               src="/logo_resized.png" 
-              alt="Carefam EMR" 
+              alt="Harbour Clinicals" 
               className="h-12 object-contain opacity-60"
             />
           </div>

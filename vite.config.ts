@@ -25,9 +25,9 @@ export default defineConfig(({ mode }) => ({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'icon.ico', 'robots.txt', 'sounds/*.wav', 'sounds/*.mp3'],
       manifest: {
-        name: 'Carefam EMR',
-        short_name: 'Carefam EMR',
-        description: 'Electronic Medical Records - Offline-First PWA',
+        name: 'Harbour Clinicals',
+        short_name: 'Harbour',
+        description: 'Harbour Clinicals Electronic Medical Records - Offline-First PWA',
         theme_color: '#0f172a',
         background_color: '#ffffff',
         display: 'standalone',

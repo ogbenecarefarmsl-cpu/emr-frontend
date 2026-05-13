@@ -192,7 +192,7 @@ export function RoleSidebar({ role, userName, onClose }: RoleSidebarProps) {
       {/* Footer */}
       <div className="p-4 border-t border-sidebar-border">
         <div className="text-xs text-sidebar-foreground/50">
-          <p>Carefam EMR v1.0.0</p>
+          <p>Harbour Clinicals v1.0.0</p>
           <p>HL7 • ASTM • FHIR Compatible</p>
         </div>
       </div>

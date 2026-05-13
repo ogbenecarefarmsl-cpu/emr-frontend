@@ -30,7 +30,7 @@ export function Sidebar() {
             <FlaskConical className="w-6 h-6 text-sidebar-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-bold text-lg">Carefam EMR</h1>
+            <h1 className="font-bold text-lg">Harbour Clinicals</h1>
             <p className="text-xs text-sidebar-foreground/60">Electronic Medical Records</p>
           </div>
         </div>
