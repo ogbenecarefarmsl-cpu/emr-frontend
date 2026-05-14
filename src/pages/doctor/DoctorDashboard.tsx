@@ -326,6 +326,17 @@ export default function DoctorDashboard() {
     }
   };
 
+  const handleAddSoapNote = () => {
+    setSoapForm({
+      subjective: selectedVisit?.chiefComplaint || '',
+      objective: '',
+      assessment: '',
+      plan: '',
+      diagnosis: selectedVisit?.diagnosis || '',
+    });
+    setActiveTab('soap');
+  };
+
   const handleCompleteVisit = async () => {
     if (!selectedVisit) return;
 
@@ -785,6 +796,14 @@ export default function DoctorDashboard() {
                   <div className="mt-6 flex flex-wrap gap-3">
                     <Button
                       variant="outline"
+                      onClick={handleAddSoapNote}
+                      disabled={!selectedVisit}
+                    >
+                      <FileText className="w-4 h-4 mr-2" />
+                      Add SOAP Note
+                    </Button>
+                    <Button
+                      variant="outline"
                       onClick={() => setLabOrderModalOpen(true)}
                       disabled={selectedVisit.status !== 'in_consultation'}
                     >
@@ -805,7 +824,7 @@ export default function DoctorDashboard() {
                       disabled={updateVisit.isPending}
                     >
                       <Save className="w-4 h-4 mr-2" />
-                      Save Notes
+                      Save SOAP Note
                     </Button>
                     <Button
                       variant="outline"
@@ -837,6 +856,18 @@ export default function DoctorDashboard() {
                 {/* SOAP Notes Tab */}
                 <TabsContent value="soap" className="p-5 mt-0">
                   <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-3 border rounded-lg p-4 bg-muted/20">
+                      <div>
+                        <h3 className="font-semibold text-sm">SOAP Note Editor</h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Save creates a clinical timeline note for follow-up, admission review, and future visits.
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={handleAddSoapNote}>
+                        <Plus className="w-3.5 h-3.5 mr-1.5" />
+                        New Note
+                      </Button>
+                    </div>
                     <div>
                       <Label className="text-sm font-semibold text-blue-600">S - Subjective</Label>
                       <Textarea
@@ -889,7 +920,7 @@ export default function DoctorDashboard() {
                     <div className="flex justify-end gap-3">
                       <Button variant="outline" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
                         <Save className="w-4 h-4 mr-2" />
-                        Save Notes
+                        Save SOAP Note
                       </Button>
                     </div>
                   </div>

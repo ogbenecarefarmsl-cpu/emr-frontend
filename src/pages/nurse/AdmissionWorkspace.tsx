@@ -1,6 +1,8 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { prescriptionService } from '@/services/prescriptionService';
 import {
   useAdmission,
   useFluidBalance,
@@ -8,6 +10,7 @@ import {
   useRecordMedication,
   useRecordFluid,
   useAddNursingNote,
+  useAddShiftHandover,
   useAddCarePlanItem,
   useResolveCarePlanItem,
   useReportIncident,
@@ -32,7 +35,7 @@ import {
 import {
   Activity, Pill, Droplet, FileText, ClipboardList, AlertTriangle,
   LogOut, ArrowRightLeft, Heart, Plus, Loader2, Save, Send, User,
-  CheckCircle, Clock, Stethoscope, BedDouble,
+  CheckCircle, Clock, Stethoscope, BedDouble, Handshake,
 } from 'lucide-react';
 
 interface Props {
@@ -41,7 +44,7 @@ interface Props {
   onDischarged?: () => void;
 }
 
-type TabKey = 'overview' | 'clinical' | 'vitals' | 'meds' | 'fluids' | 'notes' | 'care-plan' | 'incidents';
+type TabKey = 'overview' | 'clinical' | 'vitals' | 'meds' | 'fluids' | 'notes' | 'handover' | 'care-plan' | 'incidents';
 
 export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props) {
   const { data: admission, isLoading } = useAdmission(admissionId);
@@ -51,6 +54,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
   const recordMedication = useRecordMedication(admissionId);
   const recordFluid = useRecordFluid(admissionId);
   const addNote = useAddNursingNote(admissionId);
+  const addHandover = useAddShiftHandover(admissionId);
   const addCarePlan = useAddCarePlanItem(admissionId);
   const resolveCarePlan = useResolveCarePlanItem(admissionId);
   const reportIncident = useReportIncident(admissionId);
@@ -64,6 +68,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
   const [medsOpen, setMedsOpen] = useState(false);
   const [fluidOpen, setFluidOpen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false);
+  const [handoverOpen, setHandoverOpen] = useState(false);
   const [carePlanOpen, setCarePlanOpen] = useState(false);
   const [incidentOpen, setIncidentOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -75,13 +80,25 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
     oxygenSaturation: '', painScale: '', bloodGlucose: '', consciousnessLevel: '', notes: '',
   });
   const [medForm, setMedForm] = useState({
-    medicationName: '', dosage: '', route: 'PO', refused: false, refusalReason: '', notes: '',
+    medicationName: '', dosage: '', route: 'PO', prescriptionId: '', medicationId: '', refused: false, refusalReason: '', notes: '',
   });
   const [fluidForm, setFluidForm] = useState({
     direction: 'intake' as 'intake' | 'output',
     fluidType: '', volumeMl: '', route: '', notes: '',
   });
   const [noteForm, setNoteForm] = useState({ subjective: '', objective: '', assessment: '', plan: '', narrative: '' });
+  const [handoverForm, setHandoverForm] = useState({
+    shift: 'morning',
+    conditionSummary: '',
+    latestVitalsSummary: '',
+    pendingLabs: '',
+    medicationsDue: '',
+    fluidBalanceConcern: '',
+    risksAndAllergies: '',
+    tasksForNextShift: '',
+    receivingNurse: '',
+    notes: '',
+  });
   const [carePlanForm, setCarePlanForm] = useState({
     problem: '', goal: '', interventions: '', evaluation: '',
   });
@@ -90,6 +107,13 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
   });
   const [transferForm, setTransferForm] = useState({ wardType: '', bedNumber: '', notes: '' });
   const [dischargeForm, setDischargeForm] = useState({ dischargeDiagnosis: '', dischargeInstructions: '', dischargeNotes: '' });
+  const patientId = admission?.patientId?._id;
+  const { data: patientPrescriptions = [] } = useQuery({
+    queryKey: ['prescriptions', 'patient', patientId],
+    queryFn: () => prescriptionService.findByPatient(patientId),
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
 
   if (isLoading || !admission) {
     return (
@@ -107,10 +131,14 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
   const clinicalNotes = admission.clinicalNotes || [];
   const carePlan = admission.carePlan || [];
   const incidents = admission.incidents || [];
+  const shiftHandovers = admission.shiftHandovers || [];
 
   // Helpers
   const latestVitals = vitalsLog[vitalsLog.length - 1];
   const activeCarePlanItems = carePlan.filter((c: any) => c.status === 'active');
+  const prescribedMedicationItems = patientPrescriptions
+    .filter((rx: any) => rx.status !== 'cancelled')
+    .flatMap((rx: any) => (rx.items || []).map((item: any) => ({ ...item, prescriptionId: rx._id, prescriptionNumber: rx.prescriptionNumber })));
 
   const fmtTime = (d: string | Date) => {
     if (!d) return '—';
@@ -143,7 +171,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
       await recordMedication.mutateAsync(medForm);
       toast.success(medForm.refused ? 'Refusal recorded' : 'Medication administered');
       setMedsOpen(false);
-      setMedForm({ medicationName: '', dosage: '', route: 'PO', refused: false, refusalReason: '', notes: '' });
+      setMedForm({ medicationName: '', dosage: '', route: 'PO', prescriptionId: '', medicationId: '', refused: false, refusalReason: '', notes: '' });
     } catch { toast.error('Failed to record administration'); }
   };
 
@@ -169,6 +197,26 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
       setNoteOpen(false);
       setNoteForm({ subjective: '', objective: '', assessment: '', plan: '', narrative: '' });
     } catch { toast.error('Failed to save note'); }
+  };
+
+  const submitHandover = async () => {
+    try {
+      await addHandover.mutateAsync(handoverForm);
+      toast.success('Shift handover saved');
+      setHandoverOpen(false);
+      setHandoverForm({
+        shift: handoverForm.shift,
+        conditionSummary: '',
+        latestVitalsSummary: '',
+        pendingLabs: '',
+        medicationsDue: '',
+        fluidBalanceConcern: '',
+        risksAndAllergies: '',
+        tasksForNextShift: '',
+        receivingNurse: '',
+        notes: '',
+      });
+    } catch { toast.error('Failed to save handover'); }
   };
 
   const submitCarePlan = async () => {
@@ -302,6 +350,10 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
               <FileText className="w-3.5 h-3.5 mr-1.5" />Notes
               {nursingNotes.length > 0 && <Badge variant="secondary" className="ml-1.5 h-4 min-w-4 text-[10px]">{nursingNotes.length}</Badge>}
             </TabsTrigger>
+            <TabsTrigger value="handover" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+              <Handshake className="w-3.5 h-3.5 mr-1.5" />Handover
+              {shiftHandovers.length > 0 && <Badge variant="secondary" className="ml-1.5 h-4 min-w-4 text-[10px]">{shiftHandovers.length}</Badge>}
+            </TabsTrigger>
             <TabsTrigger value="care-plan" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
               <ClipboardList className="w-3.5 h-3.5 mr-1.5" />Care Plan
               {activeCarePlanItems.length > 0 && <Badge className="ml-1.5 h-4 min-w-4 text-[10px] bg-amber-500">{activeCarePlanItems.length}</Badge>}
@@ -363,6 +415,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
             <Button size="sm" variant="outline" onClick={() => setMedsOpen(true)}><Pill className="w-3.5 h-3.5 mr-1.5" />Administer Med</Button>
             <Button size="sm" variant="outline" onClick={() => setFluidOpen(true)}><Droplet className="w-3.5 h-3.5 mr-1.5" />Record Fluid</Button>
             <Button size="sm" variant="outline" onClick={() => setNoteOpen(true)}><FileText className="w-3.5 h-3.5 mr-1.5" />Add Note</Button>
+            <Button size="sm" variant="outline" onClick={() => setHandoverOpen(true)}><Handshake className="w-3.5 h-3.5 mr-1.5" />Shift Handover</Button>
             <Button size="sm" variant="outline" onClick={() => setCarePlanOpen(true)}><ClipboardList className="w-3.5 h-3.5 mr-1.5" />Add Care Plan</Button>
             <Button size="sm" variant="outline" onClick={() => setIncidentOpen(true)}><AlertTriangle className="w-3.5 h-3.5 mr-1.5" />Report Incident</Button>
           </div>
@@ -630,6 +683,49 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
           )}
         </TabsContent>
 
+        {/* ---------- Shift Handover ---------- */}
+        <TabsContent value="handover" className="p-5 mt-0 space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="font-semibold text-sm">Shift Handover</h3>
+              <p className="text-xs text-muted-foreground mt-1">Structured handoff for the next nursing team.</p>
+            </div>
+            <Button size="sm" onClick={() => setHandoverOpen(true)}>
+              <Plus className="w-3.5 h-3.5 mr-1.5" />Add Handover
+            </Button>
+          </div>
+          {shiftHandovers.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No shift handovers recorded yet</div>
+          ) : (
+            <ScrollArea className="max-h-[500px]">
+              <div className="space-y-3 pr-2">
+                {[...shiftHandovers].reverse().map((h: any, i: number) => (
+                  <div key={i} className="border rounded-lg p-4 bg-muted/10">
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div className="flex items-center gap-2">
+                        <Badge className="capitalize">{h.shift}</Badge>
+                        <p className="text-xs text-muted-foreground">To: {h.receivingNurse || 'Next shift'}</p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{fmtTime(h.handedOverAt)}</p>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      {h.conditionSummary && <div><span className="font-semibold">Condition:</span> {h.conditionSummary}</div>}
+                      {h.latestVitalsSummary && <div><span className="font-semibold">Vitals:</span> {h.latestVitalsSummary}</div>}
+                      {h.pendingLabs && <div><span className="font-semibold">Pending labs:</span> {h.pendingLabs}</div>}
+                      {h.medicationsDue && <div><span className="font-semibold">Meds due:</span> {h.medicationsDue}</div>}
+                      {h.fluidBalanceConcern && <div><span className="font-semibold">Fluids:</span> {h.fluidBalanceConcern}</div>}
+                      {h.risksAndAllergies && <div><span className="font-semibold">Risks/allergies:</span> {h.risksAndAllergies}</div>}
+                    </div>
+                    {h.tasksForNextShift && <p className="text-sm mt-3"><span className="font-semibold">Tasks:</span> {h.tasksForNextShift}</p>}
+                    {h.notes && <p className="text-sm text-muted-foreground mt-2 whitespace-pre-line">{h.notes}</p>}
+                    <p className="text-xs text-muted-foreground mt-3">Handed over by {h.handedOverBy?.full_name || 'Nurse'}</p>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          )}
+        </TabsContent>
+
         {/* ---------- Care Plan ---------- */}
         <TabsContent value="care-plan" className="p-5 mt-0 space-y-4">
           <div className="flex justify-between items-center">
@@ -779,6 +875,35 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
         <DialogContent className="max-w-xl">
           <DialogHeader><DialogTitle>Administer Medication</DialogTitle></DialogHeader>
           <div className="space-y-3">
+            {prescribedMedicationItems.length > 0 && (
+              <div>
+                <Label>Medication Chart From Prescriptions</Label>
+                <div className="mt-2 max-h-36 overflow-y-auto border rounded-lg divide-y">
+                  {prescribedMedicationItems.map((item: any, index: number) => (
+                    <button
+                      key={`${item.prescriptionId}-${index}`}
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-muted/50"
+                      onClick={() => setMedForm({
+                        ...medForm,
+                        medicationName: item.medicationName,
+                        dosage: item.dosage,
+                        prescriptionId: item.prescriptionId,
+                        medicationId: typeof item.medicationId === 'object' ? item.medicationId?._id : item.medicationId || '',
+                      })}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{item.medicationName}</p>
+                          <p className="text-xs text-muted-foreground">{item.dosage} - {item.frequency} - {item.duration}</p>
+                        </div>
+                        <Badge variant="outline" className="text-[10px]">{item.prescriptionNumber}</Badge>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <div><Label>Medication</Label><Input value={medForm.medicationName} onChange={(e) => setMedForm({...medForm, medicationName: e.target.value})} placeholder="e.g., Paracetamol 500mg" /></div>
             <div className="grid grid-cols-2 gap-3">
               <div><Label>Dose</Label><Input value={medForm.dosage} onChange={(e) => setMedForm({...medForm, dosage: e.target.value})} placeholder="500mg" /></div>
@@ -861,6 +986,45 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
             <Button variant="outline" onClick={() => setNoteOpen(false)}>Cancel</Button>
             <Button onClick={submitNote} disabled={addNote.isPending}>
               {addNote.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}Save Note
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Shift Handover */}
+      <Dialog open={handoverOpen} onOpenChange={setHandoverOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Shift Handover</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Shift</Label>
+                <Select value={handoverForm.shift} onValueChange={(v) => setHandoverForm({ ...handoverForm, shift: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="morning">Morning</SelectItem>
+                    <SelectItem value="afternoon">Afternoon</SelectItem>
+                    <SelectItem value="night">Night</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div><Label>Receiving Nurse / Team</Label><Input value={handoverForm.receivingNurse} onChange={(e) => setHandoverForm({ ...handoverForm, receivingNurse: e.target.value })} placeholder="Next nurse/team" /></div>
+            </div>
+            <div><Label>Condition Summary</Label><Textarea value={handoverForm.conditionSummary} onChange={(e) => setHandoverForm({ ...handoverForm, conditionSummary: e.target.value })} rows={2} placeholder="Current condition, response to treatment..." /></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div><Label>Latest Vitals</Label><Textarea value={handoverForm.latestVitalsSummary} onChange={(e) => setHandoverForm({ ...handoverForm, latestVitalsSummary: e.target.value })} rows={2} /></div>
+              <div><Label>Pending Labs / Results</Label><Textarea value={handoverForm.pendingLabs} onChange={(e) => setHandoverForm({ ...handoverForm, pendingLabs: e.target.value })} rows={2} /></div>
+              <div><Label>Medications Due</Label><Textarea value={handoverForm.medicationsDue} onChange={(e) => setHandoverForm({ ...handoverForm, medicationsDue: e.target.value })} rows={2} /></div>
+              <div><Label>Fluid Balance Concern</Label><Textarea value={handoverForm.fluidBalanceConcern} onChange={(e) => setHandoverForm({ ...handoverForm, fluidBalanceConcern: e.target.value })} rows={2} /></div>
+            </div>
+            <div><Label>Risks / Allergies</Label><Textarea value={handoverForm.risksAndAllergies} onChange={(e) => setHandoverForm({ ...handoverForm, risksAndAllergies: e.target.value })} rows={2} placeholder="Falls risk, allergy warning, isolation, oxygen..." /></div>
+            <div><Label>Tasks For Next Shift</Label><Textarea value={handoverForm.tasksForNextShift} onChange={(e) => setHandoverForm({ ...handoverForm, tasksForNextShift: e.target.value })} rows={3} placeholder="What must be done or watched next..." /></div>
+            <div><Label>Additional Notes</Label><Textarea value={handoverForm.notes} onChange={(e) => setHandoverForm({ ...handoverForm, notes: e.target.value })} rows={2} /></div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHandoverOpen(false)}>Cancel</Button>
+            <Button onClick={submitHandover} disabled={addHandover.isPending || !handoverForm.shift}>
+              {addHandover.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Handshake className="w-4 h-4 mr-2" />}Save Handover
             </Button>
           </DialogFooter>
         </DialogContent>

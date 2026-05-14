@@ -91,6 +91,16 @@ export function useAddNursingNote(admissionId?: string) {
   });
 }
 
+export function useAddShiftHandover(admissionId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (handover: any) => admissionsAPI.addShiftHandover(admissionId!, handover),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admissions', admissionId] });
+    },
+  });
+}
+
 export function useAddCarePlanItem(admissionId?: string) {
   const qc = useQueryClient();
   return useMutation({

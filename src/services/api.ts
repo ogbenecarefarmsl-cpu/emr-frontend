@@ -1103,7 +1103,7 @@ export const admissionsAPI = {
     return response.data;
   },
   // Medications
-  recordMedication: async (id: string, med: { medicationName: string; dosage: string; route?: string; prescriptionId?: string; refused?: boolean; refusalReason?: string; notes?: string }) => {
+  recordMedication: async (id: string, med: { medicationName: string; dosage: string; route?: string; prescriptionId?: string; medicationId?: string; refused?: boolean; refusalReason?: string; notes?: string }) => {
     const response = await api.post(`/admissions/${id}/medications`, med);
     return response.data;
   },
@@ -1119,6 +1119,22 @@ export const admissionsAPI = {
   // Nursing notes (SOAP)
   addNursingNote: async (id: string, note: { subjective?: string; objective?: string; assessment?: string; plan?: string; narrative?: string }) => {
     const response = await api.post(`/admissions/${id}/nursing-notes`, note);
+    return response.data;
+  },
+  // Shift handover
+  addShiftHandover: async (id: string, handover: {
+    shift: string;
+    conditionSummary?: string;
+    latestVitalsSummary?: string;
+    pendingLabs?: string;
+    medicationsDue?: string;
+    fluidBalanceConcern?: string;
+    risksAndAllergies?: string;
+    tasksForNextShift?: string;
+    receivingNurse?: string;
+    notes?: string;
+  }) => {
+    const response = await api.post(`/admissions/${id}/shift-handovers`, handover);
     return response.data;
   },
   // Care plan
