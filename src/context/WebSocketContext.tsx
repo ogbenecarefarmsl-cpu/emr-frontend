@@ -327,7 +327,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       invalidateClinicalFlow();
       if (hasRole('doctor', 'nurse', 'admin')) {
         soundService.play('payment-received');
-        toast.success(hasRole('nurse') ? 'Patient ready for triage' : 'Patient added to doctor queue', {
+        toast.success(hasRole('nurse') ? 'Patient ready for triage' : 'Patient sent to nurse vitals', {
           description: `${getVisitNumber(visit)} - ${getPatientName(visit)}`,
           duration: 8000,
         });

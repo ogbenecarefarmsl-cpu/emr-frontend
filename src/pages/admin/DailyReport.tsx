@@ -80,7 +80,7 @@ export default function DailyReport() {
         </style>
       </head>
       <body>
-        <h2>Hobour Diagnostics — Daily Report</h2>
+        <h2>Harbour EMR - Daily Report</h2>
         <p class="subtitle">${format(new Date(selectedDate), 'EEEE, MMMM dd, yyyy')}</p>
         ${buildPrintHTML(report)}
       </body>

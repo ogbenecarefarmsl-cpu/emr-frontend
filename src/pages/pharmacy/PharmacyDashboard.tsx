@@ -204,7 +204,7 @@ export default function PharmacyDashboard() {
                           badge={
                             <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-[10px]">
                               <Clock className="w-3 h-3 mr-0.5" />
-                              Awaiting $
+                              Awaiting Payment
                             </Badge>
                           }
                         />

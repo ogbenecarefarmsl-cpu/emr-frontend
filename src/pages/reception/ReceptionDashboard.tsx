@@ -27,7 +27,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { patientService } from '@/services/patientService';
 import { prescriptionService } from '@/services/prescriptionService';
-import { useVisitStats } from '@/hooks/useVisits';
+import { useDoctorQueue, useVisitStats } from '@/hooks/useVisits';
 import { toast } from 'sonner';
 
 export default function ReceptionDashboard() {
@@ -39,7 +39,7 @@ export default function ReceptionDashboard() {
   useRealtimeResults();
   
   const { data: patients = [], isLoading: patientsLoading } = useSearchPatients('');
-  const { data: orders = [], isLoading: ordersLoading } = useOrders('all');
+  const { data: orders = [] } = useOrders('all');
   const navigate = useNavigate();
 
   const recentRegistrations = useMemo(() => {
@@ -80,6 +80,7 @@ export default function ReceptionDashboard() {
   const todayStr = new Date().toISOString().split('T')[0];
   const { data: paymentStats } = usePaymentStats(todayStr, todayStr);
   const { data: visitStats } = useVisitStats(todayStr);
+  const { data: doctorQueue = [], isLoading: queueLoading } = useDoctorQueue();
   const { data: prescriptions = [] } = useQuery({
     queryKey: ['prescriptions', 'reception-pending'],
     queryFn: () => prescriptionService.findAll(),
@@ -93,12 +94,13 @@ export default function ReceptionDashboard() {
     },
   });
   const todayRevenue = paymentStats?.paidRevenue ?? 0;
-  const pendingPayments = Array.isArray(orders) ? orders.filter(o =>
+  const pendingLabPayments = Array.isArray(orders) ? orders.filter(o =>
     o.paymentStatus === 'pending' || o.payment_status === 'pending'
   ).length : 0;
   const pendingPrescriptionPayments = Array.isArray(prescriptions)
     ? prescriptions.filter((rx: any) => rx.status === 'pending' && !rx.isPaid)
     : [];
+  const pendingPayments = pendingLabPayments + pendingPrescriptionPayments.length;
 
   const [searchTerm, setSearchTerm] = useState('');
   const { data: searchResults = [] } = useSearchPatients(searchTerm);
@@ -192,10 +194,10 @@ export default function ReceptionDashboard() {
           trend={{ value: 12, isPositive: true }}
         />
         <MetricCard
-          title="In Doctor Queue"
-          value={visitStats?.inQueue || 0}
+          title="Awaiting Vitals"
+          value={visitStats?.awaitingTriage || 0}
           icon={Stethoscope}
-          variant={(visitStats?.inQueue || 0) > 0 ? 'warning' : 'default'}
+          variant={(visitStats?.awaitingTriage || 0) > 0 ? 'warning' : 'default'}
         />
         <MetricCard
           title="Revenue Today"
@@ -288,48 +290,40 @@ export default function ReceptionDashboard() {
           </div>
         </div>
 
-        {/* Pending Clinical Payments */}
+        {/* Doctor Queue Monitor */}
         <div className="bg-card border rounded-xl shadow-sm">
           <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Pending Clinical Payments</h3>
-            <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reception/payments')}>
-              View All <ArrowRight className="w-3.5 h-3.5" />
+            <h3 className="font-semibold text-sm">Doctor Queue Monitor</h3>
+            <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reception')}>
+              View Queue <ArrowRight className="w-3.5 h-3.5" />
             </Button>
           </div>
           <div className="divide-y">
-            {ordersLoading ? (
+            {queueLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>
             ) : (
             <>
-            {Array.isArray(orders) && orders.filter(o => 
-              o.paymentStatus === 'pending' || o.payment_status === 'pending'
-            ).slice(0, 5).map(order => (
-              <div key={order.id || order._id} className="px-5 py-3.5 hover:bg-muted/30 transition-colors">
+            {Array.isArray(doctorQueue) && doctorQueue.slice(0, 5).map((visit: any) => (
+              <div key={visit.id || visit._id} className="px-5 py-3.5 hover:bg-muted/30 transition-colors">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-medium text-sm truncate">
-                      {order.patientId?.firstName || order.patient?.firstName}{' '}
-                      {order.patientId?.lastName || order.patient?.lastName}
+                      {visit.patientId?.firstName || visit.patient?.firstName}{' '}
+                      {visit.patientId?.lastName || visit.patient?.lastName}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">{order.orderNumber || order.order_number}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {visit.visitNumber || visit.visit_number || 'Visit'} - paid, waiting for doctor
+                    </p>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-semibold text-sm">Le {(order.total || order.totalAmount || 0).toLocaleString()}</p>
-                    <Button variant="default" size="sm" className="mt-1.5 h-7 text-xs gap-1">
-                      <CreditCard className="w-3 h-3" />
-                      Pay
-                    </Button>
-                  </div>
+                  <Badge variant="outline" className="flex-shrink-0">Doctor Queue</Badge>
                 </div>
               </div>
             ))}
-            {Array.isArray(orders) && orders.filter(o => 
-              o.paymentStatus === 'pending' || o.payment_status === 'pending'
-            ).length === 0 && (
+            {(!Array.isArray(doctorQueue) || doctorQueue.length === 0) && (
               <div className="px-5 py-10 text-center text-muted-foreground text-sm">
-                No pending payments
+                No patients waiting for doctor after vitals
               </div>
             )}
             </>

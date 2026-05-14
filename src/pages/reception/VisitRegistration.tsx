@@ -66,7 +66,7 @@ export default function VisitRegistration() {
       });
 
       await markConsultationPaid.mutateAsync({ visitId: visit._id || visit.id, paymentMethod: 'cash' });
-      toast.success('Consultation payment confirmed. Patient sent to doctor queue.');
+      toast.success('Consultation payment confirmed. Patient sent to nurse vitals.');
       navigate('/reception');
     } catch (error: any) {
       toast.error(error.message || 'Failed to create visit');

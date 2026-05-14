@@ -76,7 +76,7 @@ export interface SyncMeta {
 }
 
 // ── Database definition ──────────────────────────────────────────
-class HobourDB extends Dexie {
+class HarbourEmrDB extends Dexie {
   tests!: Table<CachedTest, string>;
   panels!: Table<CachedPanel, string>;
   patients!: Table<CachedPatient, string>;
@@ -86,7 +86,7 @@ class HobourDB extends Dexie {
   syncMeta!: Table<SyncMeta, string>;
 
   constructor() {
-    super('hobour-lis');
+    super('harbour-emr');
     this.version(1).stores({
       tests: 'id, name, code, category, isActive, _syncedAt',
       panels: 'id, name, code, _syncedAt',
@@ -99,7 +99,7 @@ class HobourDB extends Dexie {
   }
 }
 
-export const db = new HobourDB();
+export const db = new HarbourEmrDB();
 
 // ── Helper: upsert many records ──────────────────────────────────
 export async function bulkUpsert<T>(

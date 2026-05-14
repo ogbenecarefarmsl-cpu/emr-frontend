@@ -72,8 +72,8 @@ export default function UserManagement() {
 
   return (
     <RoleLayout 
-      title="User Management" 
-      subtitle="Manage user accounts and role assignments"
+      title="Staff & Roles" 
+      subtitle="Manage staff accounts and role assignments"
       role="admin"
       userName={profile?.full_name}
     >

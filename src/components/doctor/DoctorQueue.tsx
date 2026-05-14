@@ -78,7 +78,7 @@ export function DoctorQueue({ onSelectPatient }: DoctorQueueProps) {
           <div className="text-center py-8 text-muted-foreground">
             <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
             <p>No patients in queue</p>
-            <p className="text-sm">Patients will appear here after consultation payment</p>
+            <p className="text-sm">Patients will appear here after nurse vitals are completed</p>
           </div>
         ) : (
           <div className="space-y-4">

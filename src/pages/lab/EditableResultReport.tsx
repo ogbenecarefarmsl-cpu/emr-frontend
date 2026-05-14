@@ -165,15 +165,15 @@ export default function EditableResultReport() {
                 </svg>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">HARBOUR</h1>
-                <p className="text-xs text-gray-500 italic">Motto: Automated Precision...</p>
+                <h1 className="text-2xl font-bold text-gray-900">HARBOUR EMR</h1>
+                <p className="text-xs text-gray-500 italic">Clinical Laboratory Services</p>
               </div>
             </div>
             
             {/* Contact Info */}
             <div className="text-right text-sm text-gray-600">
               <p className="font-semibold">075 766461, 031-551811</p>
-              <p>ogbenecarefarmsig@gmail.com</p>
+              <p>Harbour Clinicals</p>
               <p>114 Fourah Bay Road, Freetown, Sierra Leone</p>
             </div>
           </div>

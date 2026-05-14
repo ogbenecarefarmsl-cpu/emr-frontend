@@ -179,7 +179,7 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['receptionist', 'admin']}><DailyReconciliation /></RoleGuard>
       } />
       <Route path="/reception/enter-results" element={
-        <RoleGuard allowedRoles={['receptionist', 'admin']}><EnterResultsPage /></RoleGuard>
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><Navigate to="/reception" replace /></RoleGuard>
       } />
       <Route path="/reception/receipt/:orderId" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PaymentReceipt /></RoleGuard>
@@ -200,7 +200,7 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['receptionist', 'admin']}><VisitRegistration /></RoleGuard>
       } />
       <Route path="/reception/completed-orders" element={
-        <RoleGuard allowedRoles={['receptionist', 'admin']}><CompletedOrdersPage /></RoleGuard>
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><Navigate to="/reception" replace /></RoleGuard>
       } />
       <Route path="/reception/daily-report" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><DailyReport /></RoleGuard>
@@ -223,13 +223,13 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['lab_tech', 'admin']}><CollectSamplesPage /></RoleGuard>
       } />
       <Route path="/lab/processing" element={
-        <RoleGuard allowedRoles={['lab_tech', 'admin', 'receptionist']}><EnterResultsPage /></RoleGuard>
+        <RoleGuard allowedRoles={['lab_tech', 'admin']}><EnterResultsPage /></RoleGuard>
       } />
       <Route path="/lab/enter-results" element={
-        <RoleGuard allowedRoles={['lab_tech', 'admin', 'receptionist']}><EnterManualResults /></RoleGuard>
+        <RoleGuard allowedRoles={['lab_tech', 'admin']}><EnterManualResults /></RoleGuard>
       } />
       <Route path="/lab/completed-orders" element={
-        <RoleGuard allowedRoles={['lab_tech', 'admin', 'receptionist']}><CompletedOrdersPage /></RoleGuard>
+        <RoleGuard allowedRoles={['lab_tech', 'admin']}><CompletedOrdersPage /></RoleGuard>
       } />
       <Route path="/lab/patients" element={
         <RoleGuard allowedRoles={['lab_tech', 'admin']}><PatientsPage /></RoleGuard>
@@ -250,10 +250,10 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['lab_tech', 'admin']}><TestCatalogManagement /></RoleGuard>
       } />
       <Route path="/lab/result-report/:id?" element={
-        <RoleGuard allowedRoles={['lab_tech', 'admin', 'receptionist']}><EditableResultReport /></RoleGuard>
+        <RoleGuard allowedRoles={['lab_tech', 'admin']}><EditableResultReport /></RoleGuard>
       } />
       <Route path="/lab/reports/:orderId" element={
-        <RoleGuard allowedRoles={['lab_tech', 'admin', 'receptionist']}><LabReportPage /></RoleGuard>
+        <RoleGuard allowedRoles={['lab_tech', 'admin', 'doctor']}><LabReportPage /></RoleGuard>
       } />
       <Route path="/public/lab/reports/:orderId" element={<PublicLabReportPage />} />
 

@@ -262,8 +262,8 @@ export default function TestCatalogManagement() {
 
   return (
     <RoleLayout 
-      title="Test Catalog Management" 
-      subtitle="Manage tests, reference ranges, and categories"
+      title="Lab Test Pricing" 
+      subtitle="Manage lab tests, prices, reference ranges, and categories"
       role={primaryRole || 'admin'} 
       userName={profile?.full_name}
     >

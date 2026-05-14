@@ -133,8 +133,8 @@ export default function UserManagementPage() {
 
   return (
     <RoleLayout 
-      title="User Management" 
-      subtitle="Manage users and role assignments"
+      title="Staff & Roles" 
+      subtitle="Manage staff accounts and role-based access"
       role="admin"
       userName={profile?.full_name}
     >

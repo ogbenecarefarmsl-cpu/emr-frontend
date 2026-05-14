@@ -24,6 +24,7 @@ type AdminDashboardData = {
     newPatientsToday: number;
     totalVisitsToday: number;
     visitsWaitingPayment: number;
+    visitsAwaitingTriage: number;
     visitsInQueue: number;
     visitsInConsultation: number;
     visitsAwaitingLab: number;
@@ -156,8 +157,9 @@ export default function AdminDashboard() {
       {/* ───────── Live clinical pipeline ───────── */}
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Live Clinical Pipeline</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
           <PipelineStep label="Waiting Pay" value={s?.visitsWaitingPayment || 0} color="slate" onClick={() => navigate('/admin/patients')} />
+          <PipelineStep label="Awaiting Vitals" value={s?.visitsAwaitingTriage || 0} color="amber" onClick={() => navigate('/nurse')} />
           <PipelineStep label="In Queue" value={s?.visitsInQueue || 0} color="blue" onClick={() => navigate('/admin/patients')} />
           <PipelineStep label="In Consult" value={s?.visitsInConsultation || 0} color="indigo" onClick={() => navigate('/admin/patients')} />
           <PipelineStep label="Awaiting Lab" value={s?.visitsAwaitingLab || 0} color="amber" onClick={() => navigate('/admin/orders')} />
@@ -258,8 +260,8 @@ export default function AdminDashboard() {
             <RoleLink icon={FlaskConical} label="Lab" to="/lab" navigate={navigate} />
             <RoleLink icon={Pill} label="Pharmacy" to="/pharmacy" navigate={navigate} />
             <RoleLink icon={Package} label="Inventory" to="/inventory" navigate={navigate} />
-            <RoleLink icon={BarChart3} label="Reports" to="/admin/reports" navigate={navigate} />
-            <RoleLink icon={DollarSign} label="Reconciliation" to="/admin/reconciliation" navigate={navigate} />
+            <RoleLink icon={BarChart3} label="Revenue" to="/admin/reports" navigate={navigate} />
+            <RoleLink icon={DollarSign} label="Cash Desk" to="/admin/reconciliation" navigate={navigate} />
           </div>
         </div>
       </div>
@@ -268,17 +270,18 @@ export default function AdminDashboard() {
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">System Administration</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-          <AdminTool icon={Shield} label="User Management" to="/admin/users" navigate={navigate} highlight />
+          <AdminTool icon={Shield} label="Staff & Roles" to="/admin/users" navigate={navigate} highlight />
           <AdminTool icon={UserCog} label="Doctors" to="/admin/doctors" navigate={navigate} />
-          <AdminTool icon={FlaskConical} label="Test Catalog" to="/admin/test-catalog" navigate={navigate} />
-          <AdminTool icon={FileText} label="Report Template" to="/admin/report-template" navigate={navigate} />
-          <AdminTool icon={Cpu} label="Machines" to="/admin/machines" navigate={navigate} />
+          <AdminTool icon={FlaskConical} label="Lab Test Pricing" to="/admin/test-catalog" navigate={navigate} />
+          <AdminTool icon={Package} label="Inventory" to="/inventory" navigate={navigate} />
+          <AdminTool icon={FileText} label="Report Templates" to="/admin/report-template" navigate={navigate} />
+          <AdminTool icon={Cpu} label="Lab Machines" to="/admin/machines" navigate={navigate} />
           <AdminTool icon={Printer} label="Printers" to="/admin/printers" navigate={navigate} />
-          <AdminTool icon={BarChart3} label="Reports" to="/admin/reports" navigate={navigate} />
-          <AdminTool icon={TrendingUp} label="Daily Report" to="/admin/daily-report" navigate={navigate} />
-          <AdminTool icon={DollarSign} label="Reconciliation" to="/admin/reconciliation" navigate={navigate} />
+          <AdminTool icon={BarChart3} label="Revenue Reports" to="/admin/reports" navigate={navigate} />
+          <AdminTool icon={TrendingUp} label="Daily Summary" to="/admin/daily-report" navigate={navigate} />
+          <AdminTool icon={DollarSign} label="Cash Reconciliation" to="/admin/reconciliation" navigate={navigate} />
           <AdminTool icon={ClipboardList} label="Audit Logs" to="/admin/audit-logs" navigate={navigate} />
-          <AdminTool icon={Stethoscope} label="Referral Report" to="/admin/doctor-referral-report" navigate={navigate} />
+          <AdminTool icon={Stethoscope} label="Doctor Activity" to="/admin/doctor-referral-report" navigate={navigate} />
           <AdminTool icon={Settings} label="Settings" to="/admin/settings" navigate={navigate} />
         </div>
       </div>

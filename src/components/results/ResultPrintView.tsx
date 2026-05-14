@@ -159,9 +159,9 @@ export function ResultPrintView({ order, results }: ResultPrintViewProps) {
       <div ref={printRef} className="bg-white p-8 border rounded-lg">
         {/* Header */}
         <div className="header">
-          <h1>HARBOUR Laboratory</h1>
-          <p>123 Medical Center Drive, Lagos, Nigeria</p>
-          <p>Phone: 075 766461, 031-551811 | Email: ogbenecarefarmsig@gmail.com</p>
+          <h1>HARBOUR EMR</h1>
+          <p>Clinical Laboratory Services</p>
+          <p>Phone: 075 766461, 031-551811</p>
           <h2 style={{ marginTop: '15px', fontSize: '18px' }}>LABORATORY RESULTS</h2>
         </div>
 

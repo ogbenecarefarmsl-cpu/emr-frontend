@@ -336,7 +336,7 @@ export default function DoctorDashboard() {
       return await ordersAPI.create(orderData);
     },
     onSuccess: () => {
-      toast.success('Lab order created');
+      toast.success('Lab order created. Patient should pay at reception.');
       setLabOrderModalOpen(false);
       setSelectedTests([]);
       queryClient.invalidateQueries({ queryKey: ['visits'] });
@@ -360,7 +360,7 @@ export default function DoctorDashboard() {
       });
     },
     onSuccess: () => {
-      toast.success('Prescription created');
+      toast.success('Prescription created. Patient should pay at reception.');
       setPrescriptionModalOpen(false);
       setPrescriptionItems([]);
       queryClient.invalidateQueries({ queryKey: ['visits'] });
@@ -1048,8 +1048,7 @@ export default function DoctorDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Medication Search */}
             <div>
-              <Label className="text-sm{}
-medium">Search Medications</Label>
+              <Label className="text-sm font-medium">Search Medications</Label>
               <Input
                 value={searchMedication}
                 onChange={(e) => setSearchMedication(e.target.value)}

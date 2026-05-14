@@ -111,12 +111,12 @@ export default function DoctorReferralReport() {
       </style>
     </head><body>
       <div class="header">
-        <h2>Hobour Diagnostics - Doctor Referral Report</h2>
+        <h2>Harbour EMR - Doctor Activity</h2>
         <div class="sub">${dateRange}${doctorName ? ` | Doctor: ${doctorName}` : ''}</div>
       </div>
 
       <div class="cards">
-        <div class="card"><div class="val">${totalOrders}</div><div class="lbl">Orders</div></div>
+        <div class="card"><div class="val">${totalOrders}</div><div class="lbl">Clinical Orders</div></div>
         <div class="card"><div class="val">Le ${L(totalBilled)}</div><div class="lbl">Billed</div></div>
         <div class="card"><div class="val">Le ${L(totalDiscount)}</div><div class="lbl">Discount</div></div>
         <div class="card"><div class="val">Le ${L(totalPaid)}</div><div class="lbl">Paid</div></div>
@@ -153,8 +153,8 @@ export default function DoctorReferralReport() {
 
   return (
     <RoleLayout
-      title="Doctor Referral Report"
-      subtitle="Orders grouped by referring doctor - patient, tests ordered, discounts and payments"
+      title="Doctor Activity"
+      subtitle="Clinical orders grouped by doctor - patient, services, discounts, and payments"
       role={role as any}
       userName={profile?.full_name}
     >
