@@ -6,7 +6,7 @@ export const soapNoteService = {
     patientId: string;
     consultationId?: string;
     visitId?: string;
-    doctorId: string;
+    doctorId?: string;
     noteType?: SoapNoteTypeEnum;
     chiefComplaint?: string;
     historyPresentIllness?: string;

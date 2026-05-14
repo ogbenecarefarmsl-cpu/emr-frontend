@@ -41,7 +41,7 @@ interface Props {
   onDischarged?: () => void;
 }
 
-type TabKey = 'overview' | 'vitals' | 'meds' | 'fluids' | 'notes' | 'care-plan' | 'incidents';
+type TabKey = 'overview' | 'clinical' | 'vitals' | 'meds' | 'fluids' | 'notes' | 'care-plan' | 'incidents';
 
 export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props) {
   const { data: admission, isLoading } = useAdmission(admissionId);
@@ -104,6 +104,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
   const medsLog = admission.medicationLog || [];
   const fluidsLog = admission.fluidBalance || [];
   const nursingNotes = admission.nursingNotes || [];
+  const clinicalNotes = admission.clinicalNotes || [];
   const carePlan = admission.carePlan || [];
   const incidents = admission.incidents || [];
 
@@ -286,6 +287,10 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
               <Heart className="w-3.5 h-3.5 mr-1.5" />Vitals
               {vitalsLog.length > 0 && <Badge variant="secondary" className="ml-1.5 h-4 min-w-4 text-[10px]">{vitalsLog.length}</Badge>}
             </TabsTrigger>
+            <TabsTrigger value="clinical" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+              <Stethoscope className="w-3.5 h-3.5 mr-1.5" />Clinical Notes
+              {clinicalNotes.length > 0 && <Badge variant="secondary" className="ml-1.5 h-4 min-w-4 text-[10px]">{clinicalNotes.length}</Badge>}
+            </TabsTrigger>
             <TabsTrigger value="meds" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
               <Pill className="w-3.5 h-3.5 mr-1.5" />MAR
               {medsLog.length > 0 && <Badge variant="secondary" className="ml-1.5 h-4 min-w-4 text-[10px]">{medsLog.length}</Badge>}
@@ -374,6 +379,46 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
                 ))}
               </ul>
             </div>
+          )}
+        </TabsContent>
+
+        {/* ---------- Clinical Notes Timeline ---------- */}
+        <TabsContent value="clinical" className="p-5 mt-0 space-y-4">
+          <div>
+            <h3 className="font-semibold text-sm">Doctor and Nurse Clinical Notes</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Consultation SOAP, ward round notes, and nursing SOAP notes for this admission visit.
+            </p>
+          </div>
+          {clinicalNotes.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground text-sm">No clinical notes saved for this admission yet</div>
+          ) : (
+            <ScrollArea className="max-h-[500px]">
+              <div className="space-y-3 pr-2">
+                {clinicalNotes.map((note: any) => (
+                  <div key={note._id} className="border rounded-lg p-4 bg-muted/10">
+                    <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="capitalize">{String(note.noteType || '').replace(/_/g, ' ')}</Badge>
+                        <p className="text-xs text-muted-foreground">
+                          {note.doctorId?.fullName || note.nurseId?.full_name || note.nurseId?.fullName || 'Clinical staff'}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{fmtTime(note.createdAt)}</p>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      {note.chiefComplaint && <div><span className="font-semibold text-blue-600">S:</span> {note.chiefComplaint}</div>}
+                      {note.historyPresentIllness && note.historyPresentIllness !== note.chiefComplaint && (
+                        <div><span className="font-semibold text-blue-600">History:</span> {note.historyPresentIllness}</div>
+                      )}
+                      {note.physicalExamination && <div><span className="font-semibold text-green-600">O:</span> {note.physicalExamination}</div>}
+                      {note.diagnosis && <div><span className="font-semibold text-purple-600">A:</span> {note.diagnosis}</div>}
+                      {note.treatmentPlan && <div><span className="font-semibold text-orange-600">P:</span> {note.treatmentPlan}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
           )}
         </TabsContent>
 

@@ -6,6 +6,8 @@ import { useAuth } from '@/context/AuthContext';
 import { visitsAPI, ordersAPI, doctorsAPI, admissionsAPI } from '@/services/api';
 import { medicationService } from '@/services/medicationService';
 import { prescriptionService } from '@/services/prescriptionService';
+import { soapNoteService } from '@/services/soapNoteService';
+import { SoapNoteTypeEnum } from '@/types/soap-note';
 import { useDoctorDashboard, useAcceptPatient, useUpdateVisit, useCompleteVisit, usePatientVisits, useReferToSpecialist, useAcceptReferral } from '@/hooks/useVisits';
 import { useActiveTests } from '@/hooks/useTestCatalog';
 import { useResults } from '@/hooks/useResults';
@@ -296,6 +298,28 @@ export default function DoctorDashboard() {
           diagnosis: soapForm.diagnosis || undefined,
         },
       });
+      await soapNoteService.create({
+        patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
+        visitId: selectedVisit._id || selectedVisit.id,
+        doctorId: (profile as any)?._id || (profile as any)?.id || profile?.id,
+        noteType: SoapNoteTypeEnum.CONSULTATION,
+        chiefComplaint: soapForm.subjective || selectedVisit.chiefComplaint || undefined,
+        historyPresentIllness: soapForm.subjective || undefined,
+        vitalSigns: {
+          temperature: vitalsForm.temperature ? parseFloat(vitalsForm.temperature) : undefined,
+          bloodPressure: vitalsForm.bloodPressure || undefined,
+          heartRate: vitalsForm.heartRate ? parseInt(vitalsForm.heartRate) : undefined,
+          respiratoryRate: vitalsForm.respiratoryRate ? parseInt(vitalsForm.respiratoryRate) : undefined,
+          weight: vitalsForm.weight ? parseFloat(vitalsForm.weight) : undefined,
+          height: vitalsForm.height ? parseFloat(vitalsForm.height) : undefined,
+          oxygenSaturation: vitalsForm.oxygenSaturation ? parseInt(vitalsForm.oxygenSaturation) : undefined,
+        },
+        physicalExamination: soapForm.objective || undefined,
+        diagnosis: soapForm.assessment || soapForm.diagnosis || undefined,
+        treatmentPlan: soapForm.plan || undefined,
+        followUpInstructions: soapForm.plan || undefined,
+      });
+      queryClient.invalidateQueries({ queryKey: ['patient-chart', selectedVisit.patientId?._id || selectedVisit.patientId] });
       toast.success('Notes saved successfully');
     } catch (error) {
       toast.error('Failed to save notes');
@@ -1059,16 +1083,22 @@ export default function DoctorDashboard() {
                 {filteredMedications.map((med: Medication) => (
                   <div
                     key={med._id}
-                    className="p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0 flex items-center justify-between"
-                    onClick={() => addMedicationToPrescription(med)}
+                    className={cn(
+                      "p-3 border-b last:border-b-0 flex items-center justify-between",
+                      (med.stockQuantity || 0) > 0 ? "hover:bg-muted/50 cursor-pointer" : "opacity-60 cursor-not-allowed bg-muted/20",
+                    )}
+                    onClick={() => (med.stockQuantity || 0) > 0 && addMedicationToPrescription(med)}
                   >
                     <div>
                       <p className="font-medium text-sm">{med.name}</p>
                       <p className="text-xs text-muted-foreground">
                         {med.genericName} - {med.dosageForm} - Le {med.unitPrice?.toLocaleString()}
                       </p>
+                      <p className={cn("text-xs mt-0.5", (med.stockQuantity || 0) > 0 ? "text-emerald-600" : "text-red-600")}>
+                        {(med.stockQuantity || 0) > 0 ? `${med.stockQuantity} in stock` : 'Out of stock'}
+                      </p>
                     </div>
-                    <Plus className="w-4 h-4 text-muted-foreground" />
+                    {(med.stockQuantity || 0) > 0 ? <Plus className="w-4 h-4 text-muted-foreground" /> : <Badge variant="destructive">No stock</Badge>}
                   </div>
                 ))}
               </ScrollArea>

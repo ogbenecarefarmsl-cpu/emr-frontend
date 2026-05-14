@@ -5,7 +5,7 @@ export enum PrescriptionStatusEnum {
 }
 
 export interface PrescriptionItem {
-  medicationId: string;
+  medicationId: string | Medication;
   medicationName: string;
   dosage: string;
   frequency: string;

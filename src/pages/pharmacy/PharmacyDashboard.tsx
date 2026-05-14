@@ -419,7 +419,13 @@ function PrescriptionDetail({
           <p className="text-sm text-muted-foreground">No items</p>
         ) : (
           <div className="border rounded-lg overflow-hidden divide-y">
-            {rx.items?.map((item: any, i: number) => (
+            {rx.items?.map((item: any, i: number) => {
+              const medication = typeof item.medicationId === 'object' ? item.medicationId : null;
+              const stock = medication?.stockQuantity;
+              const hasStockInfo = typeof stock === 'number';
+              const enoughStock = hasStockInfo ? stock >= item.quantity : true;
+
+              return (
               <div key={i} className="p-4 hover:bg-muted/30">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -427,6 +433,11 @@ function PrescriptionDetail({
                     <p className="text-xs text-muted-foreground mt-1">
                       {item.dosage} • {item.frequency} • {item.duration}
                     </p>
+                    {hasStockInfo && (
+                      <p className={cn('text-xs mt-1 font-medium', enoughStock ? 'text-emerald-600' : 'text-red-600')}>
+                        Stock: {stock} available{enoughStock ? '' : `, needs ${item.quantity}`}
+                      </p>
+                    )}
                     {item.instructions && (
                       <p className="text-xs italic text-muted-foreground mt-1">
                         Instructions: {item.instructions}
@@ -434,7 +445,7 @@ function PrescriptionDetail({
                     )}
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <Badge variant="outline">Qty {item.quantity}</Badge>
+                    <Badge variant={enoughStock ? 'outline' : 'destructive'}>Qty {item.quantity}</Badge>
                     {item.unitPrice > 0 && (
                       <p className="text-xs text-muted-foreground mt-1">
                         @ Le {Number(item.unitPrice).toLocaleString()}
@@ -443,7 +454,8 @@ function PrescriptionDetail({
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

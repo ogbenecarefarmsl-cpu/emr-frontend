@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
-import { Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical, Clock, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical, Clock, CheckCircle, AlertTriangle, BedDouble } from 'lucide-react';
 
 const PatientRecord = () => {
   const { patientId } = useParams();
@@ -38,6 +38,7 @@ const PatientRecord = () => {
   const prescriptions = chart?.prescriptions || [];
   const soapNotes = chart?.soapNotes || [];
   const orders = chart?.orders || [];
+  const admissions = chart?.admissions || [];
   const notes = chart?.notes || [];
   const vitalsHistory = chart?.vitalsHistory || [];
   const summary = chart?.summary || {};
@@ -153,12 +154,13 @@ const PatientRecord = () => {
 
         {/* Tabs for Detailed Info */}
         <Tabs defaultValue="overview">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="consultations">Consultations</TabsTrigger>
             <TabsTrigger value="lab-results">Lab Results</TabsTrigger>
             <TabsTrigger value="prescriptions">Prescriptions</TabsTrigger>
             <TabsTrigger value="soap-notes">SOAP Notes</TabsTrigger>
+            <TabsTrigger value="admissions">Admissions</TabsTrigger>
             <TabsTrigger value="vitals">Vitals</TabsTrigger>
           </TabsList>
 
@@ -354,7 +356,9 @@ const PatientRecord = () => {
                     <div className="flex justify-between items-start">
                       <div>
                         <CardTitle className="text-base">SOAP Note - {note.noteType}</CardTitle>
-                        <p className="text-sm text-gray-500">Dr. {note.doctorId?.fullName}</p>
+                        <p className="text-sm text-gray-500">
+                          {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : note.nurseId?.full_name || note.nurseId?.fullName || 'Clinical staff'}
+                        </p>
                         <p className="text-xs text-gray-400">
                           {new Date(note.createdAt).toLocaleDateString()}
                         </p>
@@ -438,6 +442,66 @@ const PatientRecord = () => {
               ))
             ) : (
               <p className="text-center text-gray-500 py-8">No SOAP notes found</p>
+            )}
+          </TabsContent>
+
+          {/* Admissions Tab */}
+          <TabsContent value="admissions" className="space-y-4">
+            {admissions.length > 0 ? (
+              admissions.map((admission: any) => (
+                <Card key={admission._id}>
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <BedDouble className="w-4 h-4" />
+                          {admission.admissionNumber}
+                        </CardTitle>
+                        <p className="text-sm text-gray-500">
+                          {admission.wardType}{admission.bedNumber ? ` - ${admission.bedNumber}` : ''} - {admission.status}
+                        </p>
+                      </div>
+                      <Badge variant={admission.status === 'admitted' ? 'default' : 'secondary'}>
+                        {admission.status}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <p className="text-gray-500">Reason</p>
+                        <p>{admission.admissionReason || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-500">Diagnosis</p>
+                        <p>{admission.diagnosis || admission.dischargeDiagnosis || 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 text-sm">
+                      <div className="border rounded-lg p-3">
+                        <p className="text-gray-500">Vitals</p>
+                        <p className="font-semibold">{admission.vitalsLog?.length || 0}</p>
+                      </div>
+                      <div className="border rounded-lg p-3">
+                        <p className="text-gray-500">MAR Entries</p>
+                        <p className="font-semibold">{admission.medicationLog?.length || 0}</p>
+                      </div>
+                      <div className="border rounded-lg p-3">
+                        <p className="text-gray-500">Nursing Notes</p>
+                        <p className="font-semibold">{admission.nursingNotes?.length || 0}</p>
+                      </div>
+                    </div>
+                    {admission.dischargeInstructions && (
+                      <div>
+                        <p className="text-sm font-semibold text-purple-600">DISCHARGE / FOLLOW-UP:</p>
+                        <p className="text-sm mt-1">{admission.dischargeInstructions}</p>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <p className="text-center text-gray-500 py-8">No admissions found</p>
             )}
           </TabsContent>
 
