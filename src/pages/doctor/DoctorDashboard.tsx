@@ -7,6 +7,7 @@ import { visitsAPI, ordersAPI, doctorsAPI, admissionsAPI } from '@/services/api'
 import { medicationService } from '@/services/medicationService';
 import { prescriptionService } from '@/services/prescriptionService';
 import { soapNoteService } from '@/services/soapNoteService';
+import { patientService } from '@/services/patientService';
 import { SoapNoteTypeEnum } from '@/types/soap-note';
 import { useDoctorDashboard, useAcceptPatient, useUpdateVisit, useCompleteVisit, usePatientVisits, useReferToSpecialist, useAcceptReferral } from '@/hooks/useVisits';
 import { useActiveTests } from '@/hooks/useTestCatalog';
@@ -130,6 +131,7 @@ export default function DoctorDashboard() {
   // State for active patient panel
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [historyTab, setHistoryTab] = useState('visits');
 
   // Lab order modal state
   const [labOrderModalOpen, setLabOrderModalOpen] = useState(false);
@@ -220,6 +222,12 @@ export default function DoctorDashboard() {
   // Fetch patient's previous visits when a patient is selected
   const patientId = selectedVisit?.patientId?._id || selectedVisit?.patientId || '';
   const { data: patientVisits = [] } = usePatientVisits(patientId);
+  const { data: patientChart, isLoading: chartLoading } = useQuery({
+    queryKey: ['patient-chart', patientId],
+    queryFn: () => patientService.getChart(patientId),
+    enabled: !!patientId && activeTab === 'history',
+    staleTime: 60 * 1000,
+  });
 
   // Fetch lab results for the selected visit - need to find the lab order
   const labOrderId = selectedVisit?.orders?.find((o: any) => o.orderType === 'lab')?._id || 
@@ -973,37 +981,207 @@ export default function DoctorDashboard() {
                 </TabsContent>
 
                 {/* History Tab */}
-                <TabsContent value="history" className="p-5 mt-0">
-                  <h3 className="font-semibold text-sm mb-3">Previous Visits</h3>
-                  {patientVisits.length <= 1 ? (
-                    <div className="text-center py-8 text-muted-foreground text-sm">
-                      No previous visits found
+                <TabsContent value="history" className="mt-0">
+                  <Tabs value={historyTab} onValueChange={setHistoryTab} className="w-full">
+                    <div className="px-5 py-3 border-b bg-muted/10">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div>
+                          <h3 className="font-semibold text-sm">Patient History</h3>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Longitudinal record for this patient. Pick a section and it opens in this workspace.
+                          </p>
+                        </div>
+                        {chartLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
+                      </div>
+                      <div className="overflow-x-auto">
+                        <TabsList className="bg-transparent h-auto p-0 min-w-max">
+                          <TabsTrigger value="visits" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Visits</TabsTrigger>
+                          <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">SOAP Notes</TabsTrigger>
+                          <TabsTrigger value="labs" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Labs</TabsTrigger>
+                          <TabsTrigger value="meds" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Medications</TabsTrigger>
+                          <TabsTrigger value="admissions" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Admissions</TabsTrigger>
+                          <TabsTrigger value="vitals" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Vitals</TabsTrigger>
+                        </TabsList>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {patientVisits
-                        .filter((v: Visit) => v._id !== selectedVisit._id)
-                        .slice(0, 10)
-                        .map((visit: Visit) => (
-                          <div key={visit._id} className="border rounded-lg p-3 hover:bg-muted/30 cursor-pointer">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium">{visit.visitNumber}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {new Date(visit.createdAt).toLocaleDateString()}
-                                </p>
-                              </div>
-                              <div className="text-right">
-                                <Badge variant="outline">{visit.status}</Badge>
-                                {visit.diagnosis && (
-                                  <p className="text-xs text-muted-foreground mt-1">{visit.diagnosis}</p>
-                                )}
-                              </div>
+
+                    <ScrollArea className="h-[560px]">
+                      <div className="p-5">
+                        <TabsContent value="visits" className="mt-0">
+                          {patientVisits.length <= 1 ? (
+                            <div className="text-center py-10 text-muted-foreground text-sm">No previous visits found</div>
+                          ) : (
+                            <div className="space-y-3">
+                              {patientVisits
+                                .filter((v: Visit) => v._id !== selectedVisit._id)
+                                .map((visit: Visit) => (
+                                  <div key={visit._id} className="border rounded-lg p-4 bg-card">
+                                    <div className="flex items-start justify-between gap-4">
+                                      <div>
+                                        <p className="text-sm font-semibold">{visit.visitNumber}</p>
+                                        <p className="text-xs text-muted-foreground mt-1">
+                                          {new Date(visit.createdAt).toLocaleDateString()} - {visit.visitType}
+                                        </p>
+                                      </div>
+                                      <Badge variant="outline" className="capitalize">{visit.status?.replace(/_/g, ' ')}</Badge>
+                                    </div>
+                                    {visit.chiefComplaint && <p className="text-sm mt-3"><span className="font-medium">Complaint:</span> {visit.chiefComplaint}</p>}
+                                    {visit.diagnosis && <p className="text-sm mt-2"><span className="font-medium">Diagnosis:</span> {visit.diagnosis}</p>}
+                                  </div>
+                                ))}
                             </div>
-                          </div>
-                        ))}
-                    </div>
-                  )}
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="soap" className="mt-0">
+                          {(patientChart?.soapNotes || []).length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground text-sm">No SOAP notes found</div>
+                          ) : (
+                            <div className="space-y-3">
+                              {patientChart.soapNotes.map((note: any) => (
+                                <div key={note._id} className="border rounded-lg p-4 bg-card">
+                                  <div className="flex items-start justify-between gap-3 mb-3">
+                                    <div>
+                                      <p className="text-sm font-semibold capitalize">{note.noteType?.replace(/_/g, ' ') || 'Clinical note'}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {note.doctorId?.fullName || note.doctorId?.full_name || note.nurseId?.full_name || 'Clinical staff'} - {new Date(note.createdAt).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                    {note.isSigned && <Badge>Signed</Badge>}
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                    {note.chiefComplaint && <div><span className="font-semibold text-blue-600">S:</span> {note.chiefComplaint}</div>}
+                                    {note.physicalExamination && <div><span className="font-semibold text-green-600">O:</span> {note.physicalExamination}</div>}
+                                    {note.diagnosis && <div><span className="font-semibold text-purple-600">A:</span> {note.diagnosis}</div>}
+                                    {note.treatmentPlan && <div><span className="font-semibold text-orange-600">P:</span> {note.treatmentPlan}</div>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="labs" className="mt-0">
+                          {(patientChart?.orders || []).length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground text-sm">No lab history found</div>
+                          ) : (
+                            <div className="space-y-3">
+                              {patientChart.orders.map((order: any) => (
+                                <div key={order._id} className="border rounded-lg p-4 bg-card">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-semibold">{order.orderNumber}</p>
+                                      <p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleDateString()}</p>
+                                    </div>
+                                    <Badge variant="outline" className="capitalize">{order.status?.replace(/_/g, ' ')}</Badge>
+                                  </div>
+                                  <div className="mt-3 space-y-2">
+                                    {(order.orderTests || []).map((test: any, index: number) => {
+                                      const result = order.results?.find((r: any) => r.orderTestId?.toString() === test._id?.toString());
+                                      return (
+                                        <div key={`${order._id}-${index}`} className="flex items-center justify-between gap-3 text-sm border-l-2 pl-3">
+                                          <span>{test.testName || test.testCode}</span>
+                                          {result ? (
+                                            <span className="font-medium">{result.value} {result.unit || ''}</span>
+                                          ) : (
+                                            <span className="text-muted-foreground">Pending</span>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="meds" className="mt-0">
+                          {(patientChart?.prescriptions || []).length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground text-sm">No medication history found</div>
+                          ) : (
+                            <div className="space-y-3">
+                              {patientChart.prescriptions.map((prescription: any) => (
+                                <div key={prescription._id} className="border rounded-lg p-4 bg-card">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-semibold">{prescription.prescriptionNumber}</p>
+                                      <p className="text-xs text-muted-foreground">{new Date(prescription.createdAt).toLocaleDateString()}</p>
+                                    </div>
+                                    <Badge variant={prescription.isPaid ? 'default' : 'secondary'}>{prescription.isPaid ? 'Paid' : 'Awaiting payment'}</Badge>
+                                  </div>
+                                  <div className="mt-3 space-y-2">
+                                    {(prescription.items || []).map((item: any, index: number) => (
+                                      <div key={`${prescription._id}-${index}`} className="text-sm border-l-2 pl-3">
+                                        <span className="font-medium">{item.medicationName}</span>
+                                        <span className="text-muted-foreground"> - {item.dosage}, {item.frequency}, {item.duration}</span>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="admissions" className="mt-0">
+                          {(patientChart?.admissions || []).length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground text-sm">No admissions found</div>
+                          ) : (
+                            <div className="space-y-3">
+                              {patientChart.admissions.map((admission: any) => (
+                                <div key={admission._id} className="border rounded-lg p-4 bg-card">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                      <p className="text-sm font-semibold">{admission.admissionNumber}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {admission.wardType}{admission.bedNumber ? ` - ${admission.bedNumber}` : ''} - {new Date(admission.createdAt).toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                    <Badge className="capitalize">{admission.status}</Badge>
+                                  </div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mt-3">
+                                    <div><span className="font-medium">Reason:</span> {admission.admissionReason || 'N/A'}</div>
+                                    <div><span className="font-medium">Diagnosis:</span> {admission.diagnosis || admission.dischargeDiagnosis || 'N/A'}</div>
+                                    <div><span className="font-medium">MAR entries:</span> {admission.medicationLog?.length || 0}</div>
+                                    <div><span className="font-medium">Nursing notes:</span> {admission.nursingNotes?.length || 0}</div>
+                                  </div>
+                                  {admission.dischargeInstructions && (
+                                    <p className="text-sm mt-3"><span className="font-medium">Discharge/follow-up:</span> {admission.dischargeInstructions}</p>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </TabsContent>
+
+                        <TabsContent value="vitals" className="mt-0">
+                          {(patientChart?.vitalsHistory || []).length === 0 ? (
+                            <div className="text-center py-10 text-muted-foreground text-sm">No vitals history found</div>
+                          ) : (
+                            <div className="space-y-3">
+                              {patientChart.vitalsHistory.map((vital: any, index: number) => (
+                                <div key={index} className="border rounded-lg p-4 bg-card">
+                                  <div className="flex items-center justify-between mb-3">
+                                    <p className="text-sm font-semibold">{new Date(vital.date).toLocaleDateString()}</p>
+                                    <p className="text-xs text-muted-foreground">{vital.recordedBy?.fullName || vital.recordedBy?.full_name || 'Clinical staff'}</p>
+                                  </div>
+                                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                                    {vital.vitalSigns?.bloodPressure && <div>BP: <span className="font-medium">{vital.vitalSigns.bloodPressure}</span></div>}
+                                    {vital.vitalSigns?.temperature && <div>Temp: <span className="font-medium">{vital.vitalSigns.temperature}</span></div>}
+                                    {vital.vitalSigns?.heartRate && <div>HR: <span className="font-medium">{vital.vitalSigns.heartRate}</span></div>}
+                                    {vital.vitalSigns?.respiratoryRate && <div>RR: <span className="font-medium">{vital.vitalSigns.respiratoryRate}</span></div>}
+                                    {vital.vitalSigns?.weight && <div>Weight: <span className="font-medium">{vital.vitalSigns.weight}</span></div>}
+                                    {vital.vitalSigns?.height && <div>Height: <span className="font-medium">{vital.vitalSigns.height}</span></div>}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </TabsContent>
+                      </div>
+                    </ScrollArea>
+                  </Tabs>
                 </TabsContent>
               </Tabs>
             </div>
