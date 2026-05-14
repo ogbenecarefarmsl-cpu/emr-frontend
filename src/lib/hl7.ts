@@ -31,13 +31,14 @@ const REPETITION_SEPARATOR = '~';
 const ESCAPE_CHARACTER = '\\';
 const SUBCOMPONENT_SEPARATOR = '&';
 const ENCODING_CHARACTERS = `${COMPONENT_SEPARATOR}${REPETITION_SEPARATOR}${ESCAPE_CHARACTER}${SUBCOMPONENT_SEPARATOR}`;
+const ISO_TIMESTAMP_SEPARATOR_PATTERN = new RegExp('[-:' + 'T]', 'g');
 
 /**
  * Generate current timestamp in HL7 format (YYYYMMDDHHMMSS)
  */
 export function getHL7Timestamp(date: Date = new Date()): string {
   return date.toISOString()
-    .replace(/[-:T]/g, '')
+    .replace(ISO_TIMESTAMP_SEPARATOR_PATTERN, '')
     .slice(0, 14);
 }
 
