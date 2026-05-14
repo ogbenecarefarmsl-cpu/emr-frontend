@@ -23,7 +23,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     mode !== 'electron' && VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icon.ico', 'harbour-emr-logo.svg', 'harbour-emr-icon.svg', 'robots.txt', 'sounds/*.wav', 'sounds/*.mp3'],
+      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png', 'harbour-emr-logo.svg', 'harbour-emr-icon.svg', 'robots.txt', 'sounds/*.wav', 'sounds/*.mp3'],
       manifest: {
         name: 'Harbour EMR',
         short_name: 'Harbour EMR',
@@ -36,15 +36,15 @@ export default defineConfig(({ mode }) => ({
         start_url: '/',
         icons: [
           {
-            src: '/harbour-emr-icon.svg',
-            sizes: '512x512',
-            type: 'image/svg+xml',
+            src: '/icon-192.png',
+            sizes: '192x192',
+            type: 'image/png',
             purpose: 'any maskable'
           },
           {
-            src: '/harbour-emr-icon.svg',
+            src: '/icon-512.png',
             sizes: '512x512',
-            type: 'image/svg+xml',
+            type: 'image/png',
             purpose: 'any maskable'
           }
         ]
