@@ -1,24 +1,33 @@
 import api from './api';
-import { Prescription, PrescriptionStatusEnum } from '@/types/prescription';
+import { Prescription, RouteOfAdministrationEnum } from '@/types/prescription';
+
+export interface CreatePrescriptionItemInput {
+  medicationId: string;
+  medicationName: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  quantity: number;
+  route?: RouteOfAdministrationEnum;
+  /** Patient-facing label text. If omitted, backend auto-generates from dosage+frequency+duration+route */
+  instructions?: string;
+  /** Internal pharmacist note — not printed on label */
+  pharmacistNote?: string;
+}
+
+export interface CreatePrescriptionInput {
+  patientId: string;
+  consultationId?: string;
+  visitId?: string;
+  doctorId: string;
+  items: CreatePrescriptionItemInput[];
+  /** General notes from doctor — visible to pharmacist and patient */
+  notes?: string;
+  totalAmount?: number;
+}
 
 export const prescriptionService = {
-  async create(data: {
-    patientId: string;
-    consultationId?: string;
-    visitId?: string;
-    doctorId: string;
-    items: Array<{
-      medicationId: string;
-      medicationName: string;
-      dosage: string;
-      frequency: string;
-      duration: string;
-      quantity: number;
-      instructions?: string;
-    }>;
-    notes?: string;
-    totalAmount?: number;
-  }): Promise<Prescription> {
+  async create(data: CreatePrescriptionInput): Promise<Prescription> {
     const response = await api.post('/prescriptions', data);
     return response.data;
   },
@@ -38,9 +47,24 @@ export const prescriptionService = {
     return response.data;
   },
 
-  async dispense(id: string, dispensedBy: string): Promise<Prescription> {
+  async findPendingPayment(): Promise<Prescription[]> {
+    const response = await api.get('/prescriptions/pending-payment');
+    return response.data;
+  },
+
+  async findPendingDispense(): Promise<Prescription[]> {
+    const response = await api.get('/prescriptions/pending-dispense');
+    return response.data;
+  },
+
+  /**
+   * Dispense a prescription.
+   * dispensedBy is read from the JWT on the backend — do not send it in the body.
+   * dispensingNotes is the pharmacist's internal note added at dispense time.
+   */
+  async dispense(id: string, dispensingNotes?: string): Promise<Prescription> {
     const response = await api.patch(`/prescriptions/${id}/dispense`, {
-      dispensedBy,
+      ...(dispensingNotes ? { dispensingNotes } : {}),
     });
     return response.data;
   },
@@ -50,11 +74,8 @@ export const prescriptionService = {
     return response.data;
   },
 
-  async cancel(id: string, reason: string, cancelledBy: string): Promise<Prescription> {
-    const response = await api.patch(`/prescriptions/${id}/cancel`, {
-      reason,
-      cancelledBy,
-    });
+  async cancel(id: string, reason: string): Promise<Prescription> {
+    const response = await api.patch(`/prescriptions/${id}/cancel`, { reason });
     return response.data;
   },
 };

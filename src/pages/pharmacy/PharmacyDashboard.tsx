@@ -35,6 +35,7 @@ export default function PharmacyDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState<any>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [dispensingNotes, setDispensingNotes] = useState('');
 
   const { data: prescriptions = [], isLoading } = useQuery({
     queryKey: ['prescriptions', 'pharmacy'],
@@ -50,11 +51,12 @@ export default function PharmacyDashboard() {
   });
 
   const dispense = useMutation({
-    mutationFn: (id: string) => prescriptionService.dispense(id, user?.id || ''),
+    mutationFn: (id: string) => prescriptionService.dispense(id, dispensingNotes.trim() || undefined),
     onSuccess: () => {
       toast.success('Prescription dispensed, stock deducted');
       setSelected(null);
       setConfirmOpen(false);
+      setDispensingNotes('');
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
       queryClient.invalidateQueries({ queryKey: ['medications'] });
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
@@ -296,29 +298,53 @@ export default function PharmacyDashboard() {
       </div>
 
       {/* Dispense confirmation dialog */}
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <Dialog open={confirmOpen} onOpenChange={(open) => { setConfirmOpen(open); if (!open) setDispensingNotes(''); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Confirm Dispense</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <p className="text-sm">
-              Dispensing this prescription will deduct the following quantities from stock:
+              Dispensing will deduct the following quantities from stock:
             </p>
             <div className="border rounded-lg divide-y">
               {selected?.items?.map((item: any, i: number) => (
-                <div key={i} className="px-3 py-2 flex items-center justify-between text-sm">
-                  <span>{item.medicationName}</span>
-                  <Badge variant="outline">{item.quantity}</Badge>
+                <div key={i} className="px-3 py-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">{item.medicationName}</span>
+                    <Badge variant="outline">Qty {item.quantity}</Badge>
+                  </div>
+                  {item.instructions && (
+                    <p className="text-xs text-muted-foreground mt-0.5 italic">
+                      Label: {item.instructions}
+                    </p>
+                  )}
+                  {item.pharmacistNote && (
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      ⚠ {item.pharmacistNote}
+                    </p>
+                  )}
                 </div>
               ))}
+            </div>
+            <div>
+              <label className="text-sm font-medium">
+                Dispensing Notes <span className="text-muted-foreground font-normal">(optional)</span>
+              </label>
+              <textarea
+                className="mt-1 w-full border rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                rows={2}
+                placeholder="e.g. Counselled patient on storage. Brand substituted — same generic."
+                value={dispensingNotes}
+                onChange={(e) => setDispensingNotes(e.target.value)}
+              />
             </div>
             <p className="text-xs text-muted-foreground">
               This action cannot be undone.
             </p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={() => { setConfirmOpen(false); setDispensingNotes(''); }}>Cancel</Button>
             <Button
               onClick={() => dispense.mutate(getId(selected))}
               disabled={dispense.isPending}
@@ -431,7 +457,8 @@ function PrescriptionDetail({
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-sm">{item.medicationName}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      {item.dosage} • {item.frequency} • {item.duration}
+                      {item.dosage} · {item.frequency} · {item.duration}
+                      {item.route && item.route !== 'oral' && ` · ${item.route}`}
                     </p>
                     {hasStockInfo && (
                       <p className={cn('text-xs mt-1 font-medium', enoughStock ? 'text-emerald-600' : 'text-red-600')}>
@@ -439,8 +466,13 @@ function PrescriptionDetail({
                       </p>
                     )}
                     {item.instructions && (
-                      <p className="text-xs italic text-muted-foreground mt-1">
-                        Instructions: {item.instructions}
+                      <p className="text-xs italic text-muted-foreground mt-1 bg-muted/50 rounded px-2 py-1">
+                        Label: {item.instructions}
+                      </p>
+                    )}
+                    {item.pharmacistNote && (
+                      <p className="text-xs text-amber-700 mt-1 bg-amber-50 rounded px-2 py-1">
+                        ⚠ {item.pharmacistNote}
                       </p>
                     )}
                   </div>
@@ -467,6 +499,18 @@ function PrescriptionDetail({
                 Doctor's Notes
               </p>
               <p className="text-sm">{rx.notes}</p>
+            </div>
+          </>
+        )}
+
+        {rx.dispensingNotes && (
+          <>
+            <Separator className="my-4" />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                Dispensing Notes
+              </p>
+              <p className="text-sm">{rx.dispensingNotes}</p>
             </div>
           </>
         )}
