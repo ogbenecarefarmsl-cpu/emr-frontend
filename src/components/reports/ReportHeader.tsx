@@ -11,7 +11,7 @@ export function ReportHeader({ laboratoryInfo }: ReportHeaderProps) {
 
   // Keep logo code-driven with an optional env override and no template/database dependency.
   // Use the resized logo from public folder
-  const hardcodedLogoUrl = import.meta.env.VITE_REPORT_HEADER_LOGO || '/logo_resized.png';
+  const hardcodedLogoUrl = import.meta.env.VITE_REPORT_HEADER_LOGO || '/harbour-emr-logo.svg';
   const logoSrc = hardcodedLogoUrl;
 
   const defaultLabName = 'HARBOUR Medical Diagnostic';

@@ -44,7 +44,7 @@ class ConnectionManager {
             name: 'Local Network',
           },
           {
-            url: config.cloudUrl || import.meta.env.VITE_CLOUD_API_URL || 'https://carefam-lab-1e0cbe42a3ac.herokuapp.com',
+            url: config.cloudUrl || import.meta.env.VITE_CLOUD_API_URL || '',
             priority: 2,
             timeout: config.cloudTimeout || 5000,
             name: 'Cloud Server',
@@ -59,7 +59,7 @@ class ConnectionManager {
             name: 'Local Network',
           },
           {
-            url: import.meta.env.VITE_CLOUD_API_URL || 'https://carefam-lab-1e0cbe42a3ac.herokuapp.com',
+            url: import.meta.env.VITE_CLOUD_API_URL || '',
             priority: 2,
             timeout: 5000,
             name: 'Cloud Server',
@@ -82,7 +82,7 @@ class ConnectionManager {
           name: 'Local Network',
         },
         {
-          url: import.meta.env.VITE_CLOUD_API_URL || 'https://carefam-lab-1e0cbe42a3ac.herokuapp.com',
+          url: import.meta.env.VITE_CLOUD_API_URL || '',
           priority: 2,
           timeout: 5000,
           name: 'Cloud Server',

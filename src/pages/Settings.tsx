@@ -142,7 +142,7 @@ export default function Settings() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-sm font-medium text-muted-foreground">Facility Name</label>
-              <Input defaultValue="Carefam Medical Center" className="mt-1" />
+              <Input defaultValue="Harbour EMR" className="mt-1" />
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">License Number</label>

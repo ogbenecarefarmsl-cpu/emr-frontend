@@ -130,15 +130,15 @@ export default function Login() {
           {/* Logo */}
           <div className="flex justify-center mb-8">
             <img 
-              src="/logo_resized.png" 
-              alt="Harbour Clinicals Logo" 
-              className="h-16 object-contain"
+              src="/harbour-emr-logo.svg" 
+              alt="Harbour EMR Logo" 
+              className="h-20 object-contain"
             />
           </div>
 
           {/* Welcome Text */}
           <div className="mb-8 text-center">
-            <h1 className="text-3xl font-bold text-gray-900">Harbour Clinicals</h1>
+            <h1 className="text-3xl font-bold text-gray-900">Harbour EMR</h1>
             <p className="mt-2 text-sm text-gray-500">Sign in to continue</p>
           </div>
 
@@ -229,9 +229,9 @@ export default function Login() {
           {/* Footer */}
           <div className="mt-8 flex justify-center">
             <img 
-              src="/logo_resized.png" 
-              alt="Harbour Clinicals" 
-              className="h-12 object-contain opacity-60"
+              src="/harbour-emr-logo.svg" 
+              alt="Harbour EMR" 
+              className="h-12 object-contain opacity-70"
             />
           </div>
         </div>

@@ -129,9 +129,9 @@ export function RoleSidebar({ role, userName, onClose }: RoleSidebarProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <img 
-              src="/logo_resized.png" 
-              alt="Lab Logo" 
-              className="h-16 w-auto object-contain"
+              src="/harbour-emr-logo.svg" 
+              alt="Harbour EMR Logo" 
+              className="h-12 w-auto object-contain"
             />
           </div>
           {/* Close button for mobile */}
@@ -192,7 +192,7 @@ export function RoleSidebar({ role, userName, onClose }: RoleSidebarProps) {
       {/* Footer */}
       <div className="p-4 border-t border-sidebar-border">
         <div className="text-xs text-sidebar-foreground/50">
-          <p>Harbour Clinicals v1.0.0</p>
+          <p>Harbour EMR v1.0.0</p>
           <p>HL7 • ASTM • FHIR Compatible</p>
         </div>
       </div>

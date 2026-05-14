@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">Harbour EMR Icon</title>
+  <desc id="desc">A Harbour EMR medical app icon.</desc>
+  <defs>
+    <linearGradient id="markGradient" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#16a34a"/>
+    </linearGradient>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="112" fill="url(#markGradient)"/>
+  <path d="M256 104c90 0 154 56 154 136 0 116-113 181-154 218-41-37-154-102-154-218 0-80 64-136 154-136Z" fill="#fff" opacity=".96"/>
+  <path d="M256 166v214M149 273h214" stroke="#0f766e" stroke-width="44" stroke-linecap="round"/>
+  <path d="M139 376c73-32 169-32 242 0" stroke="#fff" stroke-width="32" stroke-linecap="round" opacity=".9"/>
+</svg>

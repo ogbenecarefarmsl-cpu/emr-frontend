@@ -71,7 +71,7 @@ export default function ConnectionSettings() {
       // Set defaults from environment
       setConfig({
         localUrl: import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000',
-        cloudUrl: import.meta.env.VITE_CLOUD_API_URL || 'https://carefam-lab-1e0cbe42a3ac.herokuapp.com',
+        cloudUrl: import.meta.env.VITE_CLOUD_API_URL || '',
         localTimeout: 2000,
         cloudTimeout: 5000,
         monitoringInterval: 30000,

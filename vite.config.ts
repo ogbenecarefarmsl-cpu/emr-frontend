@@ -23,11 +23,11 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     mode !== 'electron' && VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'icon.ico', 'robots.txt', 'sounds/*.wav', 'sounds/*.mp3'],
+      includeAssets: ['favicon.ico', 'icon.ico', 'harbour-emr-logo.svg', 'harbour-emr-icon.svg', 'robots.txt', 'sounds/*.wav', 'sounds/*.mp3'],
       manifest: {
-        name: 'Harbour Clinicals',
-        short_name: 'Harbour',
-        description: 'Harbour Clinicals Electronic Medical Records - Offline-First PWA',
+        name: 'Harbour EMR',
+        short_name: 'Harbour EMR',
+        description: 'Harbour EMR - Offline-First Electronic Medical Records',
         theme_color: '#0f172a',
         background_color: '#ffffff',
         display: 'standalone',
@@ -36,15 +36,15 @@ export default defineConfig(({ mode }) => ({
         start_url: '/',
         icons: [
           {
-            src: '/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png',
+            src: '/harbour-emr-icon.svg',
+            sizes: '512x512',
+            type: 'image/svg+xml',
             purpose: 'any maskable'
           },
           {
-            src: '/icon-512.png',
+            src: '/harbour-emr-icon.svg',
             sizes: '512x512',
-            type: 'image/png',
+            type: 'image/svg+xml',
             purpose: 'any maskable'
           }
         ]

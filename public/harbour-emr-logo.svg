@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 150" role="img" aria-labelledby="title desc">
+  <title id="title">Harbour EMR</title>
+  <desc id="desc">A blue and green Harbour EMR medical logo.</desc>
+  <defs>
+    <linearGradient id="markGradient" x1="18" y1="18" x2="132" y2="132" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0ea5e9"/>
+      <stop offset="1" stop-color="#16a34a"/>
+    </linearGradient>
+  </defs>
+  <rect width="520" height="150" fill="none"/>
+  <g transform="translate(16 16)">
+    <rect width="118" height="118" rx="28" fill="url(#markGradient)"/>
+    <path d="M59 22c22 0 38 14 38 34 0 29-28 45-38 54-10-9-38-25-38-54 0-20 16-34 38-34Z" fill="#fff" opacity=".96"/>
+    <path d="M59 38v56M31 66h56" stroke="#0f766e" stroke-width="12" stroke-linecap="round"/>
+    <path d="M29 92c18-8 42-8 60 0" stroke="#fff" stroke-width="8" stroke-linecap="round" opacity=".9"/>
+  </g>
+  <g transform="translate(160 48)">
+    <text x="0" y="34" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="44" font-weight="800" fill="#0f172a">Harbour EMR</text>
+    <text x="2" y="70" font-family="Inter, Segoe UI, Arial, sans-serif" font-size="18" font-weight="600" letter-spacing="2.5" fill="#0f766e">ELECTRONIC MEDICAL RECORDS</text>
+  </g>
+</svg>
