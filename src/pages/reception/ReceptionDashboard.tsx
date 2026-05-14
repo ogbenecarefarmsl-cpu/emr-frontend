@@ -164,13 +164,13 @@ export default function ReceptionDashboard() {
           <span className="text-sm font-semibold text-blue-500 group-hover:text-white transition-colors">New Visit</span>
         </button>
         <button
-          onClick={() => navigate('/reception/orders')}
+          onClick={() => navigate('/reception/payments')}
           className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border bg-card hover:bg-secondary hover:shadow-md transition-all duration-200"
         >
           <div className="w-12 h-12 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
             <CreditCard className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
           </div>
-          <span className="text-sm font-semibold text-foreground">Clinical Payments</span>
+          <span className="text-sm font-semibold text-foreground">Billing & Payments</span>
         </button>
         <button 
           onClick={() => navigate('/reception/patients')}
@@ -211,7 +211,7 @@ export default function ReceptionDashboard() {
         />
       </div>
 
-      {/* Pending Clinical Orders (from Doctors) */}
+      {/* Pending Clinical Orders (created by doctors, paid at reception) */}
       <div className="mb-6">
         <PendingOrders />
       </div>
@@ -288,10 +288,10 @@ export default function ReceptionDashboard() {
           </div>
         </div>
 
-        {/* Pending Payments */}
+        {/* Pending Clinical Payments */}
         <div className="bg-card border rounded-xl shadow-sm">
           <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Pending Payments</h3>
+            <h3 className="font-semibold text-sm">Pending Clinical Payments</h3>
             <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reception/payments')}>
               View All <ArrowRight className="w-3.5 h-3.5" />
             </Button>

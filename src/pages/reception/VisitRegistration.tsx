@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreateVisit, useMarkConsultationPaid } from '@/hooks/useVisits';
 import { useSearchPatients } from '@/hooks/usePatients';
@@ -28,8 +28,22 @@ export default function VisitRegistration() {
   const [notes, setNotes] = useState('');
 
   const { data: searchResults = [], isLoading: searchLoading } = useSearchPatients(searchTerm);
+  const { data: allPatients = [] } = useSearchPatients('');
   const createVisit = useCreateVisit();
   const markConsultationPaid = useMarkConsultationPaid();
+
+  useEffect(() => {
+    if (!preselectedPatientId || selectedPatient || !Array.isArray(allPatients)) return;
+
+    const patient = allPatients.find((item: any) => {
+      const id = item._id || item.id;
+      return id === preselectedPatientId;
+    });
+
+    if (patient) {
+      setSelectedPatient(patient);
+    }
+  }, [allPatients, preselectedPatientId, selectedPatient]);
 
   const handleSubmit = async () => {
     if (!selectedPatient) {
