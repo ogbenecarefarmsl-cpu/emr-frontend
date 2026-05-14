@@ -42,6 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     // Check if user is already logged in
+    // Also check for updates to the access token in case it was refreshed in another tab
     const token = getAccessToken();
     if (token) {
       fetchUserProfile();
