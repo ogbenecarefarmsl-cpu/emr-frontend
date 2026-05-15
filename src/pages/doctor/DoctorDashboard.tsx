@@ -29,6 +29,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 // Dashboard components
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { RoleLayout } from '@/components/layout/RoleLayout';
+import { PatientSearch } from '@/components/doctor/PatientSearch';
+import { AllergyManager } from '@/components/doctor/AllergyManager';
+import { ProblemList } from '@/components/doctor/ProblemList';
+import { VitalsTrends } from '@/components/doctor/VitalsTrends';
+import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
 
 // Icons
 import {
@@ -776,6 +781,25 @@ export default function DoctorDashboard() {
                         </>
                       )}
                     </div>
+                  </div>
+
+                  {/* Clinical Components */}
+                  <div className="mt-6 space-y-4">
+                    <AllergyManager
+                      patientId={selectedVisit.patientId?._id || selectedVisit.patientId}
+                      allergies={selectedVisit.patientId?.allergies || []}
+                      allergyDetails={selectedVisit.patientId?.allergyDetails || []}
+                    />
+                    <ProblemList
+                      visitId={selectedVisit._id || selectedVisit.id}
+                      problems={selectedVisit.problemList || []}
+                    />
+                    <VitalsTrends vitalsHistory={patientChart?.vitalsHistory || []} />
+                    <FollowUpScheduler
+                      visitId={selectedVisit._id || selectedVisit.id}
+                      followUpDate={selectedVisit.followUpDate}
+                      followUpNotes={selectedVisit.followUpNotes}
+                    />
                   </div>
 
                   {/* Quick Actions */}
