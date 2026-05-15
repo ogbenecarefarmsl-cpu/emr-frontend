@@ -4,7 +4,7 @@ import { useRealtimeOrders } from '@/hooks/useRealtimeOrders';
 import { useRealtimeResults } from '@/hooks/useRealtimeResults';
 import { useRealtimePatients } from '@/hooks/useRealtimePatients';
 import { useQuery } from '@tanstack/react-query';
-import api from '@/services/api';
+import api, { adminAPI } from '@/services/api';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Button } from '@/components/ui/button';
 import {
@@ -71,10 +71,7 @@ export default function AdminDashboard() {
 
   const { data, isLoading } = useQuery<AdminDashboardData>({
     queryKey: ['admin', 'dashboard'],
-    queryFn: async () => {
-      const res = await api.get('/admin/dashboard');
-      return res.data;
-    },
+    queryFn: () => adminAPI.getDashboard(),
     refetchInterval: 30 * 1000,
     staleTime: 15 * 1000,
   });

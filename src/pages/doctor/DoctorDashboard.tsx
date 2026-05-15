@@ -433,8 +433,10 @@ export default function DoctorDashboard() {
         frequency: '',
         duration: '',
         quantity: 1,
+        route: 'oral',
         unitPrice: med.unitPrice || 0,
         instructions: '',
+        pharmacistNote: '',
       },
     ]);
   };
@@ -1359,10 +1361,16 @@ export default function DoctorDashboard() {
                           />
                         </div>
                         <Input
-                          placeholder="Special instructions (optional)"
+                          placeholder="Patient instructions — leave blank to auto-generate from dosage/frequency/route"
                           value={item.instructions}
                           onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)}
                           className="h-8 text-xs mt-2"
+                        />
+                        <Input
+                          placeholder="Pharmacist note (internal only, not on label)"
+                          value={item.pharmacistNote || ''}
+                          onChange={(e) => updatePrescriptionItem(index, 'pharmacistNote', e.target.value)}
+                          className="h-8 text-xs mt-1"
                         />
                       </div>
                     ))}

@@ -94,7 +94,7 @@ export default function PaymentReceipt() {
       setPrintCount(result.printedCount);
       if (result.success) {
         toast.success('Both receipts printed successfully');
-        setTimeout(() => navigate('/reception/orders'), 2000);
+        setTimeout(() => navigate('/reception'), 2000);
       } else {
         toast.error(`Only ${result.printedCount} of 2 receipts printed`);
       }
@@ -137,9 +137,9 @@ export default function PaymentReceipt() {
         <Card className="p-8 text-center">
           <h2 className="text-xl font-semibold mb-2">Order Not Found</h2>
           <p className="text-muted-foreground mb-4">The order you're looking for doesn't exist.</p>
-          <Button onClick={() => navigate('/reception/orders')}>
+          <Button onClick={() => navigate('/reception')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Orders
+            Back to Dashboard
           </Button>
         </Card>
       </div>
@@ -325,9 +325,9 @@ export default function PaymentReceipt() {
         <Card className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <Button variant="outline" onClick={() => navigate('/reception/orders')}>
+              <Button variant="outline" onClick={() => navigate('/reception')}>
                 <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Orders
+                Back to Dashboard
               </Button>
               <div>
                 <h2 className="text-lg font-semibold">Payment Receipt</h2>

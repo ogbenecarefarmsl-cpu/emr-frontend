@@ -30,6 +30,7 @@ import PrinterSetup from "./pages/reception/PrinterSetup";
 import PriceListPage from "./pages/reception/PriceListPage";
 import EMRReception from "./pages/reception/EMRReception";
 import VisitRegistration from "./pages/reception/VisitRegistration";
+import ExpendituresPage from "./pages/reception/ExpendituresPage";
 
 // Lab Pages
 import LabDashboardPage from "./pages/lab/LabDashboardPage";
@@ -57,6 +58,7 @@ import AuditLogViewer from "./pages/admin/AuditLogViewer";
 import ReportTemplateEditor from "./pages/admin/ReportTemplateEditor";
 import PrinterSettings from "./pages/admin/PrinterSettings";
 import DoctorsPage from "./pages/admin/DoctorsPage";
+import ConnectionSettings from "./pages/admin/ConnectionSettings";
 
 // Doctor Pages
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
@@ -205,6 +207,9 @@ function AppRoutes() {
       <Route path="/reception/daily-report" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><DailyReport /></RoleGuard>
       } />
+      <Route path="/reception/expenditures" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><ExpendituresPage /></RoleGuard>
+      } />
       <Route path="/reception/reports/:orderId" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><LabReportPage /></RoleGuard>
       } />
@@ -320,6 +325,9 @@ function AppRoutes() {
       } />
       <Route path="/admin/doctors" element={
         <RoleGuard allowedRoles={['admin']}><DoctorsPage /></RoleGuard>
+      } />
+      <Route path="/admin/connection-settings" element={
+        <RoleGuard allowedRoles={['admin']}><ConnectionSettings /></RoleGuard>
       } />
       <Route path="/reception/doctors" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><DoctorsPage /></RoleGuard>

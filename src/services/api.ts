@@ -854,11 +854,13 @@ export const reportTemplatesAPI = {
 
 export const settingsAPI = {
   getPrinterSettings: async () => {
+    // Backend stores settings by key — printer settings are stored under 'printer'
     const response = await api.get('/settings/printer');
-    return response.data;
+    return response.data?.value ?? response.data ?? null;
   },
   updatePrinterSettings: async (patch: Record<string, any>) => {
-    const response = await api.patch('/settings/printer', patch);
+    // Backend uses POST /settings to upsert by key
+    const response = await api.post('/settings', { key: 'printer', value: patch });
     return response.data;
   },
 };
@@ -982,6 +984,15 @@ export const visitsAPI = {
     const response = await api.patch(`/visits/${id}/cancel`, { reason, cancelledBy });
     return response.data;
   },
+
+  /**
+   * Nurse assigns or reassigns a queued patient to a specific doctor.
+   * PATCH /visits/:id/assign-doctor
+   */
+  assignDoctorFromQueue: async (id: string, doctorId: string) => {
+    const response = await api.patch(`/visits/${id}/assign-doctor`, { doctorId });
+    return response.data;
+  },
 };
 
 export const pendingOrdersAPI = {
@@ -1046,6 +1057,25 @@ export const prescriptionsAPI = {
 
   markAsPaid: async (id: string, paymentMethod: string) => {
     const response = await api.patch(`/prescriptions/${id}/mark-paid`, { paymentMethod });
+    return response.data;
+  },
+};
+
+export const adminAPI = {
+  getDashboard: async (date?: string) => {
+    const response = await api.get('/admin/dashboard', { params: date ? { date } : {} });
+    return response.data;
+  },
+  getRevenueReport: async (startDate: string, endDate: string) => {
+    const response = await api.get('/admin/revenue', { params: { startDate, endDate } });
+    return response.data;
+  },
+  getStaffReport: async (startDate?: string, endDate?: string) => {
+    const response = await api.get('/admin/staff-report', { params: { startDate, endDate } });
+    return response.data;
+  },
+  getPatientStats: async (startDate?: string, endDate?: string) => {
+    const response = await api.get('/admin/patient-stats', { params: { startDate, endDate } });
     return response.data;
   },
 };

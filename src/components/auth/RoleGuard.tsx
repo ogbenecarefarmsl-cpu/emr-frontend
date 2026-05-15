@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 
 interface RoleGuardProps {
   children: React.ReactNode;
-  allowedRoles?: ('admin' | 'receptionist' | 'lab_tech' | 'doctor' | 'nurse' | 'pharmacist')[];
+  allowedRoles?: ('admin' | 'receptionist' | 'lab_tech' | 'doctor' | 'specialist' | 'nurse' | 'pharmacist' | 'inventory_manager')[];
 }
 
 export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
@@ -54,10 +54,12 @@ export function RoleGuard({ children, allowedRoles }: RoleGuardProps) {
       switch (primaryRole) {
         case 'admin': return '/admin';
         case 'doctor': return '/doctor';
+        case 'specialist': return '/doctor';
         case 'nurse': return '/nurse';
         case 'pharmacist': return '/pharmacy';
         case 'lab_tech': return '/lab';
         case 'receptionist': return '/reception';
+        case 'inventory_manager': return '/inventory';
         default: return '/login';
       }
     };
