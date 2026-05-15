@@ -64,7 +64,7 @@ export default function ResultVerification() {
       title="Result Verification" 
       subtitle="Review and verify pending results"
       role="lab_tech"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-6">
@@ -323,3 +323,4 @@ export default function ResultVerification() {
     </RoleLayout>
   );
 }
+

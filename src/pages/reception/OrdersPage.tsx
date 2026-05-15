@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState } from 'react';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useOrders, useDeleteOrder, useAssignDoctor } from '@/hooks/useOrders';
@@ -89,7 +89,7 @@ export default function OrdersPage() {
       title="Orders" 
       subtitle="View and manage test orders"
       role={currentRole}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Filters */}
       <div className="flex items-center justify-between mb-6">
@@ -351,7 +351,7 @@ export default function OrdersPage() {
             discountType: (selectedOrder.discountType || 'fixed') as 'percentage' | 'fixed',
             total: selectedOrder.total || selectedOrder.totalAmount || 0,
           }}
-          cashierName={profile?.full_name || 'Receptionist'}
+          cashierName={profile?.fullName || 'Receptionist'}
         />
       )}
       {/* Delete Order Confirmation */}
@@ -443,3 +443,4 @@ export default function OrdersPage() {
     </RoleLayout>
   );
 }
+

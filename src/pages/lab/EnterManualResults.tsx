@@ -61,7 +61,7 @@ export default function EnterManualResults() {
   const handleSaveResults = async () => {
     if (!selectedOrder) return;
 
-    const resultsToSave = selectedOrder.order_tests
+    const resultsToSave = (selectedOrder.order_tests || selectedOrder.tests || [])
       .filter(test => {
         const uniqueTestId = test.id || test._id;
         return results[uniqueTestId]?.value;
@@ -101,7 +101,7 @@ export default function EnterManualResults() {
       }
       
       // Update order status based on completion
-      const allTestsCompleted = resultsToSave.length >= selectedOrder.order_tests.length;
+      const allTestsCompleted = resultsToSave.length >= (selectedOrder.order_tests || selectedOrder.tests || []).length;
       await updateOrder.mutateAsync({
         id: selectedOrder.id,
         updates: { 
@@ -115,7 +115,7 @@ export default function EnterManualResults() {
       setResults({});
       setSelectedOrder(null);
     } catch (error) {
-      toast.error('Failed to save results');
+      toast.error((error as any)?.response?.data?.message || 'Failed to save results');
     }
   };
 
@@ -130,7 +130,7 @@ export default function EnterManualResults() {
       title="Enter Manual Results" 
       subtitle="Manual result entry for tests"
       role="lab_tech"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Orders List */}
@@ -202,7 +202,7 @@ export default function EnterManualResults() {
               </div>
 
               <div className="space-y-6">
-                {selectedOrder.order_tests.map(test => {
+                {(selectedOrder.order_tests || selectedOrder.tests || []).map(test => {
                   const uniqueTestId = test.id || test._id || `${test.testId || test.test_id}-${Math.random()}`;
                   const testCode = test.testCode || test.test_code;
                   
@@ -332,3 +332,4 @@ export default function EnterManualResults() {
     </RoleLayout>
   );
 }
+

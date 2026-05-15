@@ -96,7 +96,7 @@ export default function DailyReport() {
       title="Daily Report"
       subtitle="Summary of tests, income, discounts, expenditures & reconciliation"
       role={role as any}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -516,3 +516,4 @@ function buildPrintHTML(report: any): string {
     </div>
   `;
 }
+

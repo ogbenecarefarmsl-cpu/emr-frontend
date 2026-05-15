@@ -489,7 +489,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
                       <div className="flex items-center gap-2">
                         <Badge variant="outline" className="capitalize">{String(note.noteType || '').replace(/_/g, ' ')}</Badge>
                         <p className="text-xs text-muted-foreground">
-                          {note.doctorId?.fullName || note.nurseId?.full_name || note.nurseId?.fullName || 'Clinical staff'}
+                          {note.doctorId?.fullName || note.nurseId?.fullName || note.nurseId?.fullName || 'Clinical staff'}
                         </p>
                       </div>
                       <p className="text-xs text-muted-foreground">{fmtTime(note.createdAt)}</p>
@@ -549,7 +549,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
                       <TableCell>{v.painScale ?? '—'}</TableCell>
                       <TableCell>{v.bloodGlucose ?? '—'}</TableCell>
                       <TableCell>{v.consciousnessLevel || '—'}</TableCell>
-                      <TableCell className="text-xs">{v.recordedBy?.full_name || '—'}</TableCell>
+                      <TableCell className="text-xs">{v.recordedBy?.fullName || '—'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -599,7 +599,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
                       <TableCell className="text-xs max-w-xs truncate">
                         {m.refused ? m.refusalReason : m.notes || '—'}
                       </TableCell>
-                      <TableCell className="text-xs">{m.administeredBy?.full_name || '—'}</TableCell>
+                      <TableCell className="text-xs">{m.administeredBy?.fullName || '—'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -673,7 +673,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
                       </TableCell>
                       <TableCell>{f.route || '—'}</TableCell>
                       <TableCell className="text-xs max-w-xs truncate">{f.notes || '—'}</TableCell>
-                      <TableCell className="text-xs">{f.recordedBy?.full_name || '—'}</TableCell>
+                      <TableCell className="text-xs">{f.recordedBy?.fullName || '—'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -699,7 +699,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
                   <div key={i} className="border rounded-lg p-4 bg-muted/10">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs text-muted-foreground">{fmtTime(n.authoredAt)}</p>
-                      <p className="text-xs font-medium">{n.authoredBy?.full_name || ''}</p>
+                      <p className="text-xs font-medium">{n.authoredBy?.fullName || ''}</p>
                     </div>
                     {n.narrative ? (
                       <p className="text-sm whitespace-pre-line">{n.narrative}</p>
@@ -753,7 +753,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
                     </div>
                     {h.tasksForNextShift && <p className="text-sm mt-3"><span className="font-semibold">Tasks:</span> {h.tasksForNextShift}</p>}
                     {h.notes && <p className="text-sm text-muted-foreground mt-2 whitespace-pre-line">{h.notes}</p>}
-                    <p className="text-xs text-muted-foreground mt-3">Handed over by {h.handedOverBy?.full_name || 'Nurse'}</p>
+                    <p className="text-xs text-muted-foreground mt-3">Handed over by {h.handedOverBy?.fullName || 'Nurse'}</p>
                   </div>
                 ))}
               </div>
@@ -799,7 +799,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
                         <p className="text-sm mt-2 italic text-muted-foreground">Evaluation: {item.evaluation}</p>
                       )}
                       <p className="text-xs text-muted-foreground mt-2">
-                        Added {fmtTime(item.createdAt)} by {item.createdBy?.full_name || '—'}
+                        Added {fmtTime(item.createdAt)} by {item.createdBy?.fullName || '—'}
                       </p>
                     </div>
                     {item.status !== 'resolved' && (
@@ -860,7 +860,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
                     <p className="text-sm text-muted-foreground mt-2">Action: {inc.actionTaken}</p>
                   )}
                   <p className="text-xs text-muted-foreground mt-2">
-                    Reported by {inc.reportedBy?.full_name || '—'}
+                    Reported by {inc.reportedBy?.fullName || '—'}
                   </p>
                 </div>
               ))}

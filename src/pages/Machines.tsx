@@ -153,7 +153,7 @@ export default function Machines() {
         title="Machines" 
         subtitle="Configure and monitor laboratory analyzers"
         role={primaryRole === 'admin' ? 'admin' : 'lab_tech'}
-        userName={profile?.full_name}
+        userName={profile?.fullName}
       >
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
@@ -167,7 +167,7 @@ export default function Machines() {
       title="Machines" 
       subtitle="Configure and monitor laboratory analyzers"
       role={primaryRole === 'admin' ? 'admin' : 'lab_tech'}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Actions Bar */}
       <div className="flex items-center justify-between mb-6">
@@ -708,3 +708,4 @@ function MachineConfigForm({
     </form>
   );
 }
+

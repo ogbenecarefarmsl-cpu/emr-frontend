@@ -220,7 +220,7 @@ export default function ReconciliationReview() {
       title="Reconciliation Review"
       subtitle="Review and approve daily cash reconciliations"
       role="admin"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <div className="bg-card border-l-4 border-l-primary border rounded-lg p-5 flex items-start gap-4">
@@ -707,3 +707,4 @@ export default function ReconciliationReview() {
     </RoleLayout>
   );
 }
+

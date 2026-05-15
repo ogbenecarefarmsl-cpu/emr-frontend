@@ -228,7 +228,7 @@ export default function PrinterSettings() {
       title="Printer Configuration"
       subtitle="Configure thermal receipt and A4 report printers"
       role="admin"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="max-w-3xl mx-auto space-y-6">
 
@@ -567,3 +567,4 @@ export default function PrinterSettings() {
     </RoleLayout>
   );
 }
+

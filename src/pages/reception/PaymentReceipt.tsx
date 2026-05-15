@@ -74,7 +74,7 @@ export default function PaymentReceipt() {
     amountPaid: order.total || 0,
     paymentMethod: (order.payment_method === 'orange_money' || order.payment_method === 'afrimoney') ? 'mobile-money' : (order.payment_method || 'cash') as 'cash' | 'card' | 'mobile-money',
     paymentDate: (() => { const d = new Date(order.created_at || order.createdAt || ''); return isValid(d) ? d.toISOString() : new Date().toISOString(); })(),
-    cashier: profile?.full_name || 'Cashier',
+    cashier: profile?.fullName || 'Cashier',
     collectionDate: (() => { const raw = order.collection_date || order.collectionDate; if (!raw) return undefined; const d = new Date(raw); return isValid(d) ? format(d, 'yyyy-MM-dd HH:mm') : undefined; })(),
   } : null;
 
@@ -412,3 +412,4 @@ export default function PaymentReceipt() {
     </div>
   );
 }
+

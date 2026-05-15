@@ -320,7 +320,7 @@ export default function PatientDetails() {
 
   if (isLoading) {
     return (
-      <RoleLayout title="Patient Details" subtitle="Loading..." role={currentRole} userName={profile?.full_name}>
+      <RoleLayout title="Patient Details" subtitle="Loading..." role={currentRole} userName={profile?.fullName}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -330,7 +330,7 @@ export default function PatientDetails() {
 
   if (!normalizedPatient) {
     return (
-      <RoleLayout title="Patient Not Found" subtitle="Patient does not exist" role={currentRole} userName={profile?.full_name}>
+      <RoleLayout title="Patient Not Found" subtitle="Patient does not exist" role={currentRole} userName={profile?.fullName}>
         <div className="text-center py-12">
           <p className="text-muted-foreground mb-4">Patient not found</p>
           <Button onClick={() => navigate(goBackPath)}>
@@ -347,7 +347,7 @@ export default function PatientDetails() {
       title={getPatientFullName(normalizedPatient as any)}
       subtitle={normalizedPatient.patientId}
       role={currentRole}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="mb-6">
         <Button variant="ghost" onClick={() => navigate(goBackPath)}>
@@ -644,3 +644,4 @@ export default function PatientDetails() {
     </RoleLayout>
   );
 }
+

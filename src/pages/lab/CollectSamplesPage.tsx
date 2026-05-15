@@ -49,8 +49,8 @@ export default function CollectSamplesPage() {
       setCollectedSampleId(sample.sampleId || sample.sample_id);
       setShowConfirmModal(true);
       toast.success(`Sample ${sample.sampleId || sample.sample_id} collected`);
-    } catch (error) {
-      toast.error('Failed to collect sample');
+    } catch (error: any) {
+      toast.error((error as any)?.response?.data?.message || 'Failed to collect sample');
     }
   };
 
@@ -70,7 +70,7 @@ export default function CollectSamplesPage() {
       title="Collect Samples" 
       subtitle="Sample collection and labeling"
       role="lab_tech"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Pending Orders List */}
@@ -282,7 +282,7 @@ export default function CollectSamplesPage() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Collected By</span>
-                  <span>{profile?.full_name}</span>
+                  <span>{profile?.fullName}</span>
                 </div>
               </div>
             )}
@@ -302,3 +302,4 @@ export default function CollectSamplesPage() {
     </RoleLayout>
   );
 }
+

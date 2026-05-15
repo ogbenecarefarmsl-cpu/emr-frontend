@@ -50,7 +50,7 @@ export default function DoctorsPage() {
       title="Doctors"
       subtitle="Manage referring doctors used in orders and monthly referral reports"
       role={role as any}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-1 bg-card border rounded-lg p-4 space-y-3">
@@ -125,3 +125,4 @@ export default function DoctorsPage() {
     </RoleLayout>
   );
 }
+

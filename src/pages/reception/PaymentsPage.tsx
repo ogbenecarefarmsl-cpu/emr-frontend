@@ -150,7 +150,7 @@ export default function PaymentsPage() {
       title="Payments" 
       subtitle="Process and track order payments"
       role={currentRole as any}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Date Range Filter */}
       <div className="flex items-center gap-3 mb-4">
@@ -586,3 +586,4 @@ export default function PaymentsPage() {
     </RoleLayout>
   );
 }
+

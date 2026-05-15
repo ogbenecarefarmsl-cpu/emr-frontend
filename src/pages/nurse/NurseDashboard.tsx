@@ -103,7 +103,7 @@ export default function NurseDashboard() {
       title="Nurse Station"
       subtitle="Triage, admissions, vitals, fluid balance, medication rounds and care plans"
       role="nurse"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
@@ -359,3 +359,4 @@ export default function NurseDashboard() {
     </RoleLayout>
   );
 }
+

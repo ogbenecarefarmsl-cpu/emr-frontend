@@ -56,7 +56,7 @@ export default function AuditLogViewer() {
       title="Audit Log Viewer" 
       subtitle="System activity and change tracking"
       role="admin"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Filters */}
       <div className="flex items-center gap-3 mb-6">
@@ -259,3 +259,4 @@ export default function AuditLogViewer() {
     </RoleLayout>
   );
 }
+

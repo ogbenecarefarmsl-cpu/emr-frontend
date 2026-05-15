@@ -204,7 +204,7 @@ export default function LabReportPage() {
         title="Lab Report"
         subtitle="View and print laboratory test results"
         role={layoutRole}
-        userName={profile?.full_name}
+        userName={profile?.fullName}
       >
         <div className="p-6">
           <div className="text-center">
@@ -221,7 +221,7 @@ export default function LabReportPage() {
       title="Lab Report"
       subtitle="View and print laboratory test results"
       role={layoutRole}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="no-print mb-4 flex items-center justify-between">
         <Button 
@@ -558,3 +558,4 @@ export default function LabReportPage() {
     </RoleLayout>
   );
 }
+

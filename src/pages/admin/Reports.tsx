@@ -162,7 +162,7 @@ export default function Reports() {
 
   if (ordersLoading) {
     return (
-      <RoleLayout title="Reports" subtitle="Analytics and insights" role="admin" userName={profile?.full_name}>
+      <RoleLayout title="Reports" subtitle="Analytics and insights" role="admin" userName={profile?.fullName}>
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -175,7 +175,7 @@ export default function Reports() {
       title="Reports & Analytics" 
       subtitle="Business insights and performance metrics"
       role="admin"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Actions */}
       <div className="flex items-center justify-between mb-6">
@@ -395,3 +395,4 @@ export default function Reports() {
     </RoleLayout>
   );
 }
+

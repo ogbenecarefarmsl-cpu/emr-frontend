@@ -31,7 +31,7 @@ export default function PatientSearch() {
       title={roleTitle[role] || 'Patients'}
       subtitle="Find a patient record and review clinical history"
       role={role}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative w-full sm:max-w-md">
@@ -108,3 +108,4 @@ export default function PatientSearch() {
     </RoleLayout>
   );
 }
+

@@ -25,7 +25,7 @@ const PatientRecord = () => {
 
   if (chartLoading) {
     return (
-      <RoleLayout title="Patient Record" subtitle="Longitudinal clinical history" role={layoutRole} userName={profile?.full_name}>
+      <RoleLayout title="Patient Record" subtitle="Longitudinal clinical history" role={layoutRole} userName={profile?.fullName}>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
@@ -44,7 +44,7 @@ const PatientRecord = () => {
   const summary = chart?.summary || {};
 
   return (
-    <RoleLayout title="Patient Record" subtitle="Longitudinal clinical history" role={layoutRole} userName={profile?.full_name}>
+    <RoleLayout title="Patient Record" subtitle="Longitudinal clinical history" role={layoutRole} userName={profile?.fullName}>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
@@ -357,7 +357,7 @@ const PatientRecord = () => {
                       <div>
                         <CardTitle className="text-base">SOAP Note - {note.noteType}</CardTitle>
                         <p className="text-sm text-gray-500">
-                          {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : note.nurseId?.full_name || note.nurseId?.fullName || 'Clinical staff'}
+                          {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : note.nurseId?.fullName || note.nurseId?.fullName || 'Clinical staff'}
                         </p>
                         <p className="text-xs text-gray-400">
                           {new Date(note.createdAt).toLocaleDateString()}
@@ -560,3 +560,4 @@ const PatientRecord = () => {
 };
 
 export default PatientRecord;
+

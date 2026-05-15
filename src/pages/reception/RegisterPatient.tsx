@@ -123,7 +123,7 @@ export default function RegisterPatient() {
         title="Patient Registered" 
         subtitle="Registration successful"
         role="receptionist"
-        userName={profile?.full_name}
+        userName={profile?.fullName}
       >
         <div className="max-w-lg mx-auto">
           <div className="bg-card border rounded-xl p-8 text-center">
@@ -175,7 +175,7 @@ export default function RegisterPatient() {
       title="Register Patient" 
       subtitle="Add a new patient to the system"
       role="receptionist"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="max-w-2xl mx-auto">
         <form onSubmit={handleSubmit} className="bg-card border rounded-xl p-6">
@@ -316,3 +316,4 @@ export default function RegisterPatient() {
     </RoleLayout>
   );
 }
+

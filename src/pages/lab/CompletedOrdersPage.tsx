@@ -90,8 +90,8 @@ export default function CompletedOrdersPage() {
       toast.success(`Order ${undoOrderNumber} moved back to processing`);
       setUndoOrderId(null);
       setUndoOrderNumber('');
-    } catch (error) {
-      toast.error('Failed to undo completion');
+    } catch (error: any) {
+      toast.error((error as any)?.response?.data?.message || 'Failed to undo completion');
     }
   };
 
@@ -142,7 +142,7 @@ export default function CompletedOrdersPage() {
       title="Print Reports" 
       subtitle="View and print lab reports for orders with results (partial or complete)"
       role={primaryRole || 'lab_tech'}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Search Bar and Bulk Actions */}
       <div className="flex items-center justify-between mb-6">
@@ -417,3 +417,4 @@ export default function CompletedOrdersPage() {
     </RoleLayout>
   );
 }
+

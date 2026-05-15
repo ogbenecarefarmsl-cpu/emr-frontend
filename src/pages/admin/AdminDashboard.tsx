@@ -94,7 +94,7 @@ export default function AdminDashboard() {
 
   if (isLoading) {
     return (
-      <RoleLayout title="Admin Dashboard" subtitle="Hospital-wide overview" role="admin" userName={profile?.full_name}>
+      <RoleLayout title="Admin Dashboard" subtitle="Hospital-wide overview" role="admin" userName={profile?.fullName}>
         <div className="flex items-center justify-center py-24">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -107,7 +107,7 @@ export default function AdminDashboard() {
       title="Admin Dashboard"
       subtitle={`Hospital overview — ${s?.date || new Date().toLocaleDateString()}`}
       role="admin"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* ───────── Top banner: revenue + throughput ───────── */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-6">
@@ -419,3 +419,4 @@ function AdminTool({
     </button>
   );
 }
+

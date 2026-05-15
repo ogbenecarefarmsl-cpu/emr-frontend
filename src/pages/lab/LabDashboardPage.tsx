@@ -62,7 +62,7 @@ export default function LabDashboardPage() {
       title="Lab Dashboard" 
       subtitle="Paid lab orders, sample collection, results and analyzers"
       role="lab_tech"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Patient Search */}
       <div className="mb-6">
@@ -157,10 +157,10 @@ export default function LabDashboardPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {[
-          { label: 'Paid', value: pendingOrders?.length || 0, icon: ClipboardCheck },
-          { label: 'Collection', value: pendingOrders?.length || 0, icon: TestTube },
-          { label: 'Processing', value: processingOrders?.length || 0, icon: FlaskConical },
-          { label: 'Released', value: completedToday, icon: CheckCircle },
+          { label: 'Awaiting Collection', value: pendingOrders?.length || 0, icon: ClipboardCheck },
+          { label: 'In Processing', value: processingOrders?.length || 0, icon: TestTube },
+          { label: 'Results Entered', value: processingOrders?.length || 0, icon: FlaskConical },
+          { label: 'Released Today', value: completedToday, icon: CheckCircle },
         ].map((step) => (
           <div key={step.label} className="border bg-card rounded-lg px-4 py-3">
             <div className="flex items-center justify-between gap-3">
@@ -289,3 +289,4 @@ export default function LabDashboardPage() {
     </RoleLayout>
   );
 }
+

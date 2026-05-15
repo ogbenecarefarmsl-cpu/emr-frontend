@@ -75,7 +75,7 @@ export default function UserManagement() {
       title="Staff & Roles" 
       subtitle="Manage staff accounts and role assignments"
       role="admin"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Actions Bar */}
       <div className="flex items-center justify-between mb-6">
@@ -257,3 +257,4 @@ export default function UserManagement() {
     </RoleLayout>
   );
 }
+

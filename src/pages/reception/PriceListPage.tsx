@@ -214,7 +214,7 @@ export default function PriceListPage() {
       title="Price List"
       subtitle="Select tests to quote prices and print"
       role={currentRole as any}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-3 mb-4">
@@ -316,4 +316,5 @@ export default function PriceListPage() {
     </RoleLayout>
   );
 }
+
 

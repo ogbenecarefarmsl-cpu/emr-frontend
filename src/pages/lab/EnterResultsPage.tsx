@@ -975,7 +975,7 @@ export default function EnterResultsPage() {
       title="Enter Results"
       subtitle="Input test results — changes are synced to all users in real time"
       role={primaryRole === 'receptionist' ? 'receptionist' : primaryRole === 'admin' ? 'admin' : 'lab_tech'}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-start">
         {/* Orders List */}
@@ -1602,3 +1602,4 @@ export default function EnterResultsPage() {
     </RoleLayout>
   );
 }
+

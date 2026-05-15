@@ -86,7 +86,7 @@ export default function QCDataEntry() {
       title="Quality Control Data Entry" 
       subtitle="Record and monitor QC results"
       role="lab_tech"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Entry Form */}

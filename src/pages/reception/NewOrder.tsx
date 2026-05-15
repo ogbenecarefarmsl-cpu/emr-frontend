@@ -387,7 +387,7 @@ export default function NewOrder() {
         title="Order Created" 
         subtitle="Order has been submitted"
         role="receptionist"
-        userName={profile?.full_name}
+        userName={profile?.fullName}
       >
         <div className="max-w-2xl mx-auto">
           <div className="bg-card border rounded-xl p-8" id="receipt-content">
@@ -532,7 +532,7 @@ export default function NewOrder() {
       title="New Test Order" 
       subtitle="Create a new laboratory test order"
       role="receptionist"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Main Form */}
@@ -1008,3 +1008,4 @@ export default function NewOrder() {
     </RoleLayout>
   );
 }
+

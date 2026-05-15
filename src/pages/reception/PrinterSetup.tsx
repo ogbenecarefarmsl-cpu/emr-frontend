@@ -130,7 +130,7 @@ export default function PrinterSetup() {
       title="Printer Setup"
       subtitle="Connect the receipt printer on this computer"
       role="receptionist"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="max-w-2xl mx-auto space-y-6">
         <Card>
@@ -327,3 +327,4 @@ export default function PrinterSetup() {
     </RoleLayout>
   );
 }
+

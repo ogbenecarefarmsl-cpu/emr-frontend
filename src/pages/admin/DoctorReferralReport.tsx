@@ -156,7 +156,7 @@ export default function DoctorReferralReport() {
       title="Doctor Activity"
       subtitle="Clinical orders grouped by doctor - patient, services, discounts, and payments"
       role={role as any}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="flex flex-wrap items-end gap-3 mb-6">
         <div>
@@ -312,3 +312,4 @@ export default function DoctorReferralReport() {
     </RoleLayout>
   );
 }
+

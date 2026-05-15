@@ -202,7 +202,7 @@ export default function ExpendituresPage() {
       title="Expenditures"
       subtitle="Record and track daily expenses"
       role={currentRole as any}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Top Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -507,3 +507,4 @@ export default function ExpendituresPage() {
     </RoleLayout>
   );
 }
+

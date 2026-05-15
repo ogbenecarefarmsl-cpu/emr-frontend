@@ -80,7 +80,7 @@ export default function Settings() {
   ];
 
   return (
-    <RoleLayout title="Settings" subtitle="Configure system preferences" role="admin" userName={profile?.full_name}>
+    <RoleLayout title="Settings" subtitle="Configure system preferences" role="admin" userName={profile?.fullName}>
       <div className="max-w-4xl">
         {/* Server Connection */}
         <div className="bg-card border rounded-lg p-6 mb-6">
@@ -219,3 +219,4 @@ export default function Settings() {
     </RoleLayout>
   );
 }
+

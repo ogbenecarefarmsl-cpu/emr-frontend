@@ -1,4 +1,4 @@
-﻿import { RoleLayout } from '@/components/layout/RoleLayout';
+import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useTestCatalog, useCreateTest, useUpdateTest, useDeleteTest } from '@/hooks/useTestCatalog';
 import { useMachines } from '@/hooks/useMachines';
@@ -140,7 +140,7 @@ export default function TestCatalog() {
       title="Test Catalog" 
       subtitle="Manage available laboratory tests"
       role="admin"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Actions Bar */}
       <div className="flex items-center justify-between mb-6">
@@ -379,3 +379,4 @@ export default function TestCatalog() {
     </RoleLayout>
   );
 }
+

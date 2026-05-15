@@ -57,7 +57,7 @@ export default function InventoryManagement() {
       title="Pharmacy Inventory"
       subtitle="Read-only view of drug stock levels"
       role="pharmacist"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Info banner */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-start gap-3">
@@ -201,3 +201,4 @@ export default function InventoryManagement() {
     </RoleLayout>
   );
 }
+

@@ -59,7 +59,7 @@ export default function CommunicationLogs() {
       title="Communication Logs" 
       subtitle="Analyzer message history and monitoring"
       role="admin"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Actions Bar */}
       <div className="flex items-center justify-between mb-6">
@@ -266,3 +266,4 @@ export default function CommunicationLogs() {
     </RoleLayout>
   );
 }
+

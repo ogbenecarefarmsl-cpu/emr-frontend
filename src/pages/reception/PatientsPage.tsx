@@ -123,7 +123,7 @@ export default function PatientsPage() {
       title="Patients" 
       subtitle="Search and manage patient records"
       role={currentRole}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Actions Bar */}
       <div className="flex items-center justify-between mb-6">
@@ -369,3 +369,4 @@ export default function PatientsPage() {
     </RoleLayout>
   );
 }
+

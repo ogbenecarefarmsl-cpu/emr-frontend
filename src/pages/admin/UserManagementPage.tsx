@@ -136,7 +136,7 @@ export default function UserManagementPage() {
       title="Staff & Roles" 
       subtitle="Manage staff accounts and role-based access"
       role="admin"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Header with Create Button */}
       <div className="flex justify-between items-center mb-6">
@@ -530,3 +530,4 @@ export default function UserManagementPage() {
     </RoleLayout>
   );
 }
+

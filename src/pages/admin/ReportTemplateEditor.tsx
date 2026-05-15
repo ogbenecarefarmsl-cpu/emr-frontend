@@ -88,7 +88,7 @@ export default function ReportTemplateEditor() {
 
   if (isLoading || !formData) {
     return (
-      <RoleLayout title="Report Template" subtitle="Loading..." role="admin" userName={profile?.full_name}>
+      <RoleLayout title="Report Template" subtitle="Loading..." role="admin" userName={profile?.fullName}>
         <div className="flex items-center justify-center py-12">
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
@@ -101,7 +101,7 @@ export default function ReportTemplateEditor() {
       title="Report Template Editor"
       subtitle="Customize lab report appearance"
       role="admin"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Editor Panel */}
@@ -515,3 +515,4 @@ export default function ReportTemplateEditor() {
     </RoleLayout>
   );
 }
+

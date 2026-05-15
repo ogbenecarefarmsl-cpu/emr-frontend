@@ -251,7 +251,7 @@ export default function DailyReconciliation() {
       title="Daily Reconciliation"
       subtitle="Submit end-of-day cash reconciliation and record expenses"
       role="receptionist"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
@@ -279,7 +279,7 @@ export default function DailyReconciliation() {
               Le {netExpectedTotal.toLocaleString()}
             </p>
             <p className="text-xs text-muted-foreground mt-1 text-amber-600">
-              Le {(expected?.incomeCash || 0) + (expected?.incomeOrangeMoney || 0) + (expected?.incomeAfrimoney || 0) > 0
+              {(expected?.incomeCash || 0) + (expected?.incomeOrangeMoney || 0) + (expected?.incomeAfrimoney || 0) > 0
                 ? `Le ${((expected?.incomeCash || 0) + (expected?.incomeOrangeMoney || 0) + (expected?.incomeAfrimoney || 0)).toLocaleString()} (Collected) − Le ${(expected?.totalExpenditures || cashExpendituresTotal + orangeExpendituresTotal + afriExpendituresTotal).toLocaleString()} (Expenses)`
                 : 'Gross collected minus expenditures'}
             </p>
@@ -662,3 +662,4 @@ export default function DailyReconciliation() {
     </RoleLayout>
   );
 }
+

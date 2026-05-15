@@ -35,7 +35,7 @@ export default function PaymentDemo() {
       title="Payment & Receipt Demo"
       subtitle="Test the thermal receipt printing functionality"
       role="receptionist"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="max-w-2xl mx-auto">
         <Card className="p-8">
@@ -107,8 +107,9 @@ export default function PaymentDemo() {
         open={showPaymentDialog}
         onOpenChange={setShowPaymentDialog}
         order={mockOrder}
-        cashierName={profile?.full_name || 'Cashier'}
+        cashierName={profile?.fullName || 'Cashier'}
       />
     </RoleLayout>
   );
 }
+

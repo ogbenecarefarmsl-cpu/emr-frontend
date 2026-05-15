@@ -79,11 +79,17 @@ export function PendingOrders() {
                     {patient?.patientId} • Order: {order.orderNumber}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Ordered by: {order.doctorId?.fullName || order.orderedBy?.fullName || 'Unknown'}
+                    Ordered by: {order.orderedBy?.fullName || order.doctorId?.fullName || 'Unknown'}
                   </div>
-                  {order.tests && order.tests.length > 0 && (
+                  {order.order_tests && order.order_tests.length > 0 && (
                     <div className="text-sm text-muted-foreground mt-1">
-                      Tests: {order.tests.map((t: any) => t.testName).join(', ')}
+                      Tests:{' '}
+                      <span className="font-medium text-foreground">
+                        {order.order_tests.map((t: any) => t.testCode).join(', ')}
+                      </span>
+                      <span className="ml-1 text-xs">
+                        ({order.order_tests.map((t: any) => t.testName).join(', ')})
+                      </span>
                     </div>
                   )}
                 </div>
@@ -91,7 +97,7 @@ export function PendingOrders() {
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <div className="font-medium text-lg">
-                    ₦{order.total?.toLocaleString() || '0'}
+                    Le {order.total?.toLocaleString() || '0'}
                   </div>
                   <div className="text-sm text-muted-foreground">
                     {new Date(order.createdAt).toLocaleTimeString([], {

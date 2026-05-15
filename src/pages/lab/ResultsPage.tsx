@@ -140,7 +140,7 @@ export default function ResultsPage() {
       title="Results" 
       subtitle="View and verify test results"
       role={currentRole}
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Actions Bar */}
       <div className="flex items-center justify-between mb-6">
@@ -328,3 +328,4 @@ export default function ResultsPage() {
     </RoleLayout>
   );
 }
+

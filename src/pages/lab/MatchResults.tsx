@@ -128,7 +128,7 @@ export default function MatchResults() {
       title="Match Analyzer Results"
       subtitle="Link incoming results to patient samples"
       role="lab_tech"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Unmatched Results */}
@@ -323,3 +323,4 @@ export default function MatchResults() {
     </RoleLayout>
   );
 }
+

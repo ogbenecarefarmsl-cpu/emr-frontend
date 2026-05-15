@@ -173,7 +173,7 @@ export default function DoctorDashboard() {
       return admissionsAPI.create({
         patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
         visitId: selectedVisit._id || selectedVisit.id,
-        doctorId: (profile as any)?._id || (profile as any)?.id || profile?.id,
+        doctorId: profile?.id,  // Profile ID — admission.doctorId now refs Profile
         wardType: admitForm.wardType,
         bedNumber: admitForm.bedNumber || undefined,
         admissionReason: admitForm.admissionReason,
@@ -309,7 +309,7 @@ export default function DoctorDashboard() {
       await soapNoteService.create({
         patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
         visitId: selectedVisit._id || selectedVisit.id,
-        doctorId: (profile as any)?._id || (profile as any)?.id || profile?.id,
+        doctorId: profile?.id,  // Profile ID — soap_note.doctorId refs Profile
         noteType: SoapNoteTypeEnum.CONSULTATION,
         chiefComplaint: soapForm.subjective || selectedVisit.chiefComplaint || undefined,
         historyPresentIllness: soapForm.subjective || undefined,
@@ -482,7 +482,7 @@ export default function DoctorDashboard() {
 
   if (isLoading) {
     return (
-      <RoleLayout title="Doctor Dashboard" subtitle="Manage your consultations" role="doctor" userName={profile?.full_name}>
+      <RoleLayout title="Doctor Dashboard" subtitle="Manage your consultations" role="doctor" userName={profile?.fullName}>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -491,7 +491,7 @@ export default function DoctorDashboard() {
   }
 
   return (
-    <RoleLayout title="Doctor Dashboard" subtitle="Manage your consultations" role="doctor" userName={profile?.full_name}>
+    <RoleLayout title="Doctor Dashboard" subtitle="Manage your consultations" role="doctor" userName={profile?.fullName}>
       {/* Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <MetricCard
@@ -1058,7 +1058,7 @@ export default function DoctorDashboard() {
                                     <div>
                                       <p className="text-sm font-semibold capitalize">{note.noteType?.replace(/_/g, ' ') || 'Clinical note'}</p>
                                       <p className="text-xs text-muted-foreground">
-                                        {note.doctorId?.fullName || note.doctorId?.full_name || note.nurseId?.full_name || 'Clinical staff'} - {new Date(note.createdAt).toLocaleDateString()}
+                                        {note.doctorId?.fullName || note.doctorId?.fullName || note.nurseId?.fullName || 'Clinical staff'} - {new Date(note.createdAt).toLocaleDateString()}
                                       </p>
                                     </div>
                                     {note.isSigned && <Badge>Signed</Badge>}
@@ -1178,7 +1178,7 @@ export default function DoctorDashboard() {
                                 <div key={index} className="border rounded-lg p-4 bg-card">
                                   <div className="flex items-center justify-between mb-3">
                                     <p className="text-sm font-semibold">{new Date(vital.date).toLocaleDateString()}</p>
-                                    <p className="text-xs text-muted-foreground">{vital.recordedBy?.fullName || vital.recordedBy?.full_name || 'Clinical staff'}</p>
+                                    <p className="text-xs text-muted-foreground">{vital.recordedBy?.fullName || vital.recordedBy?.fullName || 'Clinical staff'}</p>
                                   </div>
                                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                                     {vital.vitalSigns?.bloodPressure && <div>BP: <span className="font-medium">{vital.vitalSigns.bloodPressure}</span></div>}
@@ -1565,3 +1565,4 @@ export default function DoctorDashboard() {
     </RoleLayout>
   );
 }
+

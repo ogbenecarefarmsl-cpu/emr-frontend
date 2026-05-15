@@ -458,7 +458,7 @@ export default function QuickResultEntry() {
       title="Quick Result Entry"
       subtitle={isReceptionistEntry ? 'Fast numeric entry — save and print immediately' : 'Scan or type an order number to enter results fast'}
       role="receptionist"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {isReceptionistEntry && (
         <div className="mb-4 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
@@ -697,3 +697,4 @@ export default function QuickResultEntry() {
     </RoleLayout>
   );
 }
+

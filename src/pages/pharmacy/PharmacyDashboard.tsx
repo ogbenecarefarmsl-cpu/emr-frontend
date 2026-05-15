@@ -97,7 +97,7 @@ export default function PharmacyDashboard() {
       title="Pharmacy"
       subtitle="Dispense prescriptions and monitor stock"
       role="pharmacist"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -562,3 +562,4 @@ function PrescriptionDetail({
     </div>
   );
 }
+

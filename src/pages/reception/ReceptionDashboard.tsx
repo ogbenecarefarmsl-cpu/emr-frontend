@@ -92,6 +92,9 @@ export default function ReceptionDashboard() {
       toast.success('Pharmacy payment confirmed');
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
     },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to confirm payment');
+    },
   });
   const todayRevenue = paymentStats?.paidRevenue ?? 0;
   const pendingLabPayments = Array.isArray(orders) ? orders.filter(o =>
@@ -110,7 +113,7 @@ export default function ReceptionDashboard() {
       title="Reception Dashboard"
       subtitle="Patient registration and EMR management"
       role="receptionist"
-      userName={profile?.full_name}
+      userName={profile?.fullName}
     >
       {/* Patient Search */}
       <div className="mb-6">
@@ -334,3 +337,4 @@ export default function ReceptionDashboard() {
     </RoleLayout>
   );
 }
+
