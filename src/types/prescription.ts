@@ -51,15 +51,21 @@ export interface Prescription {
     _id: string;
     consultationNumber: string;
   };
-  doctorId: {
+  /** External/referring doctor (optional, refs doctors collection) */
+  doctorId?: {
     _id: string;
     fullName: string;
   };
+  /** The system user (doctor/specialist) who wrote this prescription */
+  prescribedBy?: {
+    _id: string;
+    fullName: string;
+    email?: string;
+    department?: string;
+  };
   items: PrescriptionItem[];
   status: PrescriptionStatusEnum;
-  /** General notes from doctor — visible to pharmacist and patient */
   notes?: string;
-  /** Pharmacist's dispensing notes — added at dispense time */
   dispensingNotes?: string;
   dispensedBy?: {
     _id: string;

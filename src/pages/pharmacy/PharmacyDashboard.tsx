@@ -22,7 +22,7 @@ import { toast } from 'sonner';
 // Icons
 import {
   AlertTriangle, CheckCircle, Clock, Loader2, Package, Pill, Search, User,
-  ClipboardList, CreditCard, Send, XCircle, ChevronRight, ArrowRight,
+  ClipboardList, CreditCard, Send, XCircle, ChevronRight, ArrowRight, Stethoscope,
 } from 'lucide-react';
 
 const getId = (v: any) => v?._id || v?.id || v;
@@ -421,6 +421,18 @@ function PrescriptionDetail({
                 </>
               )}
             </div>
+            {/* Prescribing doctor — always shown so pharmacist knows who wrote it */}
+            {(rx.prescribedBy || rx.doctorId) && (
+              <div className="flex items-center gap-1.5 mt-1.5 text-sm">
+                <Stethoscope className="w-3.5 h-3.5 text-primary" />
+                <span className="font-medium">
+                  {rx.prescribedBy?.fullName || rx.doctorId?.fullName}
+                </span>
+                {rx.prescribedBy?.department && (
+                  <span className="text-muted-foreground">· {rx.prescribedBy.department}</span>
+                )}
+              </div>
+            )}
             {patient?.allergies?.length > 0 && (
               <div className="flex items-center gap-1 mt-2">
                 <AlertTriangle className="w-3.5 h-3.5 text-red-500" />

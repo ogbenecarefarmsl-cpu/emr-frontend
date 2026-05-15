@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { prescriptionService } from '@/services/prescriptionService';
+import { soapNoteService } from '@/services/soapNoteService';
 import {
   useAdmission,
   useFluidBalance,
@@ -108,11 +109,34 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
   const [transferForm, setTransferForm] = useState({ wardType: '', bedNumber: '', notes: '' });
   const [dischargeForm, setDischargeForm] = useState({ dischargeDiagnosis: '', dischargeInstructions: '', dischargeNotes: '' });
   const patientId = admission?.patientId?._id;
+  const visitId = admission?.visitId;
+
   const { data: patientPrescriptions = [] } = useQuery({
     queryKey: ['prescriptions', 'patient', patientId],
     queryFn: () => prescriptionService.findByPatient(patientId),
     enabled: !!patientId,
     staleTime: 30 * 1000,
+  });
+
+  // Fetch SOAP notes directly by visitId as a safety net.
+  // The admission object already includes clinicalNotes from the backend,
+  // but if the doctor wrote notes after the admission was loaded, this
+  // separate query ensures the nurse always sees the latest notes.
+  const { data: visitSoapNotes = [] } = useQuery({
+    queryKey: ['soap-notes', 'visit', visitId],
+    queryFn: () => soapNoteService.findByVisit(visitId!),
+    enabled: !!visitId,
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000,
+  });
+
+  // Also fetch by patient for any notes not linked to this visit
+  const { data: patientSoapNotes = [] } = useQuery({
+    queryKey: ['soap-notes', 'patient', patientId],
+    queryFn: () => soapNoteService.findByPatient(patientId!),
+    enabled: !!patientId,
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000,
   });
 
   if (isLoading || !admission) {
@@ -128,7 +152,18 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
   const medsLog = admission.medicationLog || [];
   const fluidsLog = admission.fluidBalance || [];
   const nursingNotes = admission.nursingNotes || [];
-  const clinicalNotes = admission.clinicalNotes || [];
+
+  // Merge clinical notes from three sources and deduplicate by _id:
+  // 1. admission.clinicalNotes — fetched server-side when admission was loaded
+  // 2. visitSoapNotes — direct query by visitId (catches notes added after load)
+  // 3. patientSoapNotes — all notes for this patient (catches ward round notes)
+  const allNotesMap = new Map<string, any>();
+  for (const n of [...(admission.clinicalNotes || []), ...visitSoapNotes, ...patientSoapNotes]) {
+    if (n?._id) allNotesMap.set(n._id.toString(), n);
+  }
+  const clinicalNotes = Array.from(allNotesMap.values())
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
   const carePlan = admission.carePlan || [];
   const incidents = admission.incidents || [];
   const shiftHandovers = admission.shiftHandovers || [];

@@ -44,6 +44,11 @@ export const soapNoteService = {
     return response.data;
   },
 
+  async findByVisit(visitId: string): Promise<any[]> {
+    const response = await api.get(`/soap-notes/visit/${visitId}`);
+    return response.data;
+  },
+
   async update(id: string, data: any): Promise<any> {
     const response = await api.patch(`/soap-notes/${id}`, data);
     return response.data;
