@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
 
 export interface ReportMetadata {
@@ -93,56 +93,25 @@ export interface LabResultReport {
   laboratoryInfo: LaboratoryInfo;
 }
 
-/**
- * Custom hook for fetching lab result report data
- * 
- * Fetches a formatted lab results report from the backend API for a given order ID.
- * Handles loading states, errors, and provides a refetch function for retry logic.
- * 
- * @param orderId - MongoDB ObjectId of the order
- * @returns Object containing report data, loading state, error message, and refetch function
- * 
- * @example
- * ```tsx
- * const { reportData, loading, error, refetch } = useLabReport(orderId);
- * 
- * if (loading) return <Spinner />;
- * if (error) return <ErrorMessage message={error} onRetry={refetch} />;
- * return <ReportView data={reportData} />;
- * ```
- */
+async function fetchLabReport(orderId: string): Promise<LabResultReport> {
+  if (!orderId) throw new Error('Order ID is required');
+  const response = await api.get(`/reports/lab-results/${orderId}`);
+  return response.data;
+}
+
 export function useLabReport(orderId: string) {
-  const [reportData, setReportData] = useState<LabResultReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: reportData, isLoading: loading, error, refetch } = useQuery({
+    queryKey: ['lab-report', orderId],
+    queryFn: () => fetchLabReport(orderId),
+    enabled: !!orderId,
+    staleTime: 1000 * 60 * 5,
+    retry: 2,
+  });
 
-  const fetchReport = async () => {
-    if (!orderId) {
-      setError('Order ID is required');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await api.get(`/reports/lab-results/${orderId}`);
-      setReportData(response.data);
-    } catch (err: unknown) {
-      const axiosError = err as { response?: { data?: { message?: string } }; message?: string };
-      const errorMessage = axiosError.response?.data?.message || axiosError.message || 'Failed to load report';
-      setError(errorMessage);
-      setReportData(null);
-    } finally {
-      setLoading(false);
-    }
+  return {
+    reportData: reportData || null,
+    loading,
+    error: error ? (error as Error).message : null,
+    refetch,
   };
-
-  useEffect(() => {
-    if (orderId) {
-      fetchReport();
-    }
-  }, [orderId]);
-
-  return { reportData, loading, error, refetch: fetchReport };
 }

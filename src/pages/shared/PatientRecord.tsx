@@ -4,12 +4,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { patientService } from '@/services/patientService';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Progress } from '@/components/ui/progress';
-import { Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical, Clock, CheckCircle, AlertTriangle, BedDouble } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical, Clock, AlertTriangle, ChevronDown, ChevronRight, Calendar, TrendingUp, Droplets, ExternalLink } from 'lucide-react';
 
 const PatientRecord = () => {
   const { patientId } = useParams();
@@ -25,530 +25,543 @@ const PatientRecord = () => {
 
   if (chartLoading) {
     return (
-      <RoleLayout title="Patient Record" subtitle="Longitudinal clinical history" role={layoutRole} userName={profile?.fullName}>
+      <RoleLayout title="Patient Record" subtitle="Loading clinical history..." role={layoutRole} userName={profile?.fullName}>
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="w-8 h-8 animate-spin" />
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
       </RoleLayout>
     );
   }
 
-  const patient = chart?.patient;
-  const consultations = chart?.consultations || [];
-  const prescriptions = chart?.prescriptions || [];
-  const soapNotes = chart?.soapNotes || [];
-  const orders = chart?.orders || [];
-  const admissions = chart?.admissions || [];
-  const notes = chart?.notes || [];
-  const vitalsHistory = chart?.vitalsHistory || [];
-  const summary = chart?.summary || {};
+  if (!chart?.patient) {
+    return (
+      <RoleLayout title="Patient Record" subtitle="Patient not found" role={layoutRole} userName={profile?.fullName}>
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <User className="w-16 h-16 text-muted-foreground" />
+          <p className="text-muted-foreground">Patient not found</p>
+          <Button variant="outline" onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Go Back
+          </Button>
+        </div>
+      </RoleLayout>
+    );
+  }
+
+  const patient = chart.patient;
+  const consultations = chart.consultations || [];
+  const prescriptions = chart.prescriptions || [];
+  const soapNotes = chart.soapNotes || [];
+  const orders = chart.orders || [];
+  const admissions = chart.admissions || [];
+  const vitalsHistory = chart.vitalsHistory || [];
+  const summary = chart.summary || {};
+
+  const getFlagColor = (flag: string) => {
+    switch (flag) {
+      case 'critical_high':
+      case 'critical_low':
+        return 'text-red-600 bg-red-50 border-red-200';
+      case 'high':
+      case 'low':
+        return 'text-amber-600 bg-amber-50 border-amber-200';
+      default:
+        return 'text-green-600 bg-green-50 border-green-200';
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusMap: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
+      completed: { variant: 'default', label: 'Completed' },
+      pending_collection: { variant: 'secondary', label: 'Pending Collection' },
+      processing: { variant: 'outline', label: 'Processing' },
+      cancelled: { variant: 'destructive', label: 'Cancelled' },
+      awaiting_payment: { variant: 'secondary', label: 'Awaiting Payment' },
+      paid: { variant: 'default', label: 'Paid' },
+    };
+    const config = statusMap[status] || { variant: 'outline' as const, label: status };
+    return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const groupResultsByPanel = (order: any) => {
+    const panels: Record<string, { name: string; tests: any[] }> = {};
+    const standalone: any[] = [];
+
+    order.orderTests?.forEach((test: any) => {
+      const result = order.results?.find((r: any) =>
+        r.orderTestId?.toString() === test._id?.toString()
+      );
+      const testWithResult = { ...test, result };
+
+      if (test.panelCode) {
+        if (!panels[test.panelCode]) {
+          panels[test.panelCode] = { name: test.panelName || test.panelCode, tests: [] };
+        }
+        panels[test.panelCode].tests.push(testWithResult);
+      } else {
+        standalone.push(testWithResult);
+      }
+    });
+
+    return { panels, standalone };
+  };
+
+  const formatDate = (date: string | Date) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const formatTime = (date: string | Date) => {
+    return new Date(date).toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   return (
     <RoleLayout title="Patient Record" subtitle="Longitudinal clinical history" role={layoutRole} userName={profile?.fullName}>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+        {/* Patient Header */}
+        <div className="flex items-start gap-4 bg-card border rounded-xl p-6">
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="mt-1">
             <ArrowLeft className="w-4 h-4" />
           </Button>
           <div className="flex-1">
-            <h1 className="text-3xl font-bold">
-              {patient?.firstName} {patient?.lastName}
-            </h1>
-            <p className="text-muted-foreground">
-              {patient?.patientId} • {patient?.gender} • {patient?.age} {patient?.ageUnit || 'years'}
-            </p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                <User className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">
+                  {patient.firstName} {patient.lastName}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {patient.patientId} • {patient.gender === 'M' ? 'Male' : 'Female'} • {patient.age} {patient.ageUnit || 'years'}
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {patient.bloodType && (
+                <Badge variant="outline" className="gap-1">
+                  <Droplets className="w-3 h-3" />
+                  {patient.bloodType}
+                </Badge>
+              )}
+              {patient.allergies?.length > 0 && (
+                <Badge variant="destructive" className="gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  {patient.allergies.join(', ')}
+                </Badge>
+              )}
+              {patient.chronicConditions?.length > 0 && (
+                <Badge variant="secondary" className="gap-1">
+                  {patient.chronicConditions.join(', ')}
+                </Badge>
+              )}
+              {patient.insuranceProvider && (
+                <Badge variant="outline">{patient.insuranceProvider}</Badge>
+              )}
+            </div>
           </div>
-          <Badge variant={patient?.isActive ? 'default' : 'secondary'}>
-            {patient?.isActive ? 'Active' : 'Inactive'}
-          </Badge>
         </div>
 
-        {/* Patient Info Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Blood Type</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{patient?.bloodType || 'N/A'}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Allergies</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-1">
-                {patient?.allergies?.length > 0 ? (
-                  patient.allergies.map((a: string) => (
-                    <Badge key={a} variant="destructive" className="text-xs">{a}</Badge>
-                  ))
-                ) : (
-                  <p className="text-gray-500">None</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Chronic Conditions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex flex-wrap gap-1">
-                {patient?.chronicConditions?.length > 0 ? (
-                  patient.chronicConditions.map((c: string) => (
-                    <Badge key={c} variant="secondary" className="text-xs">{c}</Badge>
-                  ))
-                ) : (
-                  <p className="text-gray-500">None</p>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Insurance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm">{patient?.insuranceProvider || 'N/A'}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Summary Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Total Consultations</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{summary.totalConsultations || 0}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Prescriptions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{summary.totalPrescriptions || 0}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Lab Orders</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{summary.totalLabOrders || 0}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">Last Visit</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm">{summary.lastVisit ? new Date(summary.lastVisit).toLocaleDateString() : 'N/A'}</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Tabs for Detailed Info */}
-        <Tabs defaultValue="overview">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="consultations">Consultations</TabsTrigger>
-            <TabsTrigger value="lab-results">Lab Results</TabsTrigger>
-            <TabsTrigger value="prescriptions">Prescriptions</TabsTrigger>
-            <TabsTrigger value="soap-notes">SOAP Notes</TabsTrigger>
-            <TabsTrigger value="admissions">Admissions</TabsTrigger>
-            <TabsTrigger value="vitals">Vitals</TabsTrigger>
-          </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle>Patient Information</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {[
+            { label: 'Consultations', value: summary.totalConsultations || 0, icon: Stethoscope, color: 'text-blue-600' },
+            { label: 'Prescriptions', value: summary.totalPrescriptions || 0, icon: Pill, color: 'text-green-600' },
+            { label: 'Lab Orders', value: summary.totalLabOrders || 0, icon: FlaskConical, color: 'text-purple-600' },
+            { label: 'Last Visit', value: summary.lastVisit ? formatDate(summary.lastVisit) : 'N/A', icon: Calendar, color: 'text-amber-600' },
+          ].map((stat) => (
+            <Card key={stat.label} className="border-l-4 border-l-primary">
+              <CardContent className="pt-4">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-500">Phone</p>
-                    <p>{patient?.phone || 'N/A'}</p>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    <p className="text-lg font-semibold mt-0.5">{stat.value}</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <p>{patient?.email || 'N/A'}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-sm text-gray-500">Address</p>
-                    <p>{patient?.address || 'N/A'}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-sm text-gray-500">Medical History</p>
-                    <p className="whitespace-pre-wrap">{patient?.medicalHistory || 'No medical history recorded'}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-sm text-gray-500">Current Medications</p>
-                    <p className="whitespace-pre-wrap">{patient?.currentMedications || 'None'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Emergency Contact</p>
-                    <p>{patient?.emergencyContactName || 'N/A'}</p>
-                    <p className="text-sm">{patient?.emergencyContactPhone || ''}</p>
-                  </div>
+                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
                 </div>
               </CardContent>
             </Card>
-          </TabsContent>
+          ))}
+        </div>
 
-          {/* Consultations Tab */}
-          <TabsContent value="consultations" className="space-y-4">
-            {consultations.length > 0 ? (
-              consultations.map((c: any) => (
-                <Card key={c._id}>
-                  <CardContent className="pt-6">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-semibold">{c.consultationNumber}</p>
-                        <p className="text-sm text-gray-500">Dr. {c.doctorId?.fullName}</p>
-                        <p className="text-xs text-gray-400">
-                          {new Date(c.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      <Badge>{c.status}</Badge>
-                    </div>
-                    {c.diagnosis && (
-                      <div className="mt-3">
-                        <p className="text-sm font-medium">Diagnosis:</p>
-                        <p className="text-sm">{c.diagnosis}</p>
-                      </div>
-                    )}
-                    {c.chiefComplaint && (
-                      <div className="mt-2">
-                        <p className="text-sm font-medium">Chief Complaint:</p>
-                        <p className="text-sm">{c.chiefComplaint}</p>
-                      </div>
-                    )}
-                    {c.treatmentPlan && (
-                      <div className="mt-2">
-                        <p className="text-sm font-medium">Treatment Plan:</p>
-                        <p className="text-sm">{c.treatmentPlan}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="timeline" className="space-y-4">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="timeline">Timeline</TabsTrigger>
+            <TabsTrigger value="lab-results">Lab Results</TabsTrigger>
+            <TabsTrigger value="prescriptions">Prescriptions</TabsTrigger>
+            <TabsTrigger value="soap-notes">SOAP Notes</TabsTrigger>
+            <TabsTrigger value="vitals">Vitals</TabsTrigger>
+          </TabsList>
+
+          {/* Timeline Tab */}
+          <TabsContent value="timeline" className="space-y-4">
+            {soapNotes.length === 0 && consultations.length === 0 && orders.length === 0 ? (
+              <Card>
+                <CardContent className="pt-12 text-center">
+                  <Clock className="w-12 h-12 mx-auto text-muted-foreground mb-3 opacity-50" />
+                  <p className="text-muted-foreground">No clinical history yet</p>
+                  <p className="text-sm text-muted-foreground mt-1">Encounters will appear here as they are recorded</p>
+                </CardContent>
+              </Card>
             ) : (
-              <p className="text-center text-gray-500 py-8">No consultations found</p>
+              <div className="space-y-3">
+                {/* SOAP Notes */}
+                {soapNotes.map((note: any) => (
+                  <div key={note._id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                        <Stethoscope className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="w-0.5 h-full bg-border mt-1" />
+                    </div>
+                    <Card className="flex-1">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-sm">Consultation</CardTitle>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : 'Clinical staff'} • {formatDate(note.createdAt)} {formatTime(note.createdAt)}
+                            </p>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm">
+                        {note.chiefComplaint && (
+                          <div>
+                            <span className="font-medium text-blue-600">Complaint:</span> {note.chiefComplaint}
+                          </div>
+                        )}
+                        {note.diagnosis && (
+                          <div>
+                            <span className="font-medium text-orange-600">Diagnosis:</span> {note.diagnosis}
+                          </div>
+                        )}
+                        {note.treatmentPlan && (
+                          <div>
+                            <span className="font-medium text-purple-600">Plan:</span> {note.treatmentPlan}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                ))}
+
+                {/* Lab Orders */}
+                {orders.map((order: any) => (
+                  <div key={order._id} className="flex gap-3">
+                    <div className="flex flex-col items-center">
+                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                        <FlaskConical className="w-4 h-4 text-purple-600" />
+                      </div>
+                      <div className="w-0.5 h-full bg-border mt-1" />
+                    </div>
+                    <Card className="flex-1">
+                      <CardHeader className="pb-2">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <CardTitle className="text-sm">{order.orderNumber}</CardTitle>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {formatDate(order.createdAt)} {formatTime(order.createdAt)} • Dr. {order.doctorId?.fullName || 'N/A'}
+                            </p>
+                          </div>
+                          {getStatusBadge(order.status)}
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-wrap gap-1">
+                          {order.orderTests?.slice(0, 5).map((test: any, idx: number) => (
+                            <Badge key={idx} variant="outline" className="text-xs">{test.testName || test.testCode}</Badge>
+                          ))}
+                          {order.orderTests?.length > 5 && (
+                            <Badge variant="outline" className="text-xs">+{order.orderTests.length - 5} more</Badge>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                ))}
+              </div>
             )}
           </TabsContent>
 
           {/* Lab Results Tab */}
           <TabsContent value="lab-results" className="space-y-4">
-            {orders.length > 0 ? (
-              orders.map((order: any) => (
-                <Card key={order._id}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-base">{order.orderNumber}</CardTitle>
-                        <p className="text-sm text-gray-500">
-                          {new Date(order.createdAt).toLocaleDateString()} • Dr. {order.doctorId?.fullName || 'N/A'}
-                        </p>
-                      </div>
-                      <Badge>{order.status}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {order.orderTests?.map((test: any, idx: number) => {
-                        const result = order.results?.find((r: any) => 
-                          r.orderTestId?.toString() === test._id?.toString()
-                        );
-                        return (
-                          <div key={idx} className="border-l-2 pl-3 py-1">
-                            <div className="flex justify-between">
-                              <p className="font-medium text-sm">{test.testName || test.testCode}</p>
-                              {result && (
-                                <Badge variant={
-                                  result.flag === 'normal' ? 'default' : 
-                                  result.flag === 'critical_high' || result.flag === 'critical_low' ? 'destructive' : 'secondary'
-                                }>
-                                  {result.flag}
-                                </Badge>
-                              )}
-                            </div>
-                            {result ? (
-                              <p className="text-sm">
-                                <span className="font-semibold">{result.value} {result.unit}</span>
-                                {result.referenceRange && (
-                                  <span className="text-gray-500 ml-2">({result.referenceRange})</span>
-                                )}
-                              </p>
-                            ) : (
-                              <p className="text-sm text-gray-500">Pending</p>
-                            )}
-                          </div>
-                        );
-                      })}
-                      {(!order.orderTests || order.orderTests.length === 0) && (
-                        <p className="text-sm text-gray-500">No tests found for this order.</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
+            {orders.length === 0 ? (
               <Card>
-                <CardContent className="pt-6">
-                  <p className="text-center text-gray-500 py-8">No lab orders found</p>
+                <CardContent className="pt-12 text-center">
+                  <FlaskConical className="w-12 h-12 mx-auto text-muted-foreground mb-3 opacity-50" />
+                  <p className="text-muted-foreground">No lab orders yet</p>
                 </CardContent>
               </Card>
+            ) : (
+              orders.map((order: any) => {
+                const { panels, standalone } = groupResultsByPanel(order);
+                const hasResults = order.results?.length > 0;
+
+                return (
+                  <Card key={order._id}>
+                    <CardHeader className="pb-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-base">{order.orderNumber}</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {formatDate(order.createdAt)} • Dr. {order.doctorId?.fullName || 'N/A'}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(order.status)}
+                          {order.status === 'completed' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              onClick={() => {
+                                const reportPath = primaryRole === 'receptionist'
+                                  ? `/reception/reports/${order._id}`
+                                  : `/lab/reports/${order._id}`;
+                                navigate(reportPath);
+                              }}
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                              Full Report
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Panel Groups */}
+                      {Object.entries(panels).map(([code, panel]: [string, any]) => (
+                        <Collapsible key={code}>
+                          <CollapsibleTrigger asChild>
+                            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                              <ChevronDown className="w-4 h-4 text-muted-foreground collapsible-icon" />
+                              <span className="font-medium text-sm">{panel.name}</span>
+                              <Badge variant="outline" className="ml-auto text-xs">{panel.tests.length} tests</Badge>
+                            </div>
+                          </CollapsibleTrigger>
+                          <CollapsibleContent className="pt-2 space-y-1 pl-6">
+                            {panel.tests.map((test: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                                <div className="flex-1">
+                                  <p className="text-sm font-medium">{test.testName}</p>
+                                  <p className="text-xs text-muted-foreground">{test.testCode}</p>
+                                </div>
+                                {test.result ? (
+                                  <div className="text-right">
+                                    <p className={`text-sm font-semibold px-2 py-0.5 rounded border ${getFlagColor(test.result.flag)}`}>
+                                      {test.result.value} {test.result.unit}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground mt-0.5">{test.result.referenceRange}</p>
+                                  </div>
+                                ) : (
+                                  <Badge variant="secondary" className="text-xs">Pending</Badge>
+                                )}
+                              </div>
+                            ))}
+                          </CollapsibleContent>
+                        </Collapsible>
+                      ))}
+
+                      {/* Standalone Tests */}
+                      {standalone.length > 0 && (
+                        <div className="space-y-1">
+                          {standalone.map((test: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                              <div className="flex-1">
+                                <p className="text-sm font-medium">{test.testName}</p>
+                                <p className="text-xs text-muted-foreground">{test.testCode}</p>
+                              </div>
+                              {test.result ? (
+                                <div className="text-right">
+                                  <p className={`text-sm font-semibold px-2 py-0.5 rounded border ${getFlagColor(test.result.flag)}`}>
+                                    {test.result.value} {test.result.unit}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">{test.result.referenceRange}</p>
+                                </div>
+                              ) : (
+                                <Badge variant="secondary" className="text-xs">Pending</Badge>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {!hasResults && order.orderTests?.length === 0 && (
+                        <p className="text-sm text-muted-foreground text-center py-4">No tests recorded for this order</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
             )}
           </TabsContent>
 
           {/* Prescriptions Tab */}
           <TabsContent value="prescriptions" className="space-y-4">
-            {prescriptions.length > 0 ? (
+            {prescriptions.length === 0 ? (
+              <Card>
+                <CardContent className="pt-12 text-center">
+                  <Pill className="w-12 h-12 mx-auto text-muted-foreground mb-3 opacity-50" />
+                  <p className="text-muted-foreground">No prescriptions yet</p>
+                </CardContent>
+              </Card>
+            ) : (
               prescriptions.map((p: any) => (
                 <Card key={p._id}>
-                  <CardContent className="pt-6">
+                  <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
                       <div>
-                        <p className="font-semibold">{p.prescriptionNumber}</p>
-                        <p className="text-sm text-gray-500">Dr. {p.doctorId?.fullName}</p>
-                        <p className="text-xs text-gray-400">
-                          {new Date(p.createdAt).toLocaleDateString()}
+                        <CardTitle className="text-base">{p.prescriptionNumber}</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Dr. {p.prescribedBy?.fullName || p.doctorId?.fullName || 'N/A'} • {formatDate(p.createdAt)}
                         </p>
                       </div>
                       <Badge variant={p.isPaid ? 'default' : 'destructive'}>
                         {p.isPaid ? 'Paid' : 'Unpaid'}
                       </Badge>
                     </div>
-                    <div className="mt-3 space-y-2">
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
                       {p.items?.map((item: any, idx: number) => (
-                        <div key={idx} className="text-sm border-l-2 pl-3">
-                          <span className="font-medium">{item.medicationName}</span>
-                          {' - '}{item.dosage}, {item.frequency} for {item.duration}
+                        <div key={idx} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
+                          <Pill className="w-4 h-4 text-primary mt-0.5" />
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{item.medicationName}</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {item.dosage} • {item.frequency} • {item.duration}
+                            </p>
+                            {item.route && (
+                              <p className="text-xs text-muted-foreground">Route: {item.route}</p>
+                            )}
+                            {item.instructions && (
+                              <p className="text-xs text-muted-foreground mt-1">Instructions: {item.instructions}</p>
+                            )}
+                          </div>
+                          <Badge variant="outline" className="text-xs">{item.quantity} units</Badge>
                         </div>
                       ))}
                     </div>
-                    {p.treatmentPlan && (
-                      <div className="mt-2">
-                        <p className="text-sm text-gray-500">Instructions: {p.treatmentPlan}</p>
-                      </div>
-                    )}
                   </CardContent>
                 </Card>
               ))
-            ) : (
-              <p className="text-center text-gray-500 py-8">No prescriptions found</p>
             )}
           </TabsContent>
 
           {/* SOAP Notes Tab */}
           <TabsContent value="soap-notes" className="space-y-4">
-            {soapNotes.length > 0 ? (
+            {soapNotes.length === 0 ? (
+              <Card>
+                <CardContent className="pt-12 text-center">
+                  <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-3 opacity-50" />
+                  <p className="text-muted-foreground">No SOAP notes yet</p>
+                </CardContent>
+              </Card>
+            ) : (
               soapNotes.map((note: any) => (
                 <Card key={note._id}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-base">SOAP Note - {note.noteType}</CardTitle>
-                        <p className="text-sm text-gray-500">
-                          {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : note.nurseId?.fullName || note.nurseId?.fullName || 'Clinical staff'}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {new Date(note.createdAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                      {note.isSigned && (
-                        <Badge variant="default">Signed</Badge>
-                      )}
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    {/* Subjective */}
-                    {note.chiefComplaint && (
-                      <div>
-                        <p className="text-sm font-semibold text-blue-600">SUBJECTIVE:</p>
-                        <p className="text-sm mt-1">{note.chiefComplaint}</p>
-                      </div>
-                    )}
-                    {note.historyPresentIllness && (
-                      <div>
-                        <p className="text-sm font-semibold text-blue-600">HISTORY OF PRESENT ILLNESS:</p>
-                        <p className="text-sm mt-1">{note.historyPresentIllness}</p>
-                      </div>
-                    )}
-
-                    {/* Objective */}
-                    {note.vitalSigns && (
-                      <div>
-                        <p className="text-sm font-semibold text-green-600">OBJECTIVE - VITALS:</p>
-                        <div className="grid grid-cols-3 gap-2 mt-1 text-sm">
-                          {note.vitalSigns.bloodPressure && (
-                            <p>BP: {note.vitalSigns.bloodPressure}</p>
-                          )}
-                          {note.vitalSigns.temperature && (
-                            <p>Temp: {note.vitalSigns.temperature}°F</p>
-                          )}
-                          {note.vitalSigns.heartRate && (
-                            <p>HR: {note.vitalSigns.heartRate} bpm</p>
-                          )}
-                          {note.vitalSigns.respiratoryRate && (
-                            <p>RR: {note.vitalSigns.respiratoryRate}</p>
-                          )}
-                          {note.vitalSigns.weight && (
-                            <p>Weight: {note.vitalSigns.weight} kg</p>
-                          )}
-                          {note.vitalSigns.height && (
-                            <p>Height: {note.vitalSigns.height} cm</p>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    {note.physicalExamination && (
-                      <div>
-                        <p className="text-sm font-semibold text-green-600">PHYSICAL EXAMINATION:</p>
-                        <p className="text-sm mt-1">{note.physicalExamination}</p>
-                      </div>
-                    )}
-
-                    {/* Assessment */}
-                    {note.diagnosis && (
-                      <div>
-                        <p className="text-sm font-semibold text-orange-600">ASSESSMENT:</p>
-                        <p className="text-sm mt-1">{note.diagnosis}</p>
-                      </div>
-                    )}
-
-                    {/* Plan */}
-                    {note.treatmentPlan && (
-                      <div>
-                        <p className="text-sm font-semibold text-purple-600">PLAN:</p>
-                        <p className="text-sm mt-1">{note.treatmentPlan}</p>
-                      </div>
-                    )}
-                    {note.followUpInstructions && (
-                      <div>
-                        <p className="text-sm font-semibold text-purple-600">FOLLOW-UP:</p>
-                        <p className="text-sm mt-1">{note.followUpInstructions}</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))
-            ) : (
-              <p className="text-center text-gray-500 py-8">No SOAP notes found</p>
-            )}
-          </TabsContent>
-
-          {/* Admissions Tab */}
-          <TabsContent value="admissions" className="space-y-4">
-            {admissions.length > 0 ? (
-              admissions.map((admission: any) => (
-                <Card key={admission._id}>
-                  <CardHeader>
+                  <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
                       <div>
                         <CardTitle className="text-base flex items-center gap-2">
-                          <BedDouble className="w-4 h-4" />
-                          {admission.admissionNumber}
+                          <Stethoscope className="w-4 h-4" />
+                          Consultation Note
                         </CardTitle>
-                        <p className="text-sm text-gray-500">
-                          {admission.wardType}{admission.bedNumber ? ` - ${admission.bedNumber}` : ''} - {admission.status}
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : 'Clinical staff'} • {formatDate(note.createdAt)} {formatTime(note.createdAt)}
                         </p>
                       </div>
-                      <Badge variant={admission.status === 'admitted' ? 'default' : 'secondary'}>
-                        {admission.status}
-                      </Badge>
+                      {note.isSigned && <Badge>Signed</Badge>}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      <div>
-                        <p className="text-gray-500">Reason</p>
-                        <p>{admission.admissionReason || 'N/A'}</p>
+                    {note.chiefComplaint && (
+                      <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <p className="text-xs font-semibold text-blue-700 uppercase">Subjective</p>
+                        <p className="text-sm mt-1">{note.chiefComplaint}</p>
                       </div>
-                      <div>
-                        <p className="text-gray-500">Diagnosis</p>
-                        <p>{admission.diagnosis || admission.dischargeDiagnosis || 'N/A'}</p>
+                    )}
+                    {note.vitalSigns && (
+                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
+                        <p className="text-xs font-semibold text-green-700 uppercase">Objective - Vitals</p>
+                        <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
+                          {note.vitalSigns.bloodPressure && <p>BP: {note.vitalSigns.bloodPressure}</p>}
+                          {note.vitalSigns.temperature && <p>Temp: {note.vitalSigns.temperature}°C</p>}
+                          {note.vitalSigns.heartRate && <p>HR: {note.vitalSigns.heartRate} bpm</p>}
+                          {note.vitalSigns.respiratoryRate && <p>RR: {note.vitalSigns.respiratoryRate}</p>}
+                          {note.vitalSigns.weight && <p>Weight: {note.vitalSigns.weight} kg</p>}
+                          {note.vitalSigns.oxygenSaturation && <p>SpO2: {note.vitalSigns.oxygenSaturation}%</p>}
+                        </div>
                       </div>
-                    </div>
-                    <div className="grid grid-cols-3 gap-3 text-sm">
-                      <div className="border rounded-lg p-3">
-                        <p className="text-gray-500">Vitals</p>
-                        <p className="font-semibold">{admission.vitalsLog?.length || 0}</p>
+                    )}
+                    {note.diagnosis && (
+                      <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
+                        <p className="text-xs font-semibold text-orange-700 uppercase">Assessment</p>
+                        <p className="text-sm mt-1">{note.diagnosis}</p>
                       </div>
-                      <div className="border rounded-lg p-3">
-                        <p className="text-gray-500">MAR Entries</p>
-                        <p className="font-semibold">{admission.medicationLog?.length || 0}</p>
-                      </div>
-                      <div className="border rounded-lg p-3">
-                        <p className="text-gray-500">Nursing Notes</p>
-                        <p className="font-semibold">{admission.nursingNotes?.length || 0}</p>
-                      </div>
-                    </div>
-                    {admission.dischargeInstructions && (
-                      <div>
-                        <p className="text-sm font-semibold text-purple-600">DISCHARGE / FOLLOW-UP:</p>
-                        <p className="text-sm mt-1">{admission.dischargeInstructions}</p>
+                    )}
+                    {note.treatmentPlan && (
+                      <div className="p-3 bg-purple-50 rounded-lg border border-purple-200">
+                        <p className="text-xs font-semibold text-purple-700 uppercase">Plan</p>
+                        <p className="text-sm mt-1">{note.treatmentPlan}</p>
                       </div>
                     )}
                   </CardContent>
                 </Card>
               ))
-            ) : (
-              <p className="text-center text-gray-500 py-8">No admissions found</p>
             )}
           </TabsContent>
 
-          {/* Vitals History Tab */}
+          {/* Vitals Tab */}
           <TabsContent value="vitals" className="space-y-4">
-            {vitalsHistory?.length > 0 ? (
-              vitalsHistory.map((v: any, idx: number) => (
-                <Card key={idx}>
-                  <CardContent className="pt-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <p className="text-sm font-medium">
-                        {new Date(v.date).toLocaleDateString()}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {v.recordedBy?.fullName || 'Unknown'}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      {v.vitalSigns?.bloodPressure && (
-                        <p>BP: {v.vitalSigns.bloodPressure}</p>
-                      )}
-                      {v.vitalSigns?.temperature && (
-                        <p>Temp: {v.vitalSigns.temperature}°F</p>
-                      )}
-                      {v.vitalSigns?.heartRate && (
-                        <p>HR: {v.vitalSigns.heartRate} bpm</p>
-                      )}
-                      {v.vitalSigns?.respiratoryRate && (
-                        <p>RR: {v.vitalSigns.respiratoryRate}</p>
-                      )}
-                      {v.vitalSigns?.weight && (
-                        <p>Weight: {v.vitalSigns.weight} kg</p>
-                      )}
-                      {v.vitalSigns?.height && (
-                        <p>Height: {v.vitalSigns.height} cm</p>
-                      )}
-                      {v.vitalSigns?.bmi && (
-                        <p>BMI: {v.vitalSigns.bmi}</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
+            {vitalsHistory.length === 0 ? (
+              <Card>
+                <CardContent className="pt-12 text-center">
+                  <Activity className="w-12 h-12 mx-auto text-muted-foreground mb-3 opacity-50" />
+                  <p className="text-muted-foreground">No vitals recorded yet</p>
+                </CardContent>
+              </Card>
             ) : (
               <Card>
-                <CardContent className="pt-6 text-center text-gray-500">
-                  No vitals recorded yet
+                <CardContent className="pt-4">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">BP</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Temp</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">HR</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">RR</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Weight</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">SpO2</th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">BMI</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {vitalsHistory.map((v: any, idx: number) => (
+                          <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/50">
+                            <td className="py-3 px-4">{formatDate(v.date)}</td>
+                            <td className="py-3 px-4">{v.vitalSigns?.bloodPressure || '—'}</td>
+                            <td className="py-3 px-4">{v.vitalSigns?.temperature ? `${v.vitalSigns.temperature}°C` : '—'}</td>
+                            <td className="py-3 px-4">{v.vitalSigns?.heartRate ? `${v.vitalSigns.heartRate} bpm` : '—'}</td>
+                            <td className="py-3 px-4">{v.vitalSigns?.respiratoryRate || '—'}</td>
+                            <td className="py-3 px-4">{v.vitalSigns?.weight ? `${v.vitalSigns.weight} kg` : '—'}</td>
+                            <td className="py-3 px-4">{v.vitalSigns?.oxygenSaturation ? `${v.vitalSigns.oxygenSaturation}%` : '—'}</td>
+                            <td className="py-3 px-4">{v.vitalSigns?.bmi || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -560,4 +573,3 @@ const PatientRecord = () => {
 };
 
 export default PatientRecord;
-

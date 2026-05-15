@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
@@ -33,7 +34,7 @@ import { RoleLayout } from '@/components/layout/RoleLayout';
 import {
   Loader2, Clock, CheckCircle, User, Stethoscope, FileText, FlaskConical, Pill,
   ChevronRight, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
-  Send, Heart, Users, ClipboardList, UserCheck, BedDouble, Inbox
+  Send, Heart, Users, ClipboardList, UserCheck, BedDouble, Inbox, ExternalLink
 } from 'lucide-react';
 
 // Types
@@ -88,6 +89,8 @@ interface Test {
   category?: string;
   sampleType?: string;
   turnaroundTime?: number;
+  isPanel?: boolean;
+  panelComponents?: Array<{ testCode: string; testName: string }>;
 }
 
 interface Medication {
@@ -121,6 +124,7 @@ const getFlagLabel = (flag?: string) => {
 
 export default function DoctorDashboard() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const { data: dashboardData, isLoading } = useDoctorDashboard();
@@ -739,61 +743,21 @@ export default function DoctorDashboard() {
                         Vitals
                       </h3>
                       <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Temperature (C)</Label>
-                          <Input
-                            value={vitalsForm.temperature}
-                            onChange={(e) => setVitalsForm({...vitalsForm, temperature: e.target.value})}
-                            placeholder="36.5"
-                            className="mt-1 h-8"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Blood Pressure</Label>
-                          <Input
-                            value={vitalsForm.bloodPressure}
-                            onChange={(e) => setVitalsForm({...vitalsForm, bloodPressure: e.target.value})}
-                            placeholder="120/80"
-                            className="mt-1 h-8"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Heart Rate (bpm)</Label>
-                          <Input
-                            value={vitalsForm.heartRate}
-                            onChange={(e) => setVitalsForm({...vitalsForm, heartRate: e.target.value})}
-                            placeholder="72"
-                            className="mt-1 h-8"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Resp. Rate (/min)</Label>
-                          <Input
-                            value={vitalsForm.respiratoryRate}
-                            onChange={(e) => setVitalsForm({...vitalsForm, respiratoryRate: e.target.value})}
-                            placeholder="16"
-                            className="mt-1 h-8"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">Weight (kg)</Label>
-                          <Input
-                            value={vitalsForm.weight}
-                            onChange={(e) => setVitalsForm({...vitalsForm, weight: e.target.value})}
-                            placeholder="70"
-                            className="mt-1 h-8"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs text-muted-foreground">SpO2 (%)</Label>
-                          <Input
-                            value={vitalsForm.oxygenSaturation}
-                            onChange={(e) => setVitalsForm({...vitalsForm, oxygenSaturation: e.target.value})}
-                            placeholder="98"
-                            className="mt-1 h-8"
-                          />
-                        </div>
+                        {[
+                          { label: 'Temperature (°C)', value: vitalsForm.temperature, icon: '🌡' },
+                          { label: 'Blood Pressure', value: vitalsForm.bloodPressure, icon: '❤' },
+                          { label: 'Heart Rate (bpm)', value: vitalsForm.heartRate, icon: '💓' },
+                          { label: 'Resp. Rate (/min)', value: vitalsForm.respiratoryRate, icon: '🫁' },
+                          { label: 'Weight (kg)', value: vitalsForm.weight, icon: '⚖' },
+                          { label: 'SpO2 (%)', value: vitalsForm.oxygenSaturation, icon: '🔵' },
+                        ].map((vital) => (
+                          <div key={vital.label} className="p-2 rounded-lg bg-muted/50 border">
+                            <div className="text-xs text-muted-foreground">{vital.label}</div>
+                            <div className="text-sm font-medium mt-0.5">{vital.value || '—'}</div>
+                          </div>
+                        ))}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-2">Vitals entered by nurse. Contact nursing staff to update.</p>
                     </div>
 
                     {/* Chief Complaint Card */}
@@ -827,7 +791,7 @@ export default function DoctorDashboard() {
                     <Button
                       variant="outline"
                       onClick={() => setLabOrderModalOpen(true)}
-                      disabled={selectedVisit.status !== 'in_consultation'}
+                      disabled={selectedVisit.status !== 'in_consultation' && selectedVisit.status !== 'results_ready'}
                     >
                       <FlaskConical className="w-4 h-4 mr-2" />
                       Order Lab Tests
@@ -835,7 +799,7 @@ export default function DoctorDashboard() {
                     <Button
                       variant="outline"
                       onClick={() => setPrescriptionModalOpen(true)}
-                      disabled={selectedVisit.status !== 'in_consultation'}
+                      disabled={selectedVisit.status !== 'in_consultation' && selectedVisit.status !== 'results_ready'}
                     >
                       <Pill className="w-4 h-4 mr-2" />
                       Prescribe Medication
@@ -957,39 +921,56 @@ export default function DoctorDashboard() {
                       <p className="text-xs mt-1">Results will appear here once verified by the lab</p>
                     </div>
                   ) : (
-                    <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full text-sm">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="text-left p-3 font-medium">Test</th>
-                            <th className="text-center p-3 font-medium">Result</th>
-                            <th className="text-center p-3 font-medium">Flag</th>
-                            <th className="text-center p-3 font-medium">Reference</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y">
-                          {labResults.map((result: LabResult) => (
-                            <tr key={result._id} className="hover:bg-muted/30">
-                              <td className="p-3">
-                                <p className="font-medium">{result.testName}</p>
-                                <p className="text-xs text-muted-foreground">{result.testCode}</p>
-                              </td>
-                              <td className="p-3 text-center">
-                                <span className="font-semibold text-lg">{result.value}</span>
-                                {result.unit && <span className="text-muted-foreground ml-1">{result.unit}</span>}
-                              </td>
-                              <td className="p-3 text-center">
-                                <span className={cn("px-2 py-1 rounded text-xs font-medium", getFlagColor(result.flag))}>
-                                  {getFlagLabel(result.flag)}
-                                </span>
-                              </td>
-                              <td className="p-3 text-center text-muted-foreground text-xs">
-                                {result.referenceRange || result.reference_range || '-'}
-                              </td>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-sm">Lab Results</h3>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => {
+                            const reportPath = `/lab/reports/${selectedVisit._id || selectedVisit.id}`;
+                            navigate(reportPath);
+                          }}
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          View Full Report
+                        </Button>
+                      </div>
+                      <div className="border rounded-lg overflow-hidden">
+                        <table className="w-full text-sm">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="text-left p-3 font-medium">Test</th>
+                              <th className="text-center p-3 font-medium">Result</th>
+                              <th className="text-center p-3 font-medium">Flag</th>
+                              <th className="text-center p-3 font-medium">Reference</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody className="divide-y">
+                            {labResults.map((result: LabResult) => (
+                              <tr key={result._id} className="hover:bg-muted/30">
+                                <td className="p-3">
+                                  <p className="font-medium">{result.testName}</p>
+                                  <p className="text-xs text-muted-foreground">{result.testCode}</p>
+                                </td>
+                                <td className="p-3 text-center">
+                                  <span className="font-semibold text-lg">{result.value}</span>
+                                  {result.unit && <span className="text-muted-foreground ml-1">{result.unit}</span>}
+                                </td>
+                                <td className="p-3 text-center">
+                                  <span className={cn("px-2 py-1 rounded text-xs font-medium", getFlagColor(result.flag))}>
+                                    {getFlagLabel(result.flag)}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-center text-muted-foreground text-xs">
+                                  {result.referenceRange || result.reference_range || '-'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
                 </TabsContent>
@@ -1234,8 +1215,18 @@ export default function DoctorDashboard() {
                     onClick={() => addTestToOrder(test)}
                   >
                     <div>
-                      <p className="font-medium text-sm">{test.name}</p>
-                      <p className="text-xs text-muted-foreground">{test.code} - Le {test.price?.toLocaleString()}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm">{test.name}</p>
+                        {test.isPanel && (
+                          <Badge variant="outline" className="text-[10px] h-5">Panel</Badge>
+                        )}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {test.code} - Le {test.price?.toLocaleString()}
+                        {test.isPanel && test.panelComponents && (
+                          <span className="ml-1">({test.panelComponents.length} components)</span>
+                        )}
+                      </p>
                     </div>
                     <Plus className="w-4 h-4 text-muted-foreground" />
                   </div>
@@ -1255,9 +1246,21 @@ export default function DoctorDashboard() {
                   <div className="divide-y">
                     {selectedTests.map((test) => (
                       <div key={test._id} className="p-3 flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-sm">{test.name}</p>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm">{test.name}</p>
+                            {test.isPanel && (
+                              <Badge variant="outline" className="text-[10px] h-5">Panel</Badge>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">Le {test.price?.toLocaleString()}</p>
+                          {test.isPanel && test.panelComponents && test.panelComponents.length > 0 && (
+                            <div className="mt-1.5 ml-2 pl-2 border-l-2 border-primary/30">
+                              {test.panelComponents.map((comp: any, idx: number) => (
+                                <p key={idx} className="text-[11px] text-muted-foreground">• {comp.testName || comp.testCode}</p>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <Button variant="ghost" size="sm" onClick={() => removeTestFromOrder(test._id)}>
                           <Trash2 className="w-4 h-4 text-red-500" />

@@ -20,6 +20,8 @@ import NotFound from "./pages/NotFound";
 import ReceptionDashboard from "./pages/reception/ReceptionDashboard";
 import PatientDetails from "./pages/reception/PatientDetails";
 import RegisterPatient from "./pages/reception/RegisterPatient";
+import NewOrder from "./pages/reception/NewOrder";
+import QuickResultEntry from "./pages/reception/QuickResultEntry";
 import PatientsPage from "./pages/reception/PatientsPage";
 import OrdersPage from "./pages/reception/OrdersPage";
 import PaymentsPage from "./pages/reception/PaymentsPage";
@@ -28,7 +30,6 @@ import PaymentReceipt from "./pages/reception/PaymentReceipt";
 import PaymentDemo from "./pages/reception/PaymentDemo";
 import PrinterSetup from "./pages/reception/PrinterSetup";
 import PriceListPage from "./pages/reception/PriceListPage";
-import EMRReception from "./pages/reception/EMRReception";
 import VisitRegistration from "./pages/reception/VisitRegistration";
 import ExpendituresPage from "./pages/reception/ExpendituresPage";
 
@@ -169,10 +170,10 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PatientDetails /></RoleGuard>
       } />
       <Route path="/reception/new-order" element={
-        <RoleGuard allowedRoles={['receptionist', 'admin']}><Navigate to="/reception/visit-registration" replace /></RoleGuard>
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><NewOrder /></RoleGuard>
       } />
       <Route path="/reception/orders" element={
-        <RoleGuard allowedRoles={['receptionist', 'admin']}><Navigate to="/reception" replace /></RoleGuard>
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><OrdersPage /></RoleGuard>
       } />
       <Route path="/reception/payments" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PaymentsPage /></RoleGuard>
@@ -180,8 +181,8 @@ function AppRoutes() {
       <Route path="/reception/reconciliation" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><DailyReconciliation /></RoleGuard>
       } />
-      <Route path="/reception/enter-results" element={
-        <RoleGuard allowedRoles={['receptionist', 'admin']}><Navigate to="/reception" replace /></RoleGuard>
+      <Route path="/reception/quick-result-entry" element={
+        <RoleGuard allowedRoles={['receptionist', 'lab_tech', 'admin']}><QuickResultEntry /></RoleGuard>
       } />
       <Route path="/reception/receipt/:orderId" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PaymentReceipt /></RoleGuard>
@@ -195,14 +196,8 @@ function AppRoutes() {
       <Route path="/reception/price-list" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PriceListPage /></RoleGuard>
       } />
-      <Route path="/reception/emr-flow" element={
-        <RoleGuard allowedRoles={['receptionist', 'admin']}><EMRReception /></RoleGuard>
-      } />
       <Route path="/reception/visit-registration" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><VisitRegistration /></RoleGuard>
-      } />
-      <Route path="/reception/completed-orders" element={
-        <RoleGuard allowedRoles={['receptionist', 'admin']}><Navigate to="/reception" replace /></RoleGuard>
       } />
       <Route path="/reception/daily-report" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><DailyReport /></RoleGuard>
@@ -319,9 +314,6 @@ function AppRoutes() {
       } />
       <Route path="/admin/printers" element={
         <RoleGuard allowedRoles={['admin']}><PrinterSettings /></RoleGuard>
-      } />
-      <Route path="/admin/logs" element={
-        <RoleGuard allowedRoles={['admin']}><CommunicationLogs /></RoleGuard>
       } />
       <Route path="/admin/doctors" element={
         <RoleGuard allowedRoles={['admin']}><DoctorsPage /></RoleGuard>

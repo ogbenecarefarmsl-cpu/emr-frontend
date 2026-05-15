@@ -50,12 +50,15 @@ export default function RegisterPatient() {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
+    dateOfBirth: '',
     age: '',
     ageUnit: 'years' as AgeUnit,
     gender: '' as 'M' | 'F' | 'O' | '',
     phone: '',
     email: '',
     address: '',
+    bloodType: '' as string,
+    allergies: '',
   });
 
   const [createdPatient, setCreatedPatient] = useState<{ id: string; patientId: string } | null>(null);
@@ -86,6 +89,7 @@ export default function RegisterPatient() {
       const newPatient = await createPatient.mutateAsync({
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
+        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth) : undefined,
         age: normalizedAge,
         ageValue,
         ageUnit: formData.ageUnit,
@@ -93,6 +97,8 @@ export default function RegisterPatient() {
         phone: normalizedPhone || undefined,
         email: formData.email.trim() || undefined,
         address: formData.address.trim() || undefined,
+        bloodType: formData.bloodType || undefined,
+        allergies: formData.allergies ? formData.allergies.split(',').map(a => a.trim()).filter(Boolean) : undefined,
       });
 
       setCreatedPatient(newPatient);
@@ -107,12 +113,15 @@ export default function RegisterPatient() {
     setFormData({
       firstName: '',
       lastName: '',
+      dateOfBirth: '',
       age: '',
       ageUnit: 'years',
       gender: '',
       phone: '',
       email: '',
       address: '',
+      bloodType: '',
+      allergies: '',
     });
     setCreatedPatient(null);
   };
@@ -290,6 +299,53 @@ export default function RegisterPatient() {
                 onChange={e => setFormData(prev => ({ ...prev, address: e.target.value }))}
                 placeholder="Enter address"
               />
+            </div>
+
+            {/* Date of Birth */}
+            <div className="space-y-2">
+              <Label htmlFor="dateOfBirth">Date of Birth</Label>
+              <Input
+                id="dateOfBirth"
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={e => setFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">Optional. Age will be calculated automatically.</p>
+            </div>
+
+            {/* Blood Type */}
+            <div className="space-y-2">
+              <Label htmlFor="bloodType">Blood Type</Label>
+              <Select
+                value={formData.bloodType}
+                onValueChange={value => setFormData(prev => ({ ...prev, bloodType: value }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select blood type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A+">A+</SelectItem>
+                  <SelectItem value="A-">A-</SelectItem>
+                  <SelectItem value="B+">B+</SelectItem>
+                  <SelectItem value="B-">B-</SelectItem>
+                  <SelectItem value="AB+">AB+</SelectItem>
+                  <SelectItem value="AB-">AB-</SelectItem>
+                  <SelectItem value="O+">O+</SelectItem>
+                  <SelectItem value="O-">O-</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Allergies */}
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="allergies">Allergies</Label>
+              <Input
+                id="allergies"
+                value={formData.allergies}
+                onChange={e => setFormData(prev => ({ ...prev, allergies: e.target.value }))}
+                placeholder="e.g. Penicillin, Sulfa drugs, Latex (comma-separated)"
+              />
+              <p className="text-xs text-muted-foreground">Separate multiple allergies with commas.</p>
             </div>
           </div>
 

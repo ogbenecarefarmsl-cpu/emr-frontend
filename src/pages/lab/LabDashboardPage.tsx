@@ -104,13 +104,13 @@ export default function LabDashboardPage() {
           )}
         </button>
         <button 
-          onClick={() => navigate('/lab/processing')}
+          onClick={() => navigate('/lab/verify-results')}
           className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border bg-card hover:bg-secondary hover:shadow-md transition-all duration-200"
         >
           <div className="w-12 h-12 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
             <FileText className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
           </div>
-          <span className="text-sm font-semibold text-foreground">View Results</span>
+          <span className="text-sm font-semibold text-foreground">Verify Results</span>
         </button>
             <button
               onClick={() => navigate('/lab/completed-orders')}
@@ -153,25 +153,6 @@ export default function LabDashboardPage() {
           icon={Cpu}
           className="col-span-2 md:col-span-1"
         />
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {[
-          { label: 'Awaiting Collection', value: pendingOrders?.length || 0, icon: ClipboardCheck },
-          { label: 'In Processing', value: processingOrders?.length || 0, icon: TestTube },
-          { label: 'Results Entered', value: processingOrders?.length || 0, icon: FlaskConical },
-          { label: 'Released Today', value: completedToday, icon: CheckCircle },
-        ].map((step) => (
-          <div key={step.label} className="border bg-card rounded-lg px-4 py-3">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs text-muted-foreground">{step.label}</p>
-                <p className="text-xl font-semibold">{step.value}</p>
-              </div>
-              <step.icon className="h-5 w-5 text-primary" />
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* Lab Queue - Paid orders from doctors ready for processing */}

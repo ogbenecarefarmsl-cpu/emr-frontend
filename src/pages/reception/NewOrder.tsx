@@ -404,8 +404,8 @@ export default function NewOrder() {
             {/* Receipt Details */}
             <div className="bg-muted rounded-lg p-6 mb-6">
               <div className="text-center mb-4 pb-4 border-b">
-                <h3 className="font-bold text-lg">HARBOUR</h3>
-                <p className="text-sm text-muted-foreground">Laboratory Information System</p>
+                <h3 className="font-bold text-lg">HARBOUR EMR</h3>
+                <p className="text-sm text-muted-foreground">Electronic Medical Records</p>
                 <p className="text-xs text-muted-foreground mt-1">
                   {new Date().toLocaleString()}
                 </p>
@@ -414,10 +414,6 @@ export default function NewOrder() {
               <div className="space-y-3 mb-4">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Order Number:</span>
-                  <span className="font-mono font-bold">{createdOrder.orderNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Sample ID:</span>
                   <span className="font-mono font-bold">{createdOrder.orderNumber}</span>
                 </div>
                 <div className="flex justify-between">
@@ -490,7 +486,7 @@ export default function NewOrder() {
 
               <div className="mt-4 pt-4 border-t text-center text-xs text-muted-foreground">
                 <p>Please bring this receipt when collecting your results.</p>
-                <p className="mt-1">Write Sample ID on sample tube: <span className="font-mono font-bold">{createdOrder.orderNumber}</span></p>
+                <p className="mt-1">Reference this Order Number: <span className="font-mono font-bold">{createdOrder.orderNumber}</span></p>
               </div>
             </div>
 

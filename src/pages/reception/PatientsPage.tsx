@@ -312,7 +312,7 @@ export default function PatientsPage() {
               <Input 
                 value={formData.phone}
                 onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                placeholder="+234 XXX XXX XXXX"
+                placeholder="+232 XX XXX XXXX"
               />
             </div>
             <div className="space-y-2">

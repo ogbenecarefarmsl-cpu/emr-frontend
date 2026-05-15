@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { Search, Pill, Plus, Trash2, Info } from 'lucide-react';
 
 const ROUTE_LABELS: Record<RouteOfAdministrationEnum, string> = {

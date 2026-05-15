@@ -222,7 +222,8 @@ export function useCreateOrder() {
       return await ordersAPI.create(orderData);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['visits'] });
     },
   });
 }

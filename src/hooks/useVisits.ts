@@ -1,5 +1,6 @@
 import { visitsAPI, pendingOrdersAPI } from '@/services/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 interface CreateVisitData {
   patientId: string;
@@ -108,6 +109,9 @@ export function useCompleteTriage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
     },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to complete triage');
+    },
   });
 }
 
@@ -120,6 +124,9 @@ export function useReferToSpecialist() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
     },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to refer to specialist');
+    },
   });
 }
 
@@ -131,6 +138,9 @@ export function useAcceptReferral() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to accept referral');
     },
   });
 }
@@ -155,6 +165,9 @@ export function useCreateVisit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
     },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to create visit');
+    },
   });
 }
 
@@ -167,6 +180,9 @@ export function useMarkConsultationPaid() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to mark consultation paid');
     },
   });
 }
@@ -181,6 +197,9 @@ export function useAcceptPatient() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
     },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to accept patient');
+    },
   });
 }
 
@@ -194,6 +213,9 @@ export function useOrderLab() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
     },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to order lab tests');
+    },
   });
 }
 
@@ -206,6 +228,9 @@ export function usePrescribeMedication() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to prescribe medication');
     },
   });
 }
@@ -221,6 +246,9 @@ export function useMarkLabPaid() {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to mark lab paid');
+    },
   });
 }
 
@@ -235,6 +263,9 @@ export function useMarkPharmacyPaid() {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to mark pharmacy paid');
+    },
   });
 }
 
@@ -248,6 +279,9 @@ export function useCompleteVisit() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
     },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to complete visit');
+    },
   });
 }
 
@@ -260,6 +294,9 @@ export function useUpdateVisit() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to update visit');
     },
   });
 }
@@ -305,8 +342,11 @@ export function useMarkOrderPaid() {
       return await pendingOrdersAPI.markAsPaid(orderId, paymentMethod);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['visits'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to mark order paid');
     },
   });
 }

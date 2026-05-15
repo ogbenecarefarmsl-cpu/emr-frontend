@@ -20,6 +20,7 @@ interface Patient {
 interface PatientCreate {
   firstName: string;
   lastName: string;
+  dateOfBirth?: Date;
   age: number;
   ageValue?: number;
   ageUnit?: 'years' | 'months' | 'weeks' | 'days';
@@ -27,6 +28,8 @@ interface PatientCreate {
   phone?: string;
   email?: string;
   address?: string;
+  bloodType?: string;
+  allergies?: string[];
 }
 
 interface PatientUpdate {
