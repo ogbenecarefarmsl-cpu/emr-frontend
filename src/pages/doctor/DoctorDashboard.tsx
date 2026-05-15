@@ -362,11 +362,13 @@ export default function DoctorDashboard() {
     mutationFn: async () => {
       if (!selectedVisit || selectedTests.length === 0) return;
 
+      // doctorId on an order is the *referring* doctor (external), not the treating doctor.
+      // The treating doctor is captured via orderedBy from the JWT on the backend.
+      // Passing profile.id here would fail because it's a Profile ID, not a Doctor document ID.
       const orderData = {
         patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
         visitId: selectedVisit._id || selectedVisit.id,
         orderType: 'lab',
-        doctorId: (profile as any)?._id || (profile as any)?.id || profile?.id,
         tests: selectedTests.map(t => ({
           testId: t._id,
           testCode: t.code,
@@ -383,9 +385,11 @@ export default function DoctorDashboard() {
       setLabOrderModalOpen(false);
       setSelectedTests([]);
       queryClient.invalidateQueries({ queryKey: ['visits'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
-    onError: () => {
-      toast.error('Failed to create lab order');
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to create lab order';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
     },
   });
 
@@ -394,11 +398,17 @@ export default function DoctorDashboard() {
     mutationFn: async () => {
       if (!selectedVisit || prescriptionItems.length === 0) return;
 
+      // doctorId on prescriptions references the doctors collection (external doctors).
+      // The prescribing doctor (system user) is captured via orderedBy from the JWT.
+      // Do not pass profile.id here — it would fail validation.
       return await prescriptionService.create({
         patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
         visitId: selectedVisit._id || selectedVisit.id,
-        doctorId: (profile as any)?._id || (profile as any)?.id || profile?.id,
-        items: prescriptionItems,
+        items: prescriptionItems.map(({ unitPrice, ...item }) => ({
+          ...item,
+          instructions: item.instructions?.trim() || undefined,
+          pharmacistNote: item.pharmacistNote?.trim() || undefined,
+        })),
         totalAmount: prescriptionItems.reduce((sum, item) => sum + (item.quantity * (item.unitPrice || 0)), 0),
       });
     },
@@ -407,9 +417,11 @@ export default function DoctorDashboard() {
       setPrescriptionModalOpen(false);
       setPrescriptionItems([]);
       queryClient.invalidateQueries({ queryKey: ['visits'] });
+      queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
     },
-    onError: () => {
-      toast.error('Failed to create prescription');
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to create prescription';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
     },
   });
 
