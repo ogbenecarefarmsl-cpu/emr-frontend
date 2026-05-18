@@ -17,21 +17,59 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Icons
 import {
   Heart, AlertTriangle, BedDouble, Users, ClipboardCheck, Clock,
   Send, Loader2, Inbox, Stethoscope, LogOut as LogOutIcon,
-  ChevronRight, Activity,
+  ChevronRight, Activity, Thermometer, Pill, AlertCircle,
 } from 'lucide-react';
 
-const PRIORITIES = [
-  { value: 'low', label: 'Low', color: 'bg-slate-500' },
-  { value: 'normal', label: 'Normal', color: 'bg-blue-500' },
-  { value: 'high', label: 'High', color: 'bg-amber-500' },
-  { value: 'urgent', label: 'Urgent', color: 'bg-orange-500' },
-  { value: 'emergency', label: 'Emergency', color: 'bg-red-500' },
+const ESI_LEVELS = [
+  { value: '1', label: 'ESI 1', color: 'bg-red-600', desc: 'Resuscitation — immediate life-saving' },
+  { value: '2', label: 'ESI 2', color: 'bg-orange-500', desc: 'Emergent — high risk, confused/lethargic' },
+  { value: '3', label: 'ESI 3', color: 'bg-yellow-500', desc: 'Urgent — multiple resources needed' },
+  { value: '4', label: 'ESI 4', color: 'bg-blue-500', desc: 'Less urgent — one resource needed' },
+  { value: '5', label: 'ESI 5', color: 'bg-green-500', desc: 'Non-urgent — no resources needed' },
 ];
+
+const VITAL_THRESHOLDS = {
+  temperature: { low: 35.5, high: 38.0, criticalHigh: 39.5 },
+  heartRate: { low: 50, high: 100, criticalHigh: 130, criticalLow: 40 },
+  respiratoryRate: { low: 10, high: 20, criticalHigh: 30, criticalLow: 8 },
+  oxygenSaturation: { low: 95, criticalLow: 90 },
+  bloodPressureSystolic: { low: 90, high: 140, criticalHigh: 180, criticalLow: 70 },
+};
+
+function checkAbnormalVitals(vitals: Record<string, string>) {
+  const alerts: string[] = [];
+  const temp = parseFloat(vitals.temperature);
+  if (!isNaN(temp)) {
+    if (temp >= VITAL_THRESHOLDS.temperature.criticalHigh) alerts.push(`Critical fever: ${temp}°C`);
+    else if (temp > VITAL_THRESHOLDS.temperature.high) alerts.push(`Elevated temp: ${temp}°C`);
+    else if (temp < VITAL_THRESHOLDS.temperature.low) alerts.push(`Hypothermia: ${temp}°C`);
+  }
+  const hr = parseInt(vitals.heartRate);
+  if (!isNaN(hr)) {
+    if (hr >= VITAL_THRESHOLDS.heartRate.criticalHigh) alerts.push(`Critical tachycardia: ${hr} bpm`);
+    else if (hr > VITAL_THRESHOLDS.heartRate.high) alerts.push(`Tachycardia: ${hr} bpm`);
+    else if (hr <= VITAL_THRESHOLDS.heartRate.criticalLow) alerts.push(`Critical bradycardia: ${hr} bpm`);
+    else if (hr < VITAL_THRESHOLDS.heartRate.low) alerts.push(`Bradycardia: ${hr} bpm`);
+  }
+  const rr = parseInt(vitals.respiratoryRate);
+  if (!isNaN(rr)) {
+    if (rr >= VITAL_THRESHOLDS.respiratoryRate.criticalHigh) alerts.push(`Tachypnea: ${rr}/min`);
+    else if (rr > VITAL_THRESHOLDS.respiratoryRate.high) alerts.push(`Elevated RR: ${rr}/min`);
+    else if (rr <= VITAL_THRESHOLDS.respiratoryRate.criticalLow) alerts.push(`Critical bradypnea: ${rr}/min`);
+  }
+  const spo2 = parseInt(vitals.oxygenSaturation);
+  if (!isNaN(spo2)) {
+    if (spo2 <= VITAL_THRESHOLDS.oxygenSaturation.criticalLow) alerts.push(`Critical SpO2: ${spo2}%`);
+    else if (spo2 < VITAL_THRESHOLDS.oxygenSaturation.low) alerts.push(`Low SpO2: ${spo2}%`);
+  }
+  return alerts;
+}
 
 export default function NurseDashboard() {
   const { profile } = useAuth();
@@ -45,7 +83,7 @@ export default function NurseDashboard() {
 
   // Selected admission for workspace
   const [selectedAdmissionId, setSelectedAdmissionId] = useState<string | null>(null);
-  const [mainTab, setMainTab] = useState<'admissions' | 'triage'>('admissions');
+  const [mainTab, setMainTab] = useState<'admissions' | 'triage' | 'mar'>('admissions');
 
   // Triage modal state
   const [triageVisit, setTriageVisit] = useState<any>(null);
@@ -54,14 +92,17 @@ export default function NurseDashboard() {
     temperature: '', bloodPressure: '', heartRate: '', respiratoryRate: '',
     weight: '', height: '', oxygenSaturation: '',
   });
-  const [triagePriority, setTriagePriority] = useState('normal');
+  const [triageEsiLevel, setTriageEsiLevel] = useState('3');
   const [triageNotes, setTriageNotes] = useState('');
   const [chiefComplaint, setChiefComplaint] = useState('');
+  const [marOpen, setMarOpen] = useState(false);
+  const [selectedMarAdmission, setSelectedMarAdmission] = useState<any>(null);
+  const [marMedications, setMarMedications] = useState<any[]>([]);
 
   const openTriage = (visit: any) => {
     setTriageVisit(visit);
     setChiefComplaint(visit.chiefComplaint || '');
-    setTriagePriority('normal');
+    setTriageEsiLevel('3');
     setTriageNotes('');
     setVitals({
       temperature: '', bloodPressure: '', heartRate: '', respiratoryRate: '',
@@ -83,7 +124,7 @@ export default function NurseDashboard() {
           weight: vitals.weight ? parseFloat(vitals.weight) : undefined,
           height: vitals.height ? parseFloat(vitals.height) : undefined,
           oxygenSaturation: vitals.oxygenSaturation ? parseInt(vitals.oxygenSaturation) : undefined,
-          triagePriority,
+          triagePriority: `esi_${triageEsiLevel}`,
           triageNotes: triageNotes || undefined,
           chiefComplaint: chiefComplaint || undefined,
         },
@@ -124,7 +165,7 @@ export default function NurseDashboard() {
         {/* LEFT: Queue panels */}
         <div className="lg:col-span-1 space-y-4">
           <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as any)}>
-            <TabsList className="w-full grid grid-cols-2">
+            <TabsList className="w-full grid grid-cols-3">
               <TabsTrigger value="admissions">
                 Admissions
                 {activeAdmissions.length > 0 && <Badge variant="secondary" className="ml-1.5">{activeAdmissions.length}</Badge>}
@@ -132,6 +173,10 @@ export default function NurseDashboard() {
               <TabsTrigger value="triage">
                 Triage
                 {triageQueue.length > 0 && <Badge className="ml-1.5 bg-amber-500">{triageQueue.length}</Badge>}
+              </TabsTrigger>
+              <TabsTrigger value="mar">
+                MAR
+                <Pill className="w-3.5 h-3.5 ml-1" />
               </TabsTrigger>
             </TabsList>
 
@@ -252,6 +297,68 @@ export default function NurseDashboard() {
                 </ScrollArea>
               </div>
             </TabsContent>
+
+            {/* MAR - Medication Administration Record */}
+            <TabsContent value="mar" className="mt-3">
+              <div className="bg-card border rounded-xl shadow-sm">
+                <div className="px-4 py-3 border-b flex items-center justify-between">
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    <Pill className="w-4 h-4 text-primary" />
+                    Medication Administration Record
+                  </h3>
+                </div>
+                <ScrollArea className="max-h-[calc(100vh-340px)]">
+                  {activeAdmissions.length === 0 ? (
+                    <div className="py-12 text-center text-muted-foreground text-sm px-4">
+                      No active admissions — MAR is available for admitted patients
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {activeAdmissions.map((adm: any) => {
+                        const scheduledMeds = adm.medicationOrders || adm.marOrders || [];
+                        const dueNow = scheduledMeds.filter((m: any) => {
+                          if (!m.nextDue) return false;
+                          return new Date(m.nextDue) <= new Date();
+                        });
+                        return (
+                          <div key={adm._id} className="p-3 hover:bg-muted/30 transition-colors">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-sm truncate">
+                                  {adm.patientId?.firstName} {adm.patientId?.lastName}
+                                </p>
+                                <p className="text-xs text-muted-foreground">{adm.admissionNumber} · {adm.wardType}{adm.bedNumber ? ` · ${adm.bedNumber}` : ''}</p>
+                                {dueNow.length > 0 && (
+                                  <div className="flex items-center gap-1 mt-1">
+                                    <AlertCircle className="w-3 h-3 text-amber-500" />
+                                    <span className="text-xs text-amber-600 font-medium">{dueNow.length} medication(s) due now</span>
+                                  </div>
+                                )}
+                                {scheduledMeds.length === 0 && (
+                                  <p className="text-xs text-muted-foreground italic mt-1">No active medication orders</p>
+                                )}
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-shrink-0"
+                                onClick={() => {
+                                  setSelectedMarAdmission(adm);
+                                  setMarMedications(scheduledMeds);
+                                  setMarOpen(true);
+                                }}
+                              >
+                                View MAR
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+            </TabsContent>
           </Tabs>
         </div>
 
@@ -301,6 +408,23 @@ export default function NurseDashboard() {
               />
             </div>
 
+            {/* Abnormal vitals alerts */}
+            {(() => {
+              const alerts = checkAbnormalVitals(vitals);
+              if (alerts.length === 0) return null;
+              return (
+                <Alert variant="destructive">
+                  <AlertCircle className="w-4 h-4" />
+                  <AlertTitle>Abnormal Vitals Detected</AlertTitle>
+                  <AlertDescription>
+                    <ul className="list-disc list-inside text-sm">
+                      {alerts.map((a, i) => <li key={i}>{a}</li>)}
+                    </ul>
+                  </AlertDescription>
+                </Alert>
+              );
+            })()}
+
             <div>
               <Label className="text-sm font-medium flex items-center gap-2">
                 <Heart className="w-4 h-4 text-red-500" />
@@ -318,22 +442,29 @@ export default function NurseDashboard() {
             </div>
 
             <div>
-              <Label className="text-sm font-medium">Priority</Label>
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Activity className="w-4 h-4 text-primary" />
+                ESI Level (Emergency Severity Index)
+              </Label>
               <div className="grid grid-cols-5 gap-2 mt-2">
-                {PRIORITIES.map((p) => (
+                {ESI_LEVELS.map((p) => (
                   <button
                     key={p.value}
                     type="button"
-                    onClick={() => setTriagePriority(p.value)}
+                    onClick={() => setTriageEsiLevel(p.value)}
                     className={cn(
-                      'px-3 py-2 rounded-lg border-2 text-xs font-medium transition-all',
-                      triagePriority === p.value ? `${p.color} text-white border-transparent` : 'border-border text-muted-foreground hover:border-primary/50',
+                      'px-2 py-2 rounded-lg border-2 text-xs font-medium transition-all text-center',
+                      triageEsiLevel === p.value ? `${p.color} text-white border-transparent` : 'border-border text-muted-foreground hover:border-primary/50',
                     )}
+                    title={p.desc}
                   >
-                    {p.label}
+                    <div>{p.label}</div>
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {ESI_LEVELS.find(e => e.value === triageEsiLevel)?.desc}
+              </p>
             </div>
 
             <div>
@@ -353,6 +484,53 @@ export default function NurseDashboard() {
               {completeTriage.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
               Send to Doctor
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ---------- MAR Modal ---------- */}
+      <Dialog open={marOpen} onOpenChange={setMarOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              MAR: {selectedMarAdmission?.patientId?.firstName} {selectedMarAdmission?.patientId?.lastName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-xs text-muted-foreground">
+              {selectedMarAdmission?.admissionNumber} · {selectedMarAdmission?.wardType}{selectedMarAdmission?.bedNumber ? ` · Bed ${selectedMarAdmission.bedNumber}` : ''}
+            </div>
+            {marMedications.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">No active medication orders</p>
+            ) : (
+              <div className="border rounded-lg divide-y">
+                {marMedications.map((med: any, i: number) => {
+                  const isDue = med.nextDue ? new Date(med.nextDue) <= new Date() : false;
+                  const isGiven = med.status === 'given' || med.status === 'administered';
+                  return (
+                    <div key={i} className="p-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{med.medicationName || med.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {med.dosage} · {med.frequency} · {med.route || 'PO'}
+                        </p>
+                        {med.nextDue && (
+                          <p className={cn('text-xs mt-0.5 font-medium', isDue ? 'text-amber-600' : 'text-muted-foreground')}>
+                            Next due: {new Date(med.nextDue).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
+                      </div>
+                      <Badge variant={isGiven ? 'default' : isDue ? 'destructive' : 'outline'} className="flex-shrink-0">
+                        {isGiven ? 'Given' : isDue ? 'Due Now' : 'Scheduled'}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button onClick={() => setMarOpen(false)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

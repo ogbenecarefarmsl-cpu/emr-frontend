@@ -7,11 +7,12 @@ import { useQuery } from '@tanstack/react-query';
 import api, { adminAPI } from '@/services/api';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   Users, ClipboardList, DollarSign, AlertTriangle, Stethoscope, Pill,
   FlaskConical, BedDouble, TrendingUp, Package, Shield, BarChart3,
   Cpu, Printer, Settings, ArrowRight, Loader2, Activity, UserCog,
-  Calendar, FileText,
+  Calendar, FileText, FileSearch, Clock,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -80,6 +81,24 @@ export default function AdminDashboard() {
     queryKey: ['admissions', 'stats'],
     queryFn: async () => (await api.get('/admissions/stats')).data,
     refetchInterval: 60 * 1000,
+  });
+
+  const { data: recentAuditLogs = [] } = useQuery({
+    queryKey: ['audit-logs', 'recent'],
+    queryFn: async () => {
+      const res = await api.get('/audit-logs?limit=5');
+      return res.data || [];
+    },
+    refetchInterval: 60 * 1000,
+  });
+
+  const { data: weeklyRevenue = [] } = useQuery({
+    queryKey: ['revenue', 'weekly'],
+    queryFn: async () => {
+      const res = await api.get('/orders/daily-income?days=7');
+      return res.data || [];
+    },
+    refetchInterval: 5 * 60 * 1000,
   });
 
   const s = data?.todayStats;
@@ -194,6 +213,85 @@ export default function AdminDashboard() {
           value={staff?.totalActiveStaff || 0}
           icon={UserCog}
         />
+      </div>
+
+      {/* ───────── Revenue trend + Audit log preview ───────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Weekly Revenue Trend */}
+        <div className="bg-card border rounded-xl shadow-sm">
+          <div className="px-5 py-4 border-b flex items-center justify-between">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-primary" />
+              7-Day Revenue Trend
+            </h3>
+            <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/admin/reports')}>
+              Full Report <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+          <div className="p-5">
+            {Array.isArray(weeklyRevenue) && weeklyRevenue.length > 0 ? (
+              <div className="space-y-2">
+                {weeklyRevenue.slice(-7).map((day: any, i: number) => {
+                  const maxRev = Math.max(...weeklyRevenue.map((d: any) => d.totalAmount || d.total || d.revenue || 0));
+                  const dayRev = day.totalAmount || day.total || day.revenue || 0;
+                  const pct = maxRev > 0 ? (dayRev / maxRev) * 100 : 0;
+                  return (
+                    <div key={i} className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground w-16 flex-shrink-0">
+                        {day.date ? new Date(day.date).toLocaleDateString([], { weekday: 'short' }) : 'Today'}
+                      </span>
+                      <div className="flex-1 h-6 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-primary rounded-full transition-all"
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                      <span className="text-xs font-medium w-20 text-right flex-shrink-0">
+                        Le {dayRev.toLocaleString()}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">No revenue data for the past 7 days</p>
+            )}
+          </div>
+        </div>
+
+        {/* Recent Audit Log */}
+        <div className="bg-card border rounded-xl shadow-sm">
+          <div className="px-5 py-4 border-b flex items-center justify-between">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <FileSearch className="w-4 h-4 text-primary" />
+              Recent Audit Activity
+            </h3>
+            <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/admin/audit-logs')}>
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+          <div className="divide-y max-h-64 overflow-y-auto">
+            {recentAuditLogs.length > 0 ? recentAuditLogs.map((log: any) => (
+              <div key={log._id || log.id} className="px-5 py-3 flex items-start gap-3">
+                <Clock className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{log.action || log.event}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {log.user?.fullName || log.userName || 'System'} · {new Date(log.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                  {log.details && (
+                    <p className="text-xs text-muted-foreground/70 mt-0.5 truncate">{log.details}</p>
+                  )}
+                </div>
+                <Badge variant="outline" className="text-[10px] flex-shrink-0">{log.resource || log.module}</Badge>
+              </div>
+            )) : (
+              <div className="px-5 py-10 text-center text-muted-foreground text-sm">
+                No recent audit activity
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ───────── Alerts + quick links row ───────── */}

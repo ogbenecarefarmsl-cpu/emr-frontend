@@ -1,7 +1,7 @@
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { usePendingCollectionOrders, useProcessingOrders, useTodayOrders } from '@/hooks/useOrders';
-import { useCriticalResults } from '@/hooks/useResults';
+import { useCriticalResults, usePendingVerificationResults } from '@/hooks/useResults';
 import { useMachines } from '@/hooks/useMachines';
 import { useRealtimeOrders } from '@/hooks/useRealtimeOrders';
 import { useRealtimeResults } from '@/hooks/useRealtimeResults';
@@ -25,10 +25,16 @@ import {
   ArrowRight,
   Search,
   ClipboardCheck,
+  Clock,
+  Timer,
+  Beaker,
+  AlertCircle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useQuery } from '@tanstack/react-query';
+import api from '@/services/api';
 
 export default function LabDashboardPage() {
   const { profile } = useAuth();
@@ -42,13 +48,50 @@ export default function LabDashboardPage() {
   const { data: processingOrders, isLoading: processingLoading } = useProcessingOrders();
   const { data: todayOrders } = useTodayOrders();
   const { data: criticalResults } = useCriticalResults();
+  const { data: pendingVerification } = usePendingVerificationResults();
   const { data: machines } = useMachines();
+
+  const { data: qcResults = [] } = useQuery({
+    queryKey: ['qc', 'recent-failures'],
+    queryFn: async () => {
+      const res = await api.get('/qc-results?status=fail&limit=5');
+      return res.data || [];
+    },
+    refetchInterval: 5 * 60 * 1000,
+  });
 
   const completedToday = Array.isArray(todayOrders) ? todayOrders.filter(o => o.status === 'completed').length : 0;
   const onlineMachines = Array.isArray(machines) ? machines.filter(m => m.status === 'online' || m.status === 'processing').length : 0;
 
+  const avgTurnaround = useMemo(() => {
+    if (!Array.isArray(todayOrders)) return null;
+    const completed = todayOrders.filter(o => o.status === 'completed' && o.completedAt && o.createdAt);
+    if (completed.length === 0) return null;
+    const totalMinutes = completed.reduce((sum: number, o: any) => {
+      const start = new Date(o.createdAt).getTime();
+      const end = new Date(o.completedAt).getTime();
+      return sum + (end - start) / (1000 * 60);
+    }, 0);
+    return Math.round(totalMinutes / completed.length);
+  }, [todayOrders]);
+
   const isLoading = pendingLoading || processingLoading;
   const [searchTerm, setSearchTerm] = useState('');
+
+  const worklistByPriority = useMemo(() => {
+    const all = [...(pendingOrders || []), ...(processingOrders || [])];
+    const seen = new Set<string>();
+    const unique = all.filter(o => {
+      const id = getOrderId(o);
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+    const stat = unique.filter(o => o.priority === 'stat');
+    const urgent = unique.filter(o => o.priority === 'urgent');
+    const routine = unique.filter(o => !o.priority || o.priority === 'routine');
+    return { stat, urgent, routine };
+  }, [pendingOrders, processingOrders]);
 
   const filteredOrders = searchTerm
     ? (pendingOrders || []).filter((o: any) =>
@@ -124,7 +167,7 @@ export default function LabDashboardPage() {
       </div>
 
       {/* Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
         <MetricCard
           title="Pending Collection"
           value={pendingOrders?.length || 0}
@@ -146,6 +189,12 @@ export default function LabDashboardPage() {
           value={criticalResults?.length || 0}
           icon={AlertTriangle}
           variant={(criticalResults?.length || 0) > 0 ? 'critical' : 'default'}
+        />
+        <MetricCard
+          title="Avg TAT"
+          value={avgTurnaround ? `${avgTurnaround}m` : '—'}
+          icon={Timer}
+          variant={avgTurnaround && avgTurnaround > 60 ? 'warning' : 'default'}
         />
         <MetricCard
           title="Machines Online"
@@ -266,6 +315,117 @@ export default function LabDashboardPage() {
 
         {/* Live Connection Monitor */}
         <LiveConnectionMonitor />
+      </div>
+
+      {/* QC Alerts + Worklist by Priority */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+        {/* QC Alerts */}
+        <div className="bg-card border rounded-xl shadow-sm">
+          <div className="px-5 py-4 border-b flex items-center justify-between">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <Beaker className="w-4 h-4 text-amber-500" />
+              QC Alerts
+            </h3>
+            <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/lab/qc')}>
+              QC Entry <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+          <div className="divide-y max-h-64 overflow-y-auto">
+            {Array.isArray(qcResults) && qcResults.length > 0 ? qcResults.map((qc: any) => (
+              <div key={qc._id || qc.id} className="px-5 py-3 flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">{qc.testName || qc.testCode}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Lot: {qc.lotNumber || 'N/A'} · Expected: {qc.expectedValue} · Got: {qc.actualValue}
+                  </p>
+                  <p className="text-xs text-red-600 mt-0.5">
+                    Failed {new Date(qc.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              </div>
+            )) : (
+              <div className="px-5 py-10 text-center text-muted-foreground text-sm">
+                No QC failures — all controls within range
+              </div>
+            )}
+            {pendingVerification && Array.isArray(pendingVerification) && pendingVerification.length > 0 && (
+              <div className="px-5 py-3 bg-amber-50 dark:bg-amber-950/20 flex items-center gap-3">
+                <Clock className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                    {pendingVerification.length} result(s) awaiting verification
+                  </p>
+                  <Button variant="link" size="sm" className="text-xs p-0 h-auto text-amber-700" onClick={() => navigate('/lab/verify-results')}>
+                    Review now →
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Worklist by Priority */}
+        <div className="bg-card border rounded-xl shadow-sm">
+          <div className="px-5 py-4 border-b">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <ClipboardCheck className="w-4 h-4 text-primary" />
+              Worklist by Priority
+            </h3>
+          </div>
+          <div className="divide-y max-h-64 overflow-y-auto">
+            {worklistByPriority.stat.length > 0 && (
+              <div className="px-5 py-3 bg-red-50 dark:bg-red-950/20">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400 uppercase tracking-wider mb-2">
+                  STAT ({worklistByPriority.stat.length})
+                </p>
+                {worklistByPriority.stat.slice(0, 3).map(order => (
+                  <div key={getOrderId(order)} className="flex items-center justify-between py-1">
+                    <p className="text-sm truncate">{getPatientName(order)}</p>
+                    <Button size="sm" className="text-xs h-7 flex-shrink-0 ml-2" onClick={() => navigate(`/lab/processing?order=${getOrderId(order)}`)}>
+                      Process
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {worklistByPriority.urgent.length > 0 && (
+              <div className="px-5 py-3 bg-amber-50 dark:bg-amber-950/20">
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wider mb-2">
+                  Urgent ({worklistByPriority.urgent.length})
+                </p>
+                {worklistByPriority.urgent.slice(0, 3).map(order => (
+                  <div key={getOrderId(order)} className="flex items-center justify-between py-1">
+                    <p className="text-sm truncate">{getPatientName(order)}</p>
+                    <Button variant="outline" size="sm" className="text-xs h-7 flex-shrink-0 ml-2" onClick={() => navigate(`/lab/processing?order=${getOrderId(order)}`)}>
+                      Process
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {worklistByPriority.routine.length > 0 && (
+              <div className="px-5 py-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
+                  Routine ({worklistByPriority.routine.length})
+                </p>
+                {worklistByPriority.routine.slice(0, 3).map(order => (
+                  <div key={getOrderId(order)} className="flex items-center justify-between py-1">
+                    <p className="text-sm truncate">{getPatientName(order)}</p>
+                    <Button variant="ghost" size="sm" className="text-xs h-7 flex-shrink-0 ml-2" onClick={() => navigate(`/lab/processing?order=${getOrderId(order)}`)}>
+                      Process
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {worklistByPriority.stat.length === 0 && worklistByPriority.urgent.length === 0 && worklistByPriority.routine.length === 0 && (
+              <div className="px-5 py-10 text-center text-muted-foreground text-sm">
+                No orders in worklist
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </RoleLayout>
   );

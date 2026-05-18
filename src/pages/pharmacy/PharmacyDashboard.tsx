@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { RoleLayout } from '@/components/layout/RoleLayout';
@@ -17,12 +17,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from 'sonner';
 
 // Icons
 import {
   AlertTriangle, CheckCircle, Clock, Loader2, Package, Pill, Search, User,
   ClipboardList, CreditCard, Send, XCircle, ChevronRight, ArrowRight, Stethoscope,
+  ShieldAlert, Calendar,
 } from 'lucide-react';
 
 const getId = (v: any) => v?._id || v?.id || v;
@@ -47,6 +49,12 @@ export default function PharmacyDashboard() {
   const { data: lowStock = [] } = useQuery({
     queryKey: ['inventory', 'low-stock'],
     queryFn: () => inventoryAPI.getLowStock(),
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  const { data: expiringSoon = [] } = useQuery({
+    queryKey: ['inventory', 'expiring-soon'],
+    queryFn: () => inventoryAPI.getExpiringSoon(90),
     refetchInterval: 5 * 60 * 1000,
   });
 
@@ -92,6 +100,39 @@ export default function PharmacyDashboard() {
   const filteredUnpaid = filter(unpaid);
   const filteredDispensed = filter(dispensedToday);
 
+  const KNOWN_INTERACTIONS: Record<string, string> = {
+    'warfarin,aspirin': 'Increased bleeding risk — monitor INR closely',
+    'warfarin,ibuprofen': 'Increased bleeding risk — avoid NSAIDs',
+    'metformin,contrast': 'Risk of lactic acidosis — hold metformin 48h',
+    'lisinopril,potassium': 'Hyperkalemia risk — monitor K+ levels',
+    'simvastatin,erythromycin': 'Rhabdomyolysis risk — avoid combination',
+    'ciprofloxacin,theophylline': 'Increased theophylline levels — reduce dose',
+    'methotrexate,nsaids': 'Methotrexate toxicity — avoid NSAIDs',
+    'digoxin,amiodarone': 'Digoxin toxicity — reduce digoxin by 50%',
+    'lithium,ibuprofen': 'Lithium toxicity — avoid NSAIDs',
+    'ssri,maoi': 'Serotonin syndrome — contraindicated',
+    'metronidazole,alcohol': 'Disulfiram-like reaction — avoid alcohol',
+    'sildenafil,nitrates': 'Severe hypotension — contraindicated',
+  };
+
+  const checkInteractions = (items: any[]) => {
+    if (!items || items.length < 2) return [];
+    const names = items.map((i: any) => (i.medicationName || '').toLowerCase().trim());
+    const interactions: string[] = [];
+    for (let i = 0; i < names.length; i++) {
+      for (let j = i + 1; j < names.length; j++) {
+        const keyA = `${names[i]},${names[j]}`;
+        const keyB = `${names[j]},${names[i]}`;
+        for (const [knownKey, warning] of Object.entries(KNOWN_INTERACTIONS)) {
+          if (keyA.includes(knownKey) || keyB.includes(knownKey)) {
+            interactions.push(warning);
+          }
+        }
+      }
+    }
+    return [...new Set(interactions)];
+  };
+
   return (
     <RoleLayout
       title="Pharmacy"
@@ -100,7 +141,7 @@ export default function PharmacyDashboard() {
       userName={profile?.fullName}
     >
       {/* Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <MetricCard
           title="Ready to Dispense"
           value={paidWaiting.length}
@@ -119,10 +160,16 @@ export default function PharmacyDashboard() {
           icon={CheckCircle}
         />
         <MetricCard
-          title="Low Stock Alerts"
+          title="Low Stock"
           value={lowStock.length}
           icon={AlertTriangle}
           variant={lowStock.length > 0 ? 'critical' : 'default'}
+        />
+        <MetricCard
+          title="Expiring (90d)"
+          value={expiringSoon.length}
+          icon={Calendar}
+          variant={expiringSoon.length > 0 ? 'warning' : 'default'}
         />
       </div>
 
@@ -246,7 +293,7 @@ export default function PharmacyDashboard() {
             </Tabs>
           </div>
 
-          {/* Low stock warning card */}
+          {/* Low stock + expiring warnings */}
           {lowStock.length > 0 && (
             <div className="bg-card border rounded-xl shadow-sm mt-4 border-l-4 border-l-amber-500">
               <div className="px-4 py-3 border-b flex items-center justify-between">
@@ -270,6 +317,34 @@ export default function PharmacyDashboard() {
               </div>
             </div>
           )}
+          {expiringSoon.length > 0 && (
+            <div className="bg-card border rounded-xl shadow-sm mt-4 border-l-4 border-l-orange-500">
+              <div className="px-4 py-3 border-b flex items-center justify-between">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-orange-500" />
+                  Expiring Soon
+                </h3>
+                <Button variant="ghost" size="sm" className="text-xs" onClick={() => navigate('/pharmacy/inventory')}>
+                  View all <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+                </Button>
+              </div>
+              <div className="divide-y">
+                {expiringSoon.slice(0, 3).map((m: any) => {
+                  const daysLeft = m.expiryDate
+                    ? Math.ceil((new Date(m.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                    : null;
+                  return (
+                    <div key={m._id} className="px-4 py-2 flex items-center justify-between">
+                      <p className="text-sm truncate">{m.name} <span className="text-xs text-muted-foreground">({m.batchNumber})</span></p>
+                      <Badge variant={daysLeft && daysLeft < 30 ? 'destructive' : 'outline'} className="text-[10px]">
+                        {daysLeft ? `${daysLeft}d` : 'N/A'}
+                      </Badge>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* RIGHT: Prescription detail */}
@@ -279,6 +354,7 @@ export default function PharmacyDashboard() {
               rx={selected}
               onDispense={() => setConfirmOpen(true)}
               isPending={dispense.isPending}
+              interactions={checkInteractions(selected.items || [])}
             />
           ) : (
             <div className="bg-card border rounded-xl shadow-sm flex flex-col items-center justify-center h-96 text-muted-foreground p-6 text-center">
@@ -391,18 +467,25 @@ function PrescriptionRow({
 }
 
 function PrescriptionDetail({
-  rx, onDispense, isPending,
-}: { rx: any; onDispense: () => void; isPending: boolean }) {
+  rx, onDispense, isPending, interactions,
+}: { rx: any; onDispense: () => void; isPending: boolean; interactions: string[] }) {
   const isDispensed = rx.status === 'dispensed';
   const isUnpaid = rx.status === 'pending' && !rx.isPaid;
   const canDispense = rx.status === 'pending' && rx.isPaid;
   const patient = rx.patientId;
   const total = rx.totalAmount || rx.items?.reduce((s: number, i: any) => s + (i.quantity * (i.unitPrice || 0)), 0) || 0;
+  const patientAllergies = patient?.allergies || patient?.allergyDetails || [];
+  const hasAllergyConflict = interactions.length > 0 || patientAllergies.length > 0;
 
   return (
     <div className="bg-card border rounded-xl shadow-sm">
       {/* Header */}
-      <div className="px-5 py-4 border-b bg-gradient-to-r from-primary/5 to-transparent">
+      <div className={cn(
+        'px-5 py-4 border-b',
+        hasAllergyConflict
+          ? 'bg-gradient-to-r from-red-50 to-amber-50 dark:from-red-950/30 dark:to-amber-950/30 border-red-200'
+          : 'bg-gradient-to-r from-primary/5 to-transparent',
+      )}>
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="flex items-center gap-2">
@@ -421,7 +504,6 @@ function PrescriptionDetail({
                 </>
               )}
             </div>
-            {/* Prescribing doctor — always shown so pharmacist knows who wrote it */}
             {(rx.prescribedBy || rx.doctorId) && (
               <div className="flex items-center gap-1.5 mt-1.5 text-sm">
                 <Stethoscope className="w-3.5 h-3.5 text-primary" />
@@ -433,13 +515,27 @@ function PrescriptionDetail({
                 )}
               </div>
             )}
-            {patient?.allergies?.length > 0 && (
-              <div className="flex items-center gap-1 mt-2">
-                <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
-                <span className="text-xs text-red-600 font-medium">
-                  Allergies: {patient.allergies.join(', ')}
-                </span>
-              </div>
+            {patientAllergies.length > 0 && (
+              <Alert variant="destructive" className="mt-3 py-2 px-3">
+                <ShieldAlert className="w-4 h-4" />
+                <AlertTitle className="text-sm font-semibold">Patient Allergies</AlertTitle>
+                <AlertDescription className="text-xs mt-0.5">
+                  {Array.isArray(patientAllergies) ? patientAllergies.join(', ') : patientAllergies}
+                </AlertDescription>
+              </Alert>
+            )}
+            {interactions.length > 0 && (
+              <Alert className="mt-3 py-2 px-3 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                <AlertTitle className="text-sm font-semibold text-amber-800 dark:text-amber-300">Drug Interaction Alerts</AlertTitle>
+                <AlertDescription className="text-xs mt-0.5 text-amber-700 dark:text-amber-400">
+                  <ul className="list-disc list-inside space-y-0.5">
+                    {interactions.map((warning, i) => (
+                      <li key={i}>{warning}</li>
+                    ))}
+                  </ul>
+                </AlertDescription>
+              </Alert>
             )}
           </div>
           <div>

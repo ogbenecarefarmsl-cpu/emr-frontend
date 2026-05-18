@@ -1,7 +1,7 @@
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useSearchPatients } from '@/hooks/usePatients';
-import { useOrders, usePaymentStats } from '@/hooks/useOrders';
+import { usePaymentStats, useDailyIncome, useOutstandingBalances } from '@/hooks/useOrders';
 import { useRealtimeOrders } from '@/hooks/useRealtimeOrders';
 import { useRealtimePatients } from '@/hooks/useRealtimePatients';
 import { useRealtimeResults } from '@/hooks/useRealtimeResults';
@@ -23,11 +23,16 @@ import {
   Loader2,
   Search,
   Stethoscope,
+  Wallet,
+  TrendingDown,
+  PiggyBank,
+  Phone,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { patientService } from '@/services/patientService';
 import { prescriptionService } from '@/services/prescriptionService';
 import { useDoctorQueue, useVisitStats } from '@/hooks/useVisits';
+import { useExpenditureSummary } from '@/hooks/useExpenditures';
 import { toast } from 'sonner';
 
 export default function ReceptionDashboard() {
@@ -39,7 +44,6 @@ export default function ReceptionDashboard() {
   useRealtimeResults();
   
   const { data: patients = [], isLoading: patientsLoading } = useSearchPatients('');
-  const { data: orders = [] } = useOrders('all');
   const navigate = useNavigate();
 
   const recentRegistrations = useMemo(() => {
@@ -81,6 +85,9 @@ export default function ReceptionDashboard() {
   const { data: paymentStats } = usePaymentStats(todayStr, todayStr);
   const { data: visitStats } = useVisitStats(todayStr);
   const { data: doctorQueue = [], isLoading: queueLoading } = useDoctorQueue();
+  const { data: dailyIncome = [] } = useDailyIncome(todayStr, todayStr);
+  const { data: outstandingBalances = [] } = useOutstandingBalances();
+  const { data: expenditureSummary } = useExpenditureSummary(todayStr, todayStr);
   const { data: prescriptions = [] } = useQuery({
     queryKey: ['prescriptions', 'reception-pending'],
     queryFn: () => prescriptionService.findAll(),
@@ -97,13 +104,27 @@ export default function ReceptionDashboard() {
     },
   });
   const todayRevenue = paymentStats?.paidRevenue ?? 0;
-  const pendingLabPayments = Array.isArray(orders) ? orders.filter(o =>
-    o.paymentStatus === 'pending' || o.payment_status === 'pending'
-  ).length : 0;
+  const pendingLabPayments = paymentStats?.pendingOrders ?? 0;
   const pendingPrescriptionPayments = Array.isArray(prescriptions)
     ? prescriptions.filter((rx: any) => rx.status === 'pending' && !rx.isPaid)
     : [];
   const pendingPayments = pendingLabPayments + pendingPrescriptionPayments.length;
+  const totalOutstanding = Array.isArray(outstandingBalances)
+    ? outstandingBalances.reduce((sum: number, o: any) => sum + (o.balance || o.outstanding || 0), 0)
+    : 0;
+  const cashByMethod = useMemo(() => {
+    const methods: Record<string, number> = { cash: 0, orange_money: 0, afrimoney: 0 };
+    if (Array.isArray(dailyIncome)) {
+      dailyIncome.forEach((entry: any) => {
+        const method = entry.paymentMethod || entry.payment_method || 'cash';
+        const amount = entry.totalAmount || entry.total_amount || entry.amount || 0;
+        if (methods[method] !== undefined) methods[method] += amount;
+      });
+    }
+    return methods;
+  }, [dailyIncome]);
+  const totalExpenditures = expenditureSummary?.totalExpenditures || 0;
+  const netCashPosition = (paymentStats?.paidRevenue ?? 0) - totalExpenditures;
 
   const [searchTerm, setSearchTerm] = useState('');
   const { data: searchResults = [] } = useSearchPatients(searchTerm);
@@ -214,6 +235,71 @@ export default function ReceptionDashboard() {
           icon={DollarSign}
           variant={pendingPayments > 0 ? 'warning' : 'default'}
         />
+      </div>
+
+      {/* Daily Cash Summary */}
+      <div className="mb-6 bg-card border rounded-xl shadow-sm">
+        <div className="px-5 py-4 border-b flex items-center justify-between">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <Wallet className="w-4 h-4 text-primary" />
+            Daily Cash Summary
+          </h3>
+          <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reconciliation')}>
+            Full Reconciliation <ArrowRight className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="w-3.5 h-3.5 text-green-600" />
+                <p className="text-xs font-medium text-green-700 dark:text-green-400">Cash</p>
+              </div>
+              <p className="text-lg font-bold text-green-800 dark:text-green-300">Le {cashByMethod.cash.toLocaleString()}</p>
+            </div>
+            <div className="bg-orange-50 dark:bg-orange-950/30 rounded-lg p-3 border border-orange-200 dark:border-orange-800">
+              <div className="flex items-center gap-2 mb-1">
+                <Phone className="w-3.5 h-3.5 text-orange-600" />
+                <p className="text-xs font-medium text-orange-700 dark:text-orange-400">Orange Money</p>
+              </div>
+              <p className="text-lg font-bold text-orange-800 dark:text-orange-300">Le {cashByMethod.orange_money.toLocaleString()}</p>
+            </div>
+            <div className="bg-yellow-50 dark:bg-yellow-950/30 rounded-lg p-3 border border-yellow-200 dark:border-yellow-800">
+              <div className="flex items-center gap-2 mb-1">
+                <Phone className="w-3.5 h-3.5 text-yellow-600" />
+                <p className="text-xs font-medium text-yellow-700 dark:text-yellow-400">Afrimoney</p>
+              </div>
+              <p className="text-lg font-bold text-yellow-800 dark:text-yellow-300">Le {cashByMethod.afrimoney.toLocaleString()}</p>
+            </div>
+            <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 border border-red-200 dark:border-red-800">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingDown className="w-3.5 h-3.5 text-red-600" />
+                <p className="text-xs font-medium text-red-700 dark:text-red-400">Expenditures</p>
+              </div>
+              <p className="text-lg font-bold text-red-800 dark:text-red-300">Le {totalExpenditures.toLocaleString()}</p>
+            </div>
+            <div className={cn(
+              'rounded-lg p-3 border',
+              netCashPosition >= 0
+                ? 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-200 dark:border-emerald-800'
+                : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800',
+            )}>
+              <div className="flex items-center gap-2 mb-1">
+                <PiggyBank className={cn('w-3.5 h-3.5', netCashPosition >= 0 ? 'text-emerald-600' : 'text-red-600')} />
+                <p className={cn('text-xs font-medium', netCashPosition >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400')}>Net Position</p>
+              </div>
+              <p className={cn('text-lg font-bold', netCashPosition >= 0 ? 'text-emerald-800 dark:text-emerald-300' : 'text-red-800 dark:text-red-300')}>
+                Le {netCashPosition.toLocaleString()}
+              </p>
+            </div>
+          </div>
+          {totalOutstanding > 0 && (
+            <div className="mt-4 pt-4 border-t flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Outstanding balances (unpaid orders):</span>
+              <span className="font-semibold text-amber-600">Le {totalOutstanding.toLocaleString()}</span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Pending Clinical Orders (created by doctors, paid at reception) */}

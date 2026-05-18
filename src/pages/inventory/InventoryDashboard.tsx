@@ -16,11 +16,13 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Icons
 import {
   Package, AlertTriangle, Clock, TrendingUp, Plus, Save,
   Boxes, Building2, ArrowUpCircle, ArrowDownCircle, Loader2, Search, Calendar,
+  Trash2, RotateCcw, ShoppingCart,
 } from 'lucide-react';
 
 export default function InventoryDashboard() {
@@ -42,6 +44,12 @@ export default function InventoryDashboard() {
   const { data: expiring = [] } = useQuery({
     queryKey: ['inventory', 'expiring'],
     queryFn: () => inventoryAPI.getExpiringSoon(90),
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  const { data: expired = [] } = useQuery({
+    queryKey: ['inventory', 'expired'],
+    queryFn: () => inventoryAPI.getExpiringSoon(0),
     refetchInterval: 5 * 60 * 1000,
   });
 
@@ -102,6 +110,21 @@ export default function InventoryDashboard() {
       .filter((m: any) => m.name?.toLowerCase().includes(medSearch.toLowerCase()) || m.genericName?.toLowerCase().includes(medSearch.toLowerCase()))
       .slice(0, 50);
   }, [allMedications, medSearch]);
+
+  const reorderList = useMemo(() => {
+    if (!Array.isArray(lowStock)) return [];
+    return lowStock
+      .filter((m: any) => m.reorderLevel && m.stockQuantity <= m.reorderLevel)
+      .map((m: any) => ({
+        ...m,
+        suggestedOrderQty: Math.max((m.reorderLevel * 2) - m.stockQuantity, m.reorderLevel),
+      }));
+  }, [lowStock]);
+
+  const expiredItems = useMemo(() => {
+    if (!Array.isArray(expired)) return [];
+    return expired.filter((m: any) => m.expiryDate && new Date(m.expiryDate) < new Date());
+  }, [expired]);
 
   const receiveStock = useMutation({
     mutationFn: () =>
@@ -164,7 +187,7 @@ export default function InventoryDashboard() {
       userName={profile?.fullName}
     >
       {/* Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <MetricCard title="Total SKUs" value={dashboard?.totalMedications || 0} icon={Package} />
         <MetricCard
           title="Low Stock"
@@ -177,6 +200,12 @@ export default function InventoryDashboard() {
           value={dashboard?.expiringSoonCount || 0}
           icon={Clock}
           variant={(dashboard?.expiringSoonCount || 0) > 0 ? 'warning' : 'default'}
+        />
+        <MetricCard
+          title="Expired"
+          value={expiredItems.length}
+          icon={Trash2}
+          variant={expiredItems.length > 0 ? 'critical' : 'default'}
         />
         <MetricCard
           title="Stock Value"
@@ -222,9 +251,17 @@ export default function InventoryDashboard() {
             Low Stock
             {lowStock.length > 0 && <Badge variant="destructive" className="ml-2">{lowStock.length}</Badge>}
           </TabsTrigger>
+          <TabsTrigger value="reorder" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+            Reorder List
+            {reorderList.length > 0 && <Badge className="ml-2 bg-blue-500">{reorderList.length}</Badge>}
+          </TabsTrigger>
           <TabsTrigger value="expiring" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
             Expiring Soon
             {expiring.length > 0 && <Badge className="ml-2 bg-amber-500">{expiring.length}</Badge>}
+          </TabsTrigger>
+          <TabsTrigger value="expired" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+            Expired
+            {expiredItems.length > 0 && <Badge variant="destructive" className="ml-2">{expiredItems.length}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="movements" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
             Movements
@@ -281,6 +318,58 @@ export default function InventoryDashboard() {
           </div>
         </TabsContent>
 
+        {/* Reorder List Tab */}
+        <TabsContent value="reorder" className="mt-4">
+          <div className="bg-card border rounded-xl shadow-sm">
+            <div className="px-5 py-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <ShoppingCart className="w-4 h-4 text-blue-500" />
+                Automated Reorder List
+              </h3>
+              {reorderList.length > 0 && (
+                <Badge className="bg-blue-500">{reorderList.length} item(s) need reorder</Badge>
+              )}
+            </div>
+            {reorderList.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground text-sm">
+                No items need reordering — all stock levels are adequate
+              </div>
+            ) : (
+              <div className="divide-y">
+                {reorderList.map((m: any) => (
+                  <div key={m._id} className="px-5 py-3.5 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm">{m.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {m.medicationCode} · Current: {m.stockQuantity} · Reorder at: {m.reorderLevel}
+                      </p>
+                      <p className="text-xs text-blue-600 font-medium mt-0.5">
+                        Suggested order qty: {m.suggestedOrderQty} {m.unit || 'units'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className="text-[10px]">
+                        {m.supplierId?.name || m.supplier || 'No supplier'}
+                      </Badge>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setReceiveForm({ ...receiveForm, medicationId: m._id, quantity: String(m.suggestedOrderQty) });
+                          setMedSearch(m.name);
+                          setReceiveOpen(true);
+                        }}
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 mr-1" />
+                        Reorder
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
         {/* Expiring Tab */}
         <TabsContent value="expiring" className="mt-4">
           <div className="bg-card border rounded-xl shadow-sm">
@@ -315,6 +404,69 @@ export default function InventoryDashboard() {
                         <p className={`text-xs ${daysLeft && daysLeft < 30 ? 'text-red-600' : 'text-amber-600'}`}>
                           {daysLeft ? `${daysLeft} days left` : ''}
                         </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </TabsContent>
+
+        {/* Expired Tab */}
+        <TabsContent value="expired" className="mt-4">
+          <div className="bg-card border rounded-xl shadow-sm border-l-4 border-l-red-500">
+            <div className="px-5 py-4 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <Trash2 className="w-4 h-4 text-red-500" />
+                Expired Medications
+              </h3>
+              {expiredItems.length > 0 && (
+                <Alert variant="destructive" className="max-w-xs py-1 px-2">
+                  <AlertDescription className="text-xs">
+                    {expiredItems.length} expired batch(es) must be removed immediately
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+            {expiredItems.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground text-sm">
+                No expired medications — all batches are within expiry date
+              </div>
+            ) : (
+              <div className="divide-y">
+                {expiredItems.map((m: any) => {
+                  const daysExpired = m.expiryDate
+                    ? Math.ceil((Date.now() - new Date(m.expiryDate).getTime()) / (1000 * 60 * 60 * 24))
+                    : null;
+                  return (
+                    <div key={m._id} className="px-5 py-3.5 flex items-center justify-between bg-red-50/50 dark:bg-red-950/10">
+                      <div>
+                        <p className="font-medium text-sm text-red-800 dark:text-red-300">{m.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          Batch: {m.batchNumber || 'N/A'} · Stock: {m.stockQuantity} · Supplier: {m.supplierId?.name || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-red-600">
+                            Expired {m.expiryDate ? new Date(m.expiryDate).toLocaleDateString() : 'N/A'}
+                          </p>
+                          <p className="text-xs text-red-600">
+                            {daysExpired ? `${daysExpired} days ago` : ''}
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            setAdjustForm({ ...adjustForm, medicationId: m._id, quantity: `-${m.stockQuantity}`, reason: 'Expired - removal from inventory' });
+                            setAdjustOpen(true);
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 mr-1" />
+                          Remove
+                        </Button>
                       </div>
                     </div>
                   );
