@@ -32,6 +32,7 @@ import PrinterSetup from "./pages/reception/PrinterSetup";
 import PriceListPage from "./pages/reception/PriceListPage";
 import VisitRegistration from "./pages/reception/VisitRegistration";
 import ExpendituresPage from "./pages/reception/ExpendituresPage";
+import AppointmentsPage from "./pages/reception/AppointmentsPage";
 
 // Lab Pages
 import LabDashboardPage from "./pages/lab/LabDashboardPage";
@@ -204,6 +205,9 @@ function AppRoutes() {
       } />
       <Route path="/reception/expenditures" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><ExpendituresPage /></RoleGuard>
+      } />
+      <Route path="/reception/appointments" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin', 'doctor', 'nurse']}><AppointmentsPage /></RoleGuard>
       } />
       <Route path="/reception/reports/:orderId" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><LabReportPage /></RoleGuard>

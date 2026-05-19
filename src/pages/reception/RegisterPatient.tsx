@@ -66,8 +66,8 @@ export default function RegisterPatient() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.firstName || !formData.lastName || !formData.age || !formData.gender) {
-      toast.error('Please fill in all required fields');
+    if (!formData.firstName || !formData.lastName || !formData.age || !formData.gender || !formData.phone.trim()) {
+      toast.error('Please fill in all required fields (phone number is required)');
       return;
     }
 
@@ -264,7 +264,7 @@ export default function RegisterPatient() {
 
             {/* Phone */}
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
+              <Label htmlFor="phone">Phone Number *</Label>
               <div className="flex items-center rounded-md border bg-background">
                 <span className="px-3 text-sm text-muted-foreground border-r">+232</span>
                 <Input
@@ -274,6 +274,7 @@ export default function RegisterPatient() {
                   onChange={e => setFormData(prev => ({ ...prev, phone: e.target.value.replace(/\D/g, '') }))}
                   placeholder="XXXXXXXX"
                   className="border-0 focus-visible:ring-0"
+                  required
                 />
               </div>
             </div>

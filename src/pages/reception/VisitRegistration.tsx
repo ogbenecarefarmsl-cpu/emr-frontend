@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Loader2, Search, UserPlus, Stethoscope, ArrowLeft } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Loader2, Search, UserPlus, Stethoscope, ArrowLeft, Thermometer } from 'lucide-react';
 
 export default function VisitRegistration() {
   const navigate = useNavigate();
@@ -26,6 +27,7 @@ export default function VisitRegistration() {
   const [consultationFee, setConsultationFee] = useState<string>('5000');
   const [chiefComplaint, setChiefComplaint] = useState('');
   const [notes, setNotes] = useState('');
+  const [temperature, setTemperature] = useState('');
 
   const { data: searchResults = [], isLoading: searchLoading } = useSearchPatients(searchTerm);
   const { data: allPatients = [] } = useSearchPatients('');
@@ -63,6 +65,7 @@ export default function VisitRegistration() {
         consultationFee: parseFloat(consultationFee),
         chiefComplaint,
         notes,
+        temperature: temperature ? parseFloat(temperature) : undefined,
       });
 
       await markConsultationPaid.mutateAsync({ visitId: visit._id || visit.id, paymentMethod: 'cash' });
@@ -212,6 +215,31 @@ export default function VisitRegistration() {
                   placeholder="Enter patient's chief complaint..."
                   rows={3}
                 />
+              </div>
+
+              {/* Quick Temperature Check */}
+              <div className="space-y-2">
+                <Label htmlFor="temperature" className="flex items-center gap-2">
+                  <Thermometer className="w-4 h-4 text-red-500" />
+                  Temperature (°C) — Quick Check
+                </Label>
+                <Input
+                  id="temperature"
+                  type="number"
+                  step="0.1"
+                  value={temperature}
+                  onChange={(e) => setTemperature(e.target.value)}
+                  placeholder="36.5"
+                  className="max-w-xs"
+                />
+                {temperature && (
+                  <p className={cn(
+                    'text-xs font-medium',
+                    parseFloat(temperature) >= 38 ? 'text-red-600' : parseFloat(temperature) >= 37.5 ? 'text-amber-600' : 'text-green-600',
+                  )}>
+                    {parseFloat(temperature) >= 38 ? '⚠ Fever detected' : parseFloat(temperature) >= 37.5 ? 'Elevated temperature' : 'Normal temperature'}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-2">

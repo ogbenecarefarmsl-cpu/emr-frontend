@@ -39,7 +39,7 @@ import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
 import {
   Loader2, Clock, CheckCircle, User, Stethoscope, FileText, FlaskConical, Pill,
   ChevronRight, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
-  Send, Heart, Users, ClipboardList, UserCheck, BedDouble, Inbox, ExternalLink
+  Send, Heart, Users, ClipboardList, UserCheck, BedDouble, Inbox, ExternalLink, Activity
 } from 'lucide-react';
 
 // Types
@@ -61,6 +61,11 @@ interface Visit {
   weight?: number;
   height?: number;
   oxygenSaturation?: number;
+  triagePriority?: string;
+  triageNotes?: string;
+  triagedAt?: string;
+  room?: string;
+  roomType?: string;
   subjectiveNotes?: string;
   objectiveNotes?: string;
   assessmentNotes?: string;
@@ -888,6 +893,54 @@ export default function DoctorDashboard() {
                         className="mt-1"
                       />
                     </div>
+
+                    {/* Triage Vitals - Auto-populated from nurse triage */}
+                    {(selectedVisit.temperature || selectedVisit.bloodPressure || selectedVisit.heartRate || selectedVisit.triagePriority) && (
+                      <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
+                          <Activity className="w-4 h-4" />
+                          Triage Vitals (from Nurse)
+                        </h4>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                          {selectedVisit.temperature && <div><span className="text-muted-foreground">Temp:</span> <span className="font-medium">{selectedVisit.temperature}°C</span></div>}
+                          {selectedVisit.bloodPressure && <div><span className="text-muted-foreground">BP:</span> <span className="font-medium">{selectedVisit.bloodPressure}</span></div>}
+                          {selectedVisit.heartRate && <div><span className="text-muted-foreground">HR:</span> <span className="font-medium">{selectedVisit.heartRate} bpm</span></div>}
+                          {selectedVisit.respiratoryRate && <div><span className="text-muted-foreground">RR:</span> <span className="font-medium">{selectedVisit.respiratoryRate}/min</span></div>}
+                          {selectedVisit.weight && <div><span className="text-muted-foreground">Weight:</span> <span className="font-medium">{selectedVisit.weight} kg</span></div>}
+                          {selectedVisit.height && <div><span className="text-muted-foreground">Height:</span> <span className="font-medium">{selectedVisit.height} cm</span></div>}
+                          {selectedVisit.oxygenSaturation && <div><span className="text-muted-foreground">SpO2:</span> <span className="font-medium">{selectedVisit.oxygenSaturation}%</span></div>}
+                          {selectedVisit.triagePriority && (
+                            <div>
+                              <span className="text-muted-foreground">Priority:</span>{' '}
+                              <Badge variant={selectedVisit.triagePriority.includes('emergency') || selectedVisit.triagePriority.includes('urgent') ? 'destructive' : 'outline'} className="text-[10px] capitalize">
+                                {selectedVisit.triagePriority.replace('esi_', 'ESI ')}
+                              </Badge>
+                            </div>
+                          )}
+                        </div>
+                        {selectedVisit.triageNotes && (
+                          <p className="text-xs text-blue-700 dark:text-blue-400 mt-2 italic">
+                            Nurse notes: {selectedVisit.triageNotes}
+                          </p>
+                        )}
+                        {selectedVisit.triagedAt && (
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            Recorded: {new Date(selectedVisit.triagedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Emergency room indicator */}
+                    {selectedVisit.roomType === 'emergency' && (
+                      <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                        <span className="text-sm font-semibold text-red-700 dark:text-red-300">
+                          Emergency — {selectedVisit.room || 'Treatment Room'}
+                        </span>
+                      </div>
+                    )}
+
                     <div>
                       <Label className="text-sm font-semibold text-green-600">O - Objective</Label>
                       <Textarea
