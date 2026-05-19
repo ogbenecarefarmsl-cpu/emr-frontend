@@ -31,6 +31,10 @@ type AdminDashboardData = {
     visitsAwaitingLab: number;
     visitsAwaitingPharmacy: number;
     visitsAwaitingDispensing: number;
+    visitsAwaitingResults: number;
+    visitsResultsReady: number;
+    visitsAwaitingDoctorReview: number;
+    visitsAdmitted: number;
     visitsCompleted: number;
     visitsCancelled: number;
   };
@@ -109,7 +113,13 @@ export default function AdminDashboard() {
 
   // Derived metrics
   const inProgress = (s?.visitsInQueue || 0) + (s?.visitsInConsultation || 0);
-  const awaitingSomething = (s?.visitsAwaitingLab || 0) + (s?.visitsAwaitingPharmacy || 0) + (s?.visitsAwaitingDispensing || 0);
+  const awaitingSomething = (s?.visitsAwaitingLab || 0)
+    + (s?.visitsAwaitingResults || 0)
+    + (s?.visitsResultsReady || 0)
+    + (s?.visitsAwaitingPharmacy || 0)
+    + (s?.visitsAwaitingDispensing || 0)
+    + (s?.visitsAwaitingDoctorReview || 0)
+    + (s?.visitsAdmitted || 0);
 
   if (isLoading) {
     return (
@@ -173,14 +183,17 @@ export default function AdminDashboard() {
       {/* ───────── Live clinical pipeline ───────── */}
       <div className="mb-6">
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Live Clinical Pipeline</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-10 gap-2">
           <PipelineStep label="Waiting Pay" value={s?.visitsWaitingPayment || 0} color="slate" onClick={() => navigate('/admin/patients')} />
           <PipelineStep label="Awaiting Vitals" value={s?.visitsAwaitingTriage || 0} color="amber" onClick={() => navigate('/nurse')} />
           <PipelineStep label="In Queue" value={s?.visitsInQueue || 0} color="blue" onClick={() => navigate('/admin/patients')} />
           <PipelineStep label="In Consult" value={s?.visitsInConsultation || 0} color="indigo" onClick={() => navigate('/admin/patients')} />
           <PipelineStep label="Awaiting Lab" value={s?.visitsAwaitingLab || 0} color="amber" onClick={() => navigate('/admin/orders')} />
+          <PipelineStep label="Awaiting Result" value={s?.visitsAwaitingResults || 0} color="orange" onClick={() => navigate('/admin/orders')} />
+          <PipelineStep label="Result Ready" value={s?.visitsResultsReady || 0} color="emerald" onClick={() => navigate('/admin/results')} />
           <PipelineStep label="Awaiting Pharm" value={s?.visitsAwaitingPharmacy || 0} color="purple" onClick={() => navigate('/admin/orders')} />
           <PipelineStep label="Awaiting Disp" value={s?.visitsAwaitingDispensing || 0} color="fuchsia" onClick={() => navigate('/admin/orders')} />
+          <PipelineStep label="Doctor Review" value={(s?.visitsAwaitingDoctorReview || 0) + (s?.visitsAdmitted || 0)} color="cyan" onClick={() => navigate('/doctor')} />
           <PipelineStep label="Completed" value={s?.visitsCompleted || 0} color="emerald" onClick={() => navigate('/admin/patients')} />
         </div>
       </div>
@@ -374,6 +387,7 @@ export default function AdminDashboard() {
           <AdminTool icon={Printer} label="Printers" to="/admin/printers" navigate={navigate} />
           <AdminTool icon={BarChart3} label="Revenue Reports" to="/admin/reports" navigate={navigate} />
           <AdminTool icon={TrendingUp} label="Daily Summary" to="/admin/daily-report" navigate={navigate} />
+          <AdminTool icon={BedDouble} label="Room Management" to="/admin/rooms" navigate={navigate} />
           <AdminTool icon={DollarSign} label="Cash Reconciliation" to="/admin/reconciliation" navigate={navigate} />
           <AdminTool icon={ClipboardList} label="Audit Logs" to="/admin/audit-logs" navigate={navigate} />
           <AdminTool icon={Stethoscope} label="Doctor Activity" to="/admin/doctor-referral-report" navigate={navigate} />
@@ -426,8 +440,10 @@ function PipelineStep({
     blue: { bg: 'bg-blue-100', text: 'text-blue-700' },
     indigo: { bg: 'bg-indigo-100', text: 'text-indigo-700' },
     amber: { bg: 'bg-amber-100', text: 'text-amber-700' },
+    orange: { bg: 'bg-orange-100', text: 'text-orange-700' },
     purple: { bg: 'bg-purple-100', text: 'text-purple-700' },
     fuchsia: { bg: 'bg-fuchsia-100', text: 'text-fuchsia-700' },
+    cyan: { bg: 'bg-cyan-100', text: 'text-cyan-700' },
     emerald: { bg: 'bg-emerald-100', text: 'text-emerald-700' },
   };
   const { bg, text } = colorMap[color] || colorMap.slate;

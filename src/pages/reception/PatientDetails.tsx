@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { useParams, useNavigate } from 'react-router-dom';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
-import { usePatient, usePatientResults, useUpdatePatient } from '@/hooks/usePatients';
+import { usePatient, usePatientResults, useUpdatePatient, usePatientWallet, useWalletTransactions, useDepositWallet, useWithdrawWallet } from '@/hooks/usePatients';
 import { useOrders } from '@/hooks/useOrders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,8 +12,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import { ArrowLeft, Edit, Eye, Loader2, Save, X } from 'lucide-react';
+import { ArrowLeft, Edit, Eye, Loader2, Save, X, Wallet, ArrowDownToLine, ArrowUpFromLine, Clock } from 'lucide-react';
 import { PatientNotesPanel } from '@/components/patients/PatientNotesPanel';
 import { getPatientAgeDisplay, getPatientFullName } from '@/utils/orderHelpers';
 
@@ -361,6 +362,7 @@ export default function PatientDetails() {
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="orders">Orders ({patientOrders.length})</TabsTrigger>
           <TabsTrigger value="history">Result History</TabsTrigger>
+          <TabsTrigger value="wallet">Wallet</TabsTrigger>
           <TabsTrigger value="notes">Clinical Notes</TabsTrigger>
         </TabsList>
 
@@ -635,6 +637,10 @@ export default function PatientDetails() {
           </div>
         </TabsContent>
 
+        <TabsContent value="wallet" className="mt-6">
+          <WalletPanel patientId={id || ''} />
+        </TabsContent>
+
         <TabsContent value="notes" className="mt-6">
           <div className="bg-card border rounded-lg p-6">
             <PatientNotesPanel patientId={id || ''} />
@@ -642,6 +648,161 @@ export default function PatientDetails() {
         </TabsContent>
       </Tabs>
     </RoleLayout>
+  );
+}
+
+function WalletPanel({ patientId }: { patientId: string }) {
+  const { data: wallet, isLoading: walletLoading } = usePatientWallet(patientId);
+  const { data: txData, isLoading: txLoading } = useWalletTransactions(patientId);
+  const deposit = useDepositWallet();
+  const withdraw = useWithdrawWallet();
+  const [depositOpen, setDepositOpen] = useState(false);
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const handleDeposit = async () => {
+    const num = Number(amount);
+    if (!num || num <= 0) { toast.error('Enter a valid positive amount'); return; }
+    await deposit.mutateAsync({ id: patientId, amount: num, notes: notes || undefined });
+    toast.success(`Le ${num.toLocaleString()} deposited`);
+    setDepositOpen(false); setAmount(''); setNotes('');
+  };
+
+  const handleWithdraw = async () => {
+    const num = Number(amount);
+    if (!num || num <= 0) { toast.error('Enter a valid positive amount'); return; }
+    if (wallet && num > (wallet.balance || 0)) { toast.error('Insufficient balance'); return; }
+    await withdraw.mutateAsync({ id: patientId, amount: num, notes: notes || undefined });
+    toast.success(`Le ${num.toLocaleString()} withdrawn`);
+    setWithdrawOpen(false); setAmount(''); setNotes('');
+  };
+
+  if (walletLoading) {
+    return <div className="flex items-center justify-center py-12"><Loader2 className="w-6 h-6 animate-spin" /></div>;
+  }
+
+  const transactions = txData?.data || txData || [];
+  const txTotal = txData?.total || (Array.isArray(transactions) ? transactions.length : 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Balance Card */}
+      <div className="bg-card border rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <Wallet className="w-8 h-8 text-primary" />
+            <div>
+              <p className="text-sm text-muted-foreground">Wallet Balance</p>
+              <p className="text-3xl font-bold">Le {(wallet?.balance || 0).toLocaleString()}</p>
+              {wallet?.lastUpdated && (
+                <p className="text-xs text-muted-foreground">Last updated: {format(new Date(wallet.lastUpdated), 'MMM dd, yyyy HH:mm')}</p>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Dialog open={depositOpen} onOpenChange={setDepositOpen}>
+              <DialogTrigger asChild>
+                <Button><ArrowDownToLine className="w-4 h-4 mr-2" />Deposit</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Deposit to Wallet</DialogTitle></DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Amount (Le)</Label>
+                    <Input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Enter amount" />
+                  </div>
+                  <div>
+                    <Label>Notes (optional)</Label>
+                    <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g., Cash deposit at reception" />
+                  </div>
+                  <Button onClick={handleDeposit} className="w-full" disabled={deposit.isPending}>
+                    {deposit.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Deposit Le {Number(amount || 0).toLocaleString()}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            <Dialog open={withdrawOpen} onOpenChange={setWithdrawOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline"><ArrowUpFromLine className="w-4 h-4 mr-2" />Withdraw</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader><DialogTitle>Withdraw from Wallet</DialogTitle></DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Amount (Le)</Label>
+                    <Input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Enter amount" />
+                    {wallet && <p className="text-xs text-muted-foreground mt-1">Available: Le {wallet.balance.toLocaleString()}</p>}
+                  </div>
+                  <div>
+                    <Label>Reason (optional)</Label>
+                    <Input value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g., Payment refund" />
+                  </div>
+                  <Button onClick={handleWithdraw} className="w-full" variant="destructive" disabled={withdraw.isPending}>
+                    {withdraw.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                    Withdraw Le {Number(amount || 0).toLocaleString()}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+      </div>
+
+      {/* Transaction History */}
+      <div className="bg-card border rounded-lg">
+        <div className="px-5 py-4 border-b flex items-center gap-2">
+          <Clock className="w-4 h-4 text-muted-foreground" />
+          <h3 className="font-semibold text-sm">Transaction History ({txTotal})</h3>
+        </div>
+        {txLoading ? (
+          <div className="flex items-center justify-center py-8"><Loader2 className="w-5 h-5 animate-spin" /></div>
+        ) : !Array.isArray(transactions) || transactions.length === 0 ? (
+          <p className="text-muted-foreground py-8 text-center">No transactions yet</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Date/Time</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th>Balance Before</th>
+                  <th>Balance After</th>
+                  <th>Notes</th>
+                  <th>By</th>
+                </tr>
+              </thead>
+              <tbody>
+                {transactions.map((tx: any) => (
+                  <tr key={tx._id || tx.id}>
+                    <td className="text-xs">{format(new Date(tx.createdAt), 'MMM dd, HH:mm')}</td>
+                    <td>
+                      <Badge variant={
+                        tx.type === 'deposit' || tx.type === 'refund' ? 'default' :
+                        tx.type === 'withdrawal' || tx.type === 'payment' ? 'destructive' :
+                        'outline'
+                      }>
+                        {tx.type}
+                      </Badge>
+                    </td>
+                    <td className={tx.type === 'deposit' || tx.type === 'refund' ? 'text-green-600 font-semibold' : 'text-red-600 font-semibold'}>
+                      {tx.type === 'deposit' || tx.type === 'refund' ? '+' : '-'}Le {Math.abs(tx.amount).toLocaleString()}
+                    </td>
+                    <td className="font-mono text-sm">Le {tx.balanceBefore?.toLocaleString() || '-'}</td>
+                    <td className="font-mono text-sm">Le {tx.balanceAfter?.toLocaleString() || '-'}</td>
+                    <td className="text-sm text-muted-foreground max-w-[200px] truncate">{tx.notes || '-'}</td>
+                    <td className="text-sm">{tx.performedBy?.fullName || '-'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 

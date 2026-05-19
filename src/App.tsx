@@ -20,7 +20,6 @@ import NotFound from "./pages/NotFound";
 import ReceptionDashboard from "./pages/reception/ReceptionDashboard";
 import PatientDetails from "./pages/reception/PatientDetails";
 import RegisterPatient from "./pages/reception/RegisterPatient";
-import NewOrder from "./pages/reception/NewOrder";
 import QuickResultEntry from "./pages/reception/QuickResultEntry";
 import PatientsPage from "./pages/reception/PatientsPage";
 import OrdersPage from "./pages/reception/OrdersPage";
@@ -60,6 +59,7 @@ import AuditLogViewer from "./pages/admin/AuditLogViewer";
 import ReportTemplateEditor from "./pages/admin/ReportTemplateEditor";
 import PrinterSettings from "./pages/admin/PrinterSettings";
 import DoctorsPage from "./pages/admin/DoctorsPage";
+import RoomsPage from "./pages/admin/RoomsPage";
 import ConnectionSettings from "./pages/admin/ConnectionSettings";
 
 // Doctor Pages
@@ -171,7 +171,7 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PatientDetails /></RoleGuard>
       } />
       <Route path="/reception/new-order" element={
-        <RoleGuard allowedRoles={['receptionist', 'admin']}><NewOrder /></RoleGuard>
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><Navigate to={`/reception/visit-registration${location.search}`} replace /></RoleGuard>
       } />
       <Route path="/reception/orders" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><OrdersPage /></RoleGuard>
@@ -321,6 +321,9 @@ function AppRoutes() {
       } />
       <Route path="/admin/doctors" element={
         <RoleGuard allowedRoles={['admin']}><DoctorsPage /></RoleGuard>
+      } />
+      <Route path="/admin/rooms" element={
+        <RoleGuard allowedRoles={['admin']}><RoomsPage /></RoleGuard>
       } />
       <Route path="/admin/connection-settings" element={
         <RoleGuard allowedRoles={['admin']}><ConnectionSettings /></RoleGuard>

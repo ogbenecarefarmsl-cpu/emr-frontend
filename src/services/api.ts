@@ -245,6 +245,26 @@ export const patientsAPI = {
     const response = await api.post(`/patients/${id}/notes`, { note });
     return response.data;
   },
+
+  getWallet: async (id: string) => {
+    const response = await api.get(`/patients/${id}/wallet`);
+    return response.data;
+  },
+
+  getWalletTransactions: async (id: string, page?: number, limit?: number) => {
+    const response = await api.get(`/patients/${id}/wallet/transactions`, { params: { page, limit } });
+    return response.data;
+  },
+
+  depositWallet: async (id: string, amount: number, notes?: string) => {
+    const response = await api.post(`/patients/${id}/wallet/deposit`, { amount, notes });
+    return response.data;
+  },
+
+  withdrawWallet: async (id: string, amount: number, notes?: string) => {
+    const response = await api.post(`/patients/${id}/wallet/withdraw`, { amount, notes });
+    return response.data;
+  },
 };
 
 export const ordersAPI = {
@@ -1241,6 +1261,44 @@ export const inventoryAPI = {
   },
   updateSupplier: async (id: string, data: any) => {
     const response = await api.patch(`/inventory/suppliers/${id}`, data);
+    return response.data;
+  },
+};
+
+export const roomsAPI = {
+  getAll: async (params?: { roomType?: string; status?: string }) => {
+    const response = await api.get('/rooms', { params });
+    return response.data;
+  },
+  getById: async (id: string) => {
+    const response = await api.get(`/rooms/${id}`);
+    return response.data;
+  },
+  create: async (data: any) => {
+    const response = await api.post('/rooms', data);
+    return response.data;
+  },
+  update: async (id: string, data: any) => {
+    const response = await api.patch(`/rooms/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    await api.delete(`/rooms/${id}`);
+  },
+  assignRoom: async (roomId: string, visitId: string) => {
+    const response = await api.post(`/rooms/${roomId}/assign/${visitId}`);
+    return response.data;
+  },
+  releaseRoom: async (id: string) => {
+    const response = await api.post(`/rooms/${id}/release`);
+    return response.data;
+  },
+  autoAssign: async (visitId: string, preferredType?: string) => {
+    const response = await api.post(`/rooms/auto-assign/${visitId}`, null, { params: { preferredType } });
+    return response.data;
+  },
+  seed: async () => {
+    const response = await api.post('/rooms/seed');
     return response.data;
   },
 };

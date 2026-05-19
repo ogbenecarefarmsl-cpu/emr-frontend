@@ -193,6 +193,32 @@ export function useUpdatePatient() {
   });
 }
 
+export function useDepositWallet() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, amount, notes }: { id: string; amount: number; notes?: string }) => {
+      return await patientsAPI.depositWallet(id, amount, notes);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['patients', variables.id, 'wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['patients', variables.id, 'wallet-transactions'] });
+    },
+  });
+}
+
+export function useWithdrawWallet() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, amount, notes }: { id: string; amount: number; notes?: string }) => {
+      return await patientsAPI.withdrawWallet(id, amount, notes);
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['patients', variables.id, 'wallet'] });
+      queryClient.invalidateQueries({ queryKey: ['patients', variables.id, 'wallet-transactions'] });
+    },
+  });
+}
+
 export function useDeletePatient() {
   const queryClient = useQueryClient();
 
@@ -203,6 +229,30 @@ export function useDeletePatient() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['patients'] });
     },
+  });
+}
+
+export function usePatientWallet(id: string) {
+  return useQuery({
+    queryKey: ['patients', id, 'wallet'],
+    queryFn: async () => {
+      const response = await patientsAPI.getWallet(id);
+      return response;
+    },
+    enabled: isValidResourceId(id),
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useWalletTransactions(id: string, page?: number, limit?: number) {
+  return useQuery({
+    queryKey: ['patients', id, 'wallet-transactions', page, limit],
+    queryFn: async () => {
+      const response = await patientsAPI.getWalletTransactions(id, page, limit);
+      return response;
+    },
+    enabled: isValidResourceId(id),
+    staleTime: 30 * 1000,
   });
 }
 

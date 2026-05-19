@@ -24,7 +24,7 @@ import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { usePrinterContext } from '@/context/PrinterContext';
 import { usbPrinterService } from '@/services/usbPrinterService';
 import { toast } from 'sonner';
-import { CreditCard, Banknote, Smartphone, Printer, Check } from 'lucide-react';
+import { CreditCard, Banknote, Smartphone, Printer, Check, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAddPayment } from '@/hooks/useOrders';
 
@@ -63,7 +63,7 @@ export function PaymentDialog({
   const patientReceiptRef = useRef<HTMLDivElement>(null);
   const labReceiptRef = useRef<HTMLDivElement>(null);
 
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mobile-money'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mobile-money' | 'wallet'>('cash');
   const [amountPaid, setAmountPaid] = useState<string>(order.total.toString());
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
@@ -257,6 +257,15 @@ export function PaymentDialog({
                   >
                     <Smartphone className="w-6 h-6" />
                     <span>Mobile Money</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={paymentMethod === 'wallet' ? 'default' : 'outline'}
+                    className="h-20 flex flex-col gap-2"
+                    onClick={() => setPaymentMethod('wallet')}
+                  >
+                    <Wallet className="w-6 h-6" />
+                    <span>Wallet</span>
                   </Button>
                 </div>
               </div>

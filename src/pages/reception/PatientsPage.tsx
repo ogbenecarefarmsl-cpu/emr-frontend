@@ -211,11 +211,11 @@ export default function PatientsPage() {
                             toast.error('Patient record is missing ID');
                             return;
                           }
-                          navigate(`/reception/new-order?patient=${patientObjectId}`);
+                          navigate(`/reception/visit-registration?patient=${patientObjectId}`);
                         }}
                       >
                         <ClipboardList className="w-4 h-4 mr-1" />
-                        Order
+                        Visit
                       </Button>
                       {isAdmin && (
                         <Button

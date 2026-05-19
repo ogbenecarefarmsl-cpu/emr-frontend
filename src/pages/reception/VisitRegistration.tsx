@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreateVisit, useMarkConsultationPaid } from '@/hooks/useVisits';
 import { useSearchPatients } from '@/hooks/usePatients';
@@ -33,6 +33,21 @@ export default function VisitRegistration() {
   const { data: allPatients = [] } = useSearchPatients('');
   const createVisit = useCreateVisit();
   const markConsultationPaid = useMarkConsultationPaid();
+
+  const recentPatients = useMemo(() => {
+    if (!Array.isArray(allPatients)) return [];
+
+    const getTimestamp = (patient: any) => {
+      const raw = patient?.createdAt || patient?.registeredAt || patient?.updatedAt;
+      if (!raw) return 0;
+      const parsed = new Date(raw).getTime();
+      return Number.isNaN(parsed) ? 0 : parsed;
+    };
+
+    return [...allPatients]
+      .sort((a: any, b: any) => getTimestamp(b) - getTimestamp(a))
+      .slice(0, 8);
+  }, [allPatients]);
 
   useEffect(() => {
     if (!preselectedPatientId || selectedPatient || !Array.isArray(allPatients)) return;
@@ -137,6 +152,33 @@ export default function VisitRegistration() {
                       </p>
                     </div>
                   ))}
+                </div>
+              )}
+
+              {!searchTerm && !selectedPatient && recentPatients.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-sm font-medium">Recent Patients</p>
+                    <Button variant="ghost" size="sm" onClick={() => navigate('/reception/register')}>
+                      Register New
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {recentPatients.map((p: any) => (
+                      <button
+                        key={p._id || p.id}
+                        type="button"
+                        className="text-left border rounded-lg p-3 hover:bg-muted/50 transition-colors"
+                        onClick={() => setSelectedPatient(p)}
+                      >
+                        <p className="font-semibold text-sm">{p.firstName} {p.lastName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {p.patientId} - {p.age}y - {p.gender === 'M' ? 'Male' : p.gender === 'F' ? 'Female' : 'Other'}
+                        </p>
+                        {p.phone && <p className="text-xs text-muted-foreground mt-0.5">{p.phone}</p>}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
 

@@ -236,6 +236,12 @@ export default function DoctorDashboard() {
   // Fetch patient's previous visits when a patient is selected
   const patientId = selectedVisit?.patientId?._id || selectedVisit?.patientId || '';
   const { data: patientVisits = [] } = usePatientVisits(patientId);
+  const { data: patientOrders = [] } = useQuery({
+    queryKey: ['orders', 'patient', patientId],
+    queryFn: () => ordersAPI.getAll({ patientId, limit: 100 }),
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
   const { data: patientChart, isLoading: chartLoading } = useQuery({
     queryKey: ['patient-chart', patientId],
     queryFn: () => patientService.getChart(patientId),
@@ -244,7 +250,14 @@ export default function DoctorDashboard() {
   });
 
   // Fetch lab results for the selected visit - need to find the lab order
-  const labOrderId = selectedVisit?.orders?.find((o: any) => o.orderType === 'lab')?._id || 
+  const currentVisitLabOrder = patientOrders.find((order: any) => {
+    const orderVisitId = typeof order.visitId === 'object' ? order.visitId?._id : order.visitId;
+    const visitId = selectedVisit?._id || selectedVisit?.id;
+    return orderVisitId === visitId && (order.orderType || order.order_type) === 'lab';
+  });
+  const labOrderId = selectedVisit?.orders?.find((o: any) => o.orderType === 'lab')?._id ||
+    currentVisitLabOrder?._id ||
+    currentVisitLabOrder?.id ||
     selectedVisit?.consultationOrderId;
   const { data: labResults = [] } = useResults(labOrderId);
 
@@ -371,6 +384,22 @@ export default function DoctorDashboard() {
     }
   };
 
+  const handleCompleteAndNext = async () => {
+    if (!selectedVisit) return;
+
+    try {
+      await completeVisit.mutateAsync(selectedVisit._id || selectedVisit.id || '');
+      toast.success('Visit completed');
+      setSelectedVisit(null);
+      const nextInQueue = waitingQueue.find((v: Visit) => v.status === 'in_queue');
+      if (nextInQueue) {
+        handleAcceptPatient(nextInQueue);
+      }
+    } catch (error) {
+      toast.error('Failed to complete visit');
+    }
+  };
+
   // Lab order creation
   const createLabOrder = useMutation({
     mutationFn: async () => {
@@ -398,6 +427,7 @@ export default function DoctorDashboard() {
       toast.success('Lab order created. Patient should pay at reception.');
       setLabOrderModalOpen(false);
       setSelectedTests([]);
+      setSelectedVisit(prev => prev ? { ...prev, status: 'awaiting_lab' } : prev);
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
@@ -430,6 +460,7 @@ export default function DoctorDashboard() {
       toast.success('Prescription created. Patient should pay at reception.');
       setPrescriptionModalOpen(false);
       setPrescriptionItems([]);
+      setSelectedVisit(prev => prev ? { ...prev, status: 'awaiting_pharmacy' } : prev);
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
     },
@@ -481,11 +512,20 @@ export default function DoctorDashboard() {
   const stats = dashboardData?.todayStats || { seen: 0, waiting: 0, completed: 0 };
   const waitingQueue = dashboardData?.waitingQueue || [];
   const activePatients = dashboardData?.activePatients || [];
+  const awaitingLabPayment = dashboardData?.awaitingLabPayment || [];
+  const awaitingResults = dashboardData?.awaitingResults || [];
+  const awaitingPharmacy = dashboardData?.awaitingPharmacy || [];
+  const awaitingDispensing = dashboardData?.awaitingDispensing || [];
+  const awaitingDoctorReview = dashboardData?.awaitingDoctorReview || [];
+  const admittedPatients = dashboardData?.admittedPatients || [];
   const resultsReady = dashboardData?.resultsReady || [];
   const incomingReferrals = dashboardData?.incomingReferrals || [];
+  const openEncounterCount = activePatients.length;
 
   // Get the active visit for the doctor (if any)
-  const currentActiveVisit = activePatients[0];
+  const currentActiveVisit = activePatients.find((v: Visit) => v.status === 'in_consultation') || activePatients[0];
+  const canContinueClinicalWork = !!selectedVisit && ['in_consultation', 'results_ready', 'awaiting_doctor_review'].includes(selectedVisit.status);
+  const canCloseEncounter = !!selectedVisit && !['awaiting_lab', 'awaiting_results', 'awaiting_pharmacy', 'awaiting_dispensing'].includes(selectedVisit.status);
 
   // Auto-select the active patient if available
   useEffect(() => {
@@ -515,9 +555,10 @@ export default function DoctorDashboard() {
           variant={stats.waiting > 0 ? 'warning' : 'default'}
         />
         <MetricCard
-          title="Seen Today"
-          value={stats.seen}
+          title="Open Encounters"
+          value={openEncounterCount}
           icon={Stethoscope}
+          variant={openEncounterCount > 0 ? 'default' : 'default'}
         />
         <MetricCard
           title="Results Ready"
@@ -593,6 +634,77 @@ export default function DoctorDashboard() {
                 </div>
               )}
             </ScrollArea>
+          </div>
+
+          {/* My Open Encounters */}
+          <div className="bg-card border rounded-xl shadow-sm">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <h3 className="font-semibold text-sm flex items-center gap-2">
+                <Stethoscope className="w-4 h-4 text-blue-500" />
+                My Open Encounters
+              </h3>
+              <Badge variant="secondary">{activePatients.length}</Badge>
+            </div>
+            <ScrollArea className="max-h-96">
+              {activePatients.length === 0 ? (
+                <div className="p-6 text-center text-muted-foreground text-sm">
+                  No open encounters
+                </div>
+              ) : (
+                <div className="divide-y">
+                  {activePatients.map((visit: Visit) => (
+                    <button
+                      key={visit._id || visit.id}
+                      type="button"
+                      className={cn(
+                        "w-full p-3 text-left hover:bg-muted/50 transition-colors",
+                        selectedVisit?._id === visit._id && "bg-primary/5 border-l-2 border-primary"
+                      )}
+                      onClick={() => {
+                        setSelectedVisit(visit);
+                        if (visit.status === 'results_ready') setActiveTab('lab-results');
+                      }}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-medium text-sm truncate">
+                            {visit.patientId?.firstName} {visit.patientId?.lastName}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{visit.visitNumber}</p>
+                          {visit.chiefComplaint && (
+                            <p className="text-xs text-muted-foreground mt-1 truncate max-w-48">
+                              {visit.chiefComplaint}
+                            </p>
+                          )}
+                        </div>
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "capitalize shrink-0 text-[10px]",
+                            visit.status === 'results_ready' && "bg-green-50 text-green-700 border-green-200",
+                            visit.status === 'awaiting_results' && "bg-amber-50 text-amber-700 border-amber-200",
+                            visit.status === 'awaiting_lab' && "bg-orange-50 text-orange-700 border-orange-200",
+                            visit.status === 'awaiting_pharmacy' && "bg-purple-50 text-purple-700 border-purple-200",
+                            visit.status === 'awaiting_dispensing' && "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
+                            visit.status === 'admitted' && "bg-blue-50 text-blue-700 border-blue-200"
+                          )}
+                        >
+                          {visit.status?.replace(/_/g, ' ')}
+                        </Badge>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+            {activePatients.length > 0 && (
+              <div className="px-4 py-3 border-t grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+                <span>Lab pay: {awaitingLabPayment.length}</span>
+                <span>Results: {awaitingResults.length}</span>
+                <span>Pharmacy: {awaitingPharmacy.length + awaitingDispensing.length}</span>
+                <span>Review: {resultsReady.length + awaitingDoctorReview.length + admittedPatients.length}</span>
+              </div>
+            )}
           </div>
 
           {/* Results Ready */}
@@ -720,6 +832,10 @@ export default function DoctorDashboard() {
                       selectedVisit.status === 'results_ready' && 'bg-green-500',
                       selectedVisit.status === 'awaiting_lab' && 'bg-amber-500',
                       selectedVisit.status === 'awaiting_pharmacy' && 'bg-purple-500',
+                      selectedVisit.status === 'awaiting_results' && 'bg-orange-500',
+                      selectedVisit.status === 'awaiting_dispensing' && 'bg-fuchsia-500',
+                      selectedVisit.status === 'awaiting_doctor_review' && 'bg-cyan-600',
+                      selectedVisit.status === 'admitted' && 'bg-blue-600',
                     )}>
                       {selectedVisit.status?.replace(/_/g, ' ')}
                     </Badge>
@@ -820,7 +936,7 @@ export default function DoctorDashboard() {
                     <Button
                       variant="outline"
                       onClick={() => setLabOrderModalOpen(true)}
-                      disabled={selectedVisit.status !== 'in_consultation' && selectedVisit.status !== 'results_ready'}
+                      disabled={!canContinueClinicalWork}
                     >
                       <FlaskConical className="w-4 h-4 mr-2" />
                       Order Lab Tests
@@ -828,7 +944,7 @@ export default function DoctorDashboard() {
                     <Button
                       variant="outline"
                       onClick={() => setPrescriptionModalOpen(true)}
-                      disabled={selectedVisit.status !== 'in_consultation' && selectedVisit.status !== 'results_ready'}
+                      disabled={!canContinueClinicalWork}
                     >
                       <Pill className="w-4 h-4 mr-2" />
                       Prescribe Medication
@@ -844,7 +960,7 @@ export default function DoctorDashboard() {
                     <Button
                       variant="outline"
                       onClick={() => setReferralOpen(true)}
-                      disabled={selectedVisit.status !== 'in_consultation' && selectedVisit.status !== 'results_ready'}
+                      disabled={!canContinueClinicalWork}
                     >
                       <UserCheck className="w-4 h-4 mr-2" />
                       Refer to Specialist
@@ -852,18 +968,18 @@ export default function DoctorDashboard() {
                     <Button
                       variant="outline"
                       onClick={() => setAdmitOpen(true)}
-                      disabled={selectedVisit.status !== 'in_consultation' && selectedVisit.status !== 'results_ready'}
+                      disabled={!canContinueClinicalWork}
                     >
                       <BedDouble className="w-4 h-4 mr-2" />
                       Admit Patient
                     </Button>
                     <Button
-                      onClick={handleCompleteVisit}
-                      disabled={completeVisit.isPending || selectedVisit.status === 'awaiting_lab' || selectedVisit.status === 'awaiting_results'}
+                      onClick={handleCompleteAndNext}
+                      disabled={completeVisit.isPending || !canCloseEncounter}
                       className="ml-auto"
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
-                      Complete Visit
+                      Complete & Next
                     </Button>
                   </div>
                 </TabsContent>

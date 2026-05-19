@@ -480,6 +480,7 @@ export default function PaymentsPage() {
                       <option value="cash">Cash</option>
                       <option value="orange_money">Orange Money</option>
                       <option value="afrimoney">Afrimoney</option>
+                      <option value="wallet">Wallet</option>
                     </select>
                     <Input
                       type="number"

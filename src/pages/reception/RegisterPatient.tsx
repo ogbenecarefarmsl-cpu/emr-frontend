@@ -61,7 +61,7 @@ export default function RegisterPatient() {
     allergies: '',
   });
 
-  const [createdPatient, setCreatedPatient] = useState<{ id: string; patientId: string } | null>(null);
+  const [createdPatient, setCreatedPatient] = useState<{ id?: string; _id?: string; patientId: string } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,11 +165,11 @@ export default function RegisterPatient() {
                     toast.error('Patient record is missing ID');
                     return;
                   }
-                  navigate(`/reception/new-order?patient=${patientObjectId}`);
+                  navigate(`/reception/visit-registration?patient=${patientObjectId}`);
                 }}
                 className="flex-1"
               >
-                Create Order
+                Create Visit
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
             </div>
