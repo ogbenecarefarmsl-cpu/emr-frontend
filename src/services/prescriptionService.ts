@@ -19,7 +19,7 @@ export interface CreatePrescriptionInput {
   patientId: string;
   consultationId?: string;
   visitId?: string;
-  doctorId: string;
+  doctorId?: string;
   items: CreatePrescriptionItemInput[];
   /** General notes from doctor — visible to pharmacist and patient */
   notes?: string;

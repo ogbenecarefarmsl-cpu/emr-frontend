@@ -83,7 +83,7 @@ interface Order {
   _id?: string;
   orderNumber: string;
   patientId: string | Patient;
-  status: 'pending_payment' | 'pending_collection' | 'collected' | 'processing' | 'completed' | 'cancelled';
+  status: 'awaiting_payment' | 'paid' | 'pending_collection' | 'collected' | 'processing' | 'completed' | 'cancelled';
   priority: 'routine' | 'urgent' | 'stat';
   total?: number;
   totalAmount?: number;
@@ -94,7 +94,7 @@ interface Order {
   amountPaid?: number;
   balance?: number;
   paymentStatus?: 'pending' | 'partial' | 'paid';
-  paymentMethod?: 'cash' | 'orange_money' | 'afrimoney';
+  paymentMethod?: 'cash' | 'orange_money' | 'afrimoney' | 'wallet';
   notes?: string;
   referredByDoctor?: string;
   doctorId?: string | { _id: string; fullName: string; phone?: string; facility?: string };
@@ -110,7 +110,7 @@ export interface OrderWithDetails extends Order {
   patients?: Patient;
   order_number?: string;
   payment_status?: 'pending' | 'partial' | 'paid';
-  payment_method?: 'cash' | 'orange_money' | 'afrimoney';
+  payment_method?: 'cash' | 'orange_money' | 'afrimoney' | 'wallet';
   created_at?: string;
   updated_at?: string;
 }
@@ -133,21 +133,21 @@ interface OrderCreate {
   }>;
   discount?: number;
   discountType?: 'fixed' | 'percentage';
-  paymentMethod?: 'cash' | 'orange_money' | 'afrimoney';
+  paymentMethod?: 'cash' | 'orange_money' | 'afrimoney' | 'wallet';
   initialPaymentAmount?: number;
   initialPayments?: Array<{ amount: number; paymentMethod: string }>;
 }
 
 interface OrderUpdate {
-  status?: 'pending_payment' | 'pending_collection' | 'collected' | 'processing' | 'completed' | 'cancelled';
+  status?: 'awaiting_payment' | 'paid' | 'pending_collection' | 'collected' | 'processing' | 'completed' | 'cancelled';
   priority?: 'routine' | 'urgent' | 'stat';
   notes?: string;
   paidAmount?: number;
   paymentStatus?: 'pending' | 'partial' | 'paid';
-  paymentMethod?: 'cash' | 'orange_money' | 'afrimoney';
+  paymentMethod?: 'cash' | 'orange_money' | 'afrimoney' | 'wallet';
   // Backend snake_case format
   payment_status?: 'pending' | 'partial' | 'paid';
-  payment_method?: 'cash' | 'orange_money' | 'afrimoney';
+  payment_method?: 'cash' | 'orange_money' | 'afrimoney' | 'wallet';
 }
 
 export function useOrders(status?: string) {

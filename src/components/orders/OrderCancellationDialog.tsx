@@ -27,7 +27,7 @@ export function OrderCancellationDialog({
   const updateOrder = useUpdateOrder();
   const [reason, setReason] = useState('');
 
-  const canCancel = order && ['pending_payment', 'pending_collection'].includes(order.status);
+  const canCancel = order && ['awaiting_payment', 'pending_collection'].includes(order.status);
 
   const handleCancel = async () => {
     if (!order || !reason.trim()) {

@@ -1,11 +1,16 @@
 export type VisitStatus =
   | 'waiting_payment'
+  | 'awaiting_triage'
   | 'in_queue'
   | 'in_consultation'
   | 'awaiting_lab'
   | 'awaiting_pharmacy'
   | 'awaiting_results'
   | 'results_ready'
+  | 'awaiting_dispensing'
+  | 'awaiting_doctor_review'
+  | 'admitted'
+  | 'referred'
   | 'completed'
   | 'cancelled';
 

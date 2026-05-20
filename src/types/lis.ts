@@ -41,7 +41,7 @@ export interface TestOrder {
   patient: Patient;
   tests: OrderedTest[];
   priority: 'routine' | 'urgent' | 'stat';
-  status: 'pending_payment' | 'pending_collection' | 'collected' | 'processing' | 'completed' | 'cancelled';
+  status: 'awaiting_payment' | 'paid' | 'pending_collection' | 'collected' | 'processing' | 'completed' | 'cancelled';
   subtotal: number;
   discount: number;
   discountType: 'percentage' | 'fixed';

@@ -70,7 +70,8 @@ export default function OrdersPage() {
   const paginatedOrders = filteredOrders.slice(startIndex, endIndex);
 
   const statusStyles: Record<string, string> = {
-    pending_payment: 'bg-status-warning/10 text-status-warning border-status-warning/20',
+    awaiting_payment: 'bg-status-warning/10 text-status-warning border-status-warning/20',
+    paid: 'bg-status-normal/10 text-status-normal border-status-normal/20',
     pending_collection: 'bg-primary/10 text-primary border-primary/20',
     collected: 'bg-primary/10 text-primary border-primary/20',
     processing: 'bg-status-warning/10 text-status-warning border-status-warning/20',
@@ -109,7 +110,8 @@ export default function OrdersPage() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="pending_payment">Pending Payment</SelectItem>
+              <SelectItem value="awaiting_payment">Awaiting Payment</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
               <SelectItem value="pending_collection">Pending Collection</SelectItem>
               <SelectItem value="collected">Collected</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
