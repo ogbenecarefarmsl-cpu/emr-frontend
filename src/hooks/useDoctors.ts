@@ -6,6 +6,9 @@ export interface Doctor {
   fullName: string;
   phone?: string;
   facility?: string;
+  doctorType?: string;
+  specialty?: string;
+  department?: string;
   isActive: boolean;
 }
 

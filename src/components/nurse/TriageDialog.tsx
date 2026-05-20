@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useDoctors } from '@/hooks/useDoctors';
 import { useCompleteTriage } from '@/hooks/useVisits';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Activity, AlertCircle, Heart, Loader2, Send } from 'lucide-react';
 import { ESI_LEVELS, checkAbnormalVitals, patientName, triagePriorityFromEsi } from './nurseUtils';
@@ -30,16 +32,19 @@ const EMPTY_VITALS = {
 
 export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageDialogProps) {
   const completeTriage = useCompleteTriage();
+  const { data: doctors = [], isLoading: doctorsLoading } = useDoctors();
   const [vitals, setVitals] = useState(EMPTY_VITALS);
   const [triageEsiLevel, setTriageEsiLevel] = useState('3');
   const [triageNotes, setTriageNotes] = useState('');
   const [chiefComplaint, setChiefComplaint] = useState('');
+  const [doctorId, setDoctorId] = useState('');
 
   useEffect(() => {
     if (!visit || !open) return;
     setChiefComplaint(visit.chiefComplaint || '');
     setTriageEsiLevel('3');
     setTriageNotes('');
+    setDoctorId(typeof visit.doctorId === 'object' ? visit.doctorId?._id || '' : visit.doctorId || '');
     setVitals(EMPTY_VITALS);
   }, [visit, open]);
 
@@ -59,9 +64,10 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
           triagePriority: triagePriorityFromEsi(triageEsiLevel),
           triageNotes: triageNotes || undefined,
           chiefComplaint: chiefComplaint || undefined,
+          doctorId: doctorId || undefined,
         },
       });
-      toast.success('Triage complete - patient sent to doctor queue');
+      toast.success(doctorId ? 'Triage complete - patient sent to selected doctor' : 'Triage complete - patient sent to doctor queue');
       onOpenChange(false);
       onCompleted?.();
     } catch {
@@ -144,6 +150,27 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
           </div>
 
           <div>
+            <Label className="text-sm">Send to Doctor</Label>
+            <Select value={doctorId || 'general_queue'} onValueChange={(value) => setDoctorId(value === 'general_queue' ? '' : value)}>
+              <SelectTrigger className="mt-1">
+                <SelectValue placeholder="Select doctor or send to general queue" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general_queue">General doctor queue</SelectItem>
+                {doctors.map((doctor: any) => (
+                  <SelectItem key={doctor._id} value={doctor._id}>
+                    {doctor.fullName}
+                    {doctor.specialty ? ` - ${String(doctor.specialty).replace(/_/g, ' ')}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              {doctorsLoading ? 'Loading doctors...' : `${doctors.length} active doctor${doctors.length === 1 ? '' : 's'} available`}
+            </p>
+          </div>
+
+          <div>
             <Label className="text-sm">Triage Notes</Label>
             <Textarea
               value={triageNotes}
@@ -158,7 +185,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
           <Button onClick={submitTriage} disabled={completeTriage.isPending}>
             {completeTriage.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-            Send to Doctor
+            {doctorId ? 'Send to Selected Doctor' : 'Send to Doctor Queue'}
           </Button>
         </DialogFooter>
       </DialogContent>
