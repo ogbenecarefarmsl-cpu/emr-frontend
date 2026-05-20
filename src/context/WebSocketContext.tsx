@@ -300,16 +300,54 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['payment-stats'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['payment-history'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['reception-dashboard'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['visits'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['doctor-dashboard'], exact: false });
 
       const patientName = getPatientName(order);
       const orderNumber = order?.orderNumber || order?.order_number || 'Clinical order';
       const isPaid = order?.paymentStatus === 'paid' || order?.payment_status === 'paid';
 
-      if (isPaid && hasRole('lab_tech', 'admin')) {
+      if (isPaid && order?.orderType === 'lab' && hasRole('lab_tech', 'admin')) {
         soundService.play('payment-received');
         toast.success('Paid lab order ready', {
           description: `${orderNumber} - ${patientName}`,
           duration: 8000,
+        });
+      }
+
+      if (isPaid && order?.orderType === 'pharmacy' && hasRole('pharmacist', 'admin')) {
+        soundService.play('payment-received');
+        toast.success('Paid pharmacy order ready', {
+          description: `${orderNumber} - ${patientName}`,
+          duration: 8000,
+        });
+      }
+    });
+
+    newSocket.on('visit:status_updated', (payload: any) => {
+      invalidateClinicalFlow();
+      const status = payload?.status;
+
+      if (status === 'results_ready' && hasRole('doctor', 'admin')) {
+        soundService.play('results-ready');
+        toast.success('New result available', {
+          description: 'A patient visit has results ready for doctor review',
+          duration: 10000,
+        });
+      }
+
+      if (status === 'awaiting_dispensing' && hasRole('pharmacist', 'admin')) {
+        soundService.play('payment-received');
+        toast.success('Prescription ready to dispense', {
+          description: 'A paid prescription has entered the pharmacy queue',
+          duration: 10000,
+        });
+      }
+
+      if (status === 'awaiting_doctor_review' && hasRole('doctor', 'admin')) {
+        toast.success('Patient ready for doctor review', {
+          description: 'A department action is complete and the encounter is back with the doctor',
+          duration: 10000,
         });
       }
     });
@@ -412,6 +450,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     newSocket.on('prescription:created', (prescription: any) => {
       queryClient.invalidateQueries({ queryKey: ['prescriptions'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['visits'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['doctor-dashboard'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['reception-dashboard'], exact: false });
       if (hasRole('receptionist', 'admin')) {
         soundService.play('new-order');
@@ -424,6 +464,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     newSocket.on('prescription:paid', (prescription: any) => {
       queryClient.invalidateQueries({ queryKey: ['prescriptions'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['visits'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['doctor-dashboard'], exact: false });
       if (hasRole('pharmacist', 'admin')) {
         soundService.play('payment-received');
         toast.success('Paid prescription ready', {
@@ -435,6 +477,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     newSocket.on('prescription:dispensed', (prescription: any) => {
       queryClient.invalidateQueries({ queryKey: ['prescriptions'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['visits'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['doctor-dashboard'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['medications'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['inventory'], exact: false });
       if (hasRole('doctor', 'receptionist', 'admin')) {
@@ -442,6 +486,45 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
           description: prescription?.prescriptionNumber || 'Medication history updated',
         });
       }
+    });
+
+    newSocket.on('admission:created', () => {
+      queryClient.invalidateQueries({ queryKey: ['admissions'], exact: false });
+      invalidateClinicalFlow();
+      if (hasRole('nurse', 'doctor', 'admin')) {
+        toast.info('Admission created');
+      }
+    });
+
+    newSocket.on('admission:updated', () => {
+      queryClient.invalidateQueries({ queryKey: ['admissions'], exact: false });
+      invalidateClinicalFlow();
+    });
+
+    newSocket.on('admission:discharged', () => {
+      queryClient.invalidateQueries({ queryKey: ['admissions'], exact: false });
+      invalidateClinicalFlow();
+      if (hasRole('nurse', 'doctor', 'admin')) {
+        toast.info('Admission discharged');
+      }
+    });
+
+    newSocket.on('wallet:updated', (payload: any) => {
+      queryClient.invalidateQueries({ queryKey: ['patients'], exact: false });
+      if (payload?.patientId) {
+        queryClient.invalidateQueries({ queryKey: ['patients', payload.patientId, 'wallet'], exact: false });
+        queryClient.invalidateQueries({ queryKey: ['patients', payload.patientId, 'wallet-transactions'], exact: false });
+      }
+    });
+
+    newSocket.on('inventory:stock_received', () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['medications'], exact: false });
+    });
+
+    newSocket.on('inventory:stock_adjusted', () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['medications'], exact: false });
     });
 
     setSocket(newSocket);
