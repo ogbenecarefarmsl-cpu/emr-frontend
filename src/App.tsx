@@ -20,7 +20,6 @@ import NotFound from "./pages/NotFound";
 import ReceptionDashboard from "./pages/reception/ReceptionDashboard";
 import PatientDetails from "./pages/reception/PatientDetails";
 import RegisterPatient from "./pages/reception/RegisterPatient";
-import QuickResultEntry from "./pages/reception/QuickResultEntry";
 import PatientsPage from "./pages/reception/PatientsPage";
 import OrdersPage from "./pages/reception/OrdersPage";
 import PaymentsPage from "./pages/reception/PaymentsPage";
@@ -32,6 +31,7 @@ import PriceListPage from "./pages/reception/PriceListPage";
 import VisitRegistration from "./pages/reception/VisitRegistration";
 import ExpendituresPage from "./pages/reception/ExpendituresPage";
 import AppointmentsPage from "./pages/reception/AppointmentsPage";
+import ReferralLettersPage from "./pages/reception/ReferralLettersPage";
 
 // Lab Pages
 import LabDashboardPage from "./pages/lab/LabDashboardPage";
@@ -188,7 +188,13 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['receptionist', 'admin']}><DailyReconciliation /></RoleGuard>
       } />
       <Route path="/reception/quick-result-entry" element={
-        <RoleGuard allowedRoles={['receptionist', 'lab_tech', 'admin']}><QuickResultEntry /></RoleGuard>
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><Navigate to="/reception/lab-reports" replace /></RoleGuard>
+      } />
+      <Route path="/reception/lab-reports" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><CompletedOrdersPage /></RoleGuard>
+      } />
+      <Route path="/reception/referral-letters" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><ReferralLettersPage /></RoleGuard>
       } />
       <Route path="/reception/receipt/:orderId" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PaymentReceipt /></RoleGuard>

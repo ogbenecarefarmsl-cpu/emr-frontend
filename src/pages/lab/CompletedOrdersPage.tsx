@@ -36,7 +36,10 @@ export default function CompletedOrdersPage() {
   const allOrders = [
     ...(Array.isArray(completedOrders) ? completedOrders : []),
     ...(Array.isArray(processingOrders) ? processingOrders : [])
-  ].sort((a, b) => {
+  ].filter((order: any) => {
+    const type = String(order.orderType || order.order_type || 'lab').toLowerCase();
+    return type === 'lab';
+  }).sort((a, b) => {
     const dateA = new Date(a.createdAt || a.created_at || 0).getTime();
     const dateB = new Date(b.createdAt || b.created_at || 0).getTime();
     return dateB - dateA;
@@ -139,8 +142,8 @@ export default function CompletedOrdersPage() {
 
   return (
     <RoleLayout 
-      title="Print Reports" 
-      subtitle="View and print lab reports for orders with results (partial or complete)"
+      title={primaryRole === 'receptionist' ? 'Lab Reports' : 'Print Reports'} 
+      subtitle={primaryRole === 'receptionist' ? 'Print doctor-ordered lab results after lab release' : 'View and print lab reports for orders with results (partial or complete)'}
       role={primaryRole || 'lab_tech'}
       userName={profile?.fullName}
     >
@@ -173,7 +176,7 @@ export default function CompletedOrdersPage() {
 
       {selectedOrders.size === 0 && filteredOrders.length > 0 && (
         <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700">
-          💡 Tip: Select orders using checkboxes to print multiple reports at once
+          Tip: Select orders using checkboxes to print multiple reports at once
         </div>
       )}
 
@@ -268,12 +271,12 @@ export default function CompletedOrdersPage() {
                         <Button 
                           variant="ghost" 
                           size="sm"
-                          onClick={() => navigate(`/lab/reports/${orderId}`)}
+                          onClick={() => handlePrintReport(orderId)}
                           title="View Report"
                         >
                           <Eye className="w-4 h-4" />
                         </Button>
-                        {order.status === 'completed' && (
+                        {order.status === 'completed' && primaryRole !== 'receptionist' && (
                           <Button 
                             variant="ghost" 
                             size="sm"
@@ -367,10 +370,10 @@ export default function CompletedOrdersPage() {
           <div>
             <h4 className="font-medium text-blue-900 mb-1">How to Print Reports</h4>
             <ul className="text-sm text-blue-800 space-y-1">
-              <li>• Click "Print Report" to open the printable lab report</li>
-              <li>• Click the eye icon to preview the report before printing</li>
-              <li>• Use the search box to find specific patients or orders</li>
-              <li>• Reports include all test results with age-specific reference ranges</li>
+              <li>- Click "Print Report" to open the printable lab report</li>
+              <li>- Click the eye icon to preview the report before printing</li>
+              <li>- Use the search box to find specific patients or orders</li>
+              <li>- Reports include all test results with age-specific reference ranges</li>
             </ul>
           </div>
         </div>

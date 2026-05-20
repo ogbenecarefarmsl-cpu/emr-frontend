@@ -1,10 +1,14 @@
 export const ESI_LEVELS = [
-  { value: '1', label: 'ESI 1', color: 'bg-red-600', desc: 'Resuscitation - immediate life-saving' },
-  { value: '2', label: 'ESI 2', color: 'bg-orange-500', desc: 'Emergent - high risk, confused/lethargic' },
-  { value: '3', label: 'ESI 3', color: 'bg-yellow-500', desc: 'Urgent - multiple resources needed' },
-  { value: '4', label: 'ESI 4', color: 'bg-blue-500', desc: 'Less urgent - one resource needed' },
-  { value: '5', label: 'ESI 5', color: 'bg-green-500', desc: 'Non-urgent - no resources needed' },
+  { value: '1', priority: 'emergency', label: 'ESI 1', color: 'bg-red-600', desc: 'Resuscitation - immediate life-saving' },
+  { value: '2', priority: 'urgent', label: 'ESI 2', color: 'bg-orange-500', desc: 'Emergent - high risk, confused/lethargic' },
+  { value: '3', priority: 'high', label: 'ESI 3', color: 'bg-yellow-500', desc: 'Urgent - multiple resources needed' },
+  { value: '4', priority: 'normal', label: 'ESI 4', color: 'bg-blue-500', desc: 'Less urgent - one resource needed' },
+  { value: '5', priority: 'low', label: 'ESI 5', color: 'bg-green-500', desc: 'Non-urgent - no resources needed' },
 ];
+
+export function triagePriorityFromEsi(esiLevel: string) {
+  return ESI_LEVELS.find((level) => level.value === esiLevel)?.priority || 'normal';
+}
 
 const VITAL_THRESHOLDS = {
   temperature: { low: 35.5, high: 38.0, criticalHigh: 39.5 },

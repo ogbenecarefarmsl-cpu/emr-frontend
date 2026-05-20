@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Search, Stethoscope } from 'lucide-react';
+import { Loader2, Plus, Printer, Search, Stethoscope } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function DoctorsPage() {
@@ -47,13 +47,19 @@ export default function DoctorsPage() {
 
   return (
     <RoleLayout
-      title="Doctors"
-      subtitle="Manage referring doctors used in orders and monthly referral reports"
+      title={role === 'receptionist' ? 'Doctor Directory' : 'Doctors'}
+      subtitle={role === 'receptionist' ? 'Find and register doctors for referrals, reports, and patient routing' : 'Manage referring doctors used in orders and monthly referral reports'}
       role={role as any}
       userName={profile?.fullName}
     >
+      <style>{`
+        @media print {
+          .doctor-directory-no-print { display: none !important; }
+          .doctor-directory-print { box-shadow: none !important; border: none !important; }
+        }
+      `}</style>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <div className="xl:col-span-1 bg-card border rounded-lg p-4 space-y-3">
+        <div className="doctor-directory-no-print xl:col-span-1 bg-card border rounded-lg p-4 space-y-3">
           <h3 className="font-semibold flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add Doctor
           </h3>
@@ -75,14 +81,20 @@ export default function DoctorsPage() {
           </Button>
         </div>
 
-        <div className="xl:col-span-2 bg-card border rounded-lg p-4">
+        <div className="doctor-directory-print xl:col-span-2 bg-card border rounded-lg p-4">
           <div className="flex items-center justify-between gap-3 mb-4">
             <h3 className="font-semibold flex items-center gap-2">
               <Stethoscope className="w-4 h-4" /> Doctors List
             </h3>
-            <Badge variant="secondary">{doctorCount} doctors</Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary">{doctorCount} doctors</Badge>
+              <Button variant="outline" size="sm" onClick={() => window.print()} className="doctor-directory-no-print gap-2">
+                <Printer className="w-4 h-4" />
+                Print
+              </Button>
+            </div>
           </div>
-          <div className="relative mb-4">
+          <div className="doctor-directory-no-print relative mb-4">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               className="pl-10"

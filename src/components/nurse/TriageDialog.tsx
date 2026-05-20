@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Activity, AlertCircle, Heart, Loader2, Send } from 'lucide-react';
-import { ESI_LEVELS, checkAbnormalVitals, patientName } from './nurseUtils';
+import { ESI_LEVELS, checkAbnormalVitals, patientName, triagePriorityFromEsi } from './nurseUtils';
 
 interface TriageDialogProps {
   visit: any | null;
@@ -56,7 +56,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
           weight: vitals.weight ? parseFloat(vitals.weight) : undefined,
           height: vitals.height ? parseFloat(vitals.height) : undefined,
           oxygenSaturation: vitals.oxygenSaturation ? parseInt(vitals.oxygenSaturation, 10) : undefined,
-          triagePriority: `esi_${triageEsiLevel}`,
+          triagePriority: triagePriorityFromEsi(triageEsiLevel),
           triageNotes: triageNotes || undefined,
           chiefComplaint: chiefComplaint || undefined,
         },

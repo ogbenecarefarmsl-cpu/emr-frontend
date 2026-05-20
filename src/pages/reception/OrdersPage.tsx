@@ -1,14 +1,13 @@
 import { useState } from 'react';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
-import { useOrders, useDeleteOrder, useAssignDoctor } from '@/hooks/useOrders';
-import { useDoctors } from '@/hooks/useDoctors';
+import { useOrders, useDeleteOrder } from '@/hooks/useOrders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Search, CreditCard, Loader2, Eye, Trash2, Stethoscope } from 'lucide-react';
+import { Search, CreditCard, Loader2, Eye, Trash2, FlaskConical, Pill, Stethoscope, ClipboardList, BedDouble, ReceiptText } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { OrderWithDetails } from '@/hooks/useOrders';
@@ -21,21 +20,18 @@ export default function OrdersPage() {
   const currentRole = primaryRole === 'admin' ? 'admin' : 'receptionist';
   const isAdmin = primaryRole === 'admin';
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<OrderWithDetails | null>(null);
+  const [viewOrder, setViewOrder] = useState<OrderWithDetails | null>(null);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleteConfirmNum, setDeleteConfirmNum] = useState('');
-  const [assignOrder, setAssignOrder] = useState<OrderWithDetails | null>(null);
-  const [assignDoctorId, setAssignDoctorId] = useState<string>('none');
-  const [assignDoctorText, setAssignDoctorText] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(15);
   
   const { data: orders, isLoading } = useOrders(statusFilter as any);
-  const { data: doctors = [] } = useDoctors();
   const deleteOrder = useDeleteOrder();
-  const assignDoctor = useAssignDoctor();
 
   const handleDeleteOrder = async () => {
     if (!deleteConfirmId) return;
@@ -48,18 +44,22 @@ export default function OrdersPage() {
     }
   };
 
-  const filteredOrders = Array.isArray(orders) ? orders.filter(order => {    if (!searchTerm) return true;
+  const filteredOrders = Array.isArray(orders) ? orders.filter(order => {
+    if (typeFilter !== 'all' && (order.orderType || 'lab') !== typeFilter) return false;
+    if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     const orderNum = (order.orderNumber || order.order_number || '').toLowerCase();
     const firstName = (order.patientId?.firstName || order.patients?.first_name || '').toLowerCase();
     const lastName = (order.patientId?.lastName || order.patients?.last_name || '').toLowerCase();
     const patientId = (order.patientId?.patientId || order.patients?.patient_id || '').toLowerCase();
+    const orderType = (order.orderType || '').toLowerCase();
     
     return (
       orderNum.includes(search) ||
       firstName.includes(search) ||
       lastName.includes(search) ||
-      patientId.includes(search)
+      patientId.includes(search) ||
+      orderType.includes(search)
     );
   }) : [];
 
@@ -85,10 +85,79 @@ export default function OrdersPage() {
     stat: 'bg-status-critical/10 text-status-critical',
   };
 
+  const getOrderTypeBadge = (order: any) => {
+    const type = order.orderType || 'lab';
+    const config: Record<string, { label: string; className: string; icon: any }> = {
+      consultation: { label: 'Consultation', className: 'bg-cyan-50 text-cyan-700 border-cyan-200', icon: Stethoscope },
+      lab: { label: 'Lab', className: 'bg-blue-50 text-blue-700 border-blue-200', icon: FlaskConical },
+      pharmacy: { label: 'Pharmacy', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: Pill },
+      procedure: { label: 'Procedure', className: 'bg-purple-50 text-purple-700 border-purple-200', icon: ClipboardList },
+      admission: { label: 'Admission', className: 'bg-rose-50 text-rose-700 border-rose-200', icon: BedDouble },
+      other: { label: 'Other', className: 'bg-muted text-muted-foreground border-border', icon: ReceiptText },
+    };
+    const item = config[type] || config.other;
+    const Icon = item.icon;
+    return (
+      <Badge variant="outline" className={cn('capitalize gap-1', item.className)}>
+        <Icon className="w-3 h-3" />
+        {item.label}
+      </Badge>
+    );
+  };
+
+  const getClinicalItems = (order: any) => {
+    const type = order.orderType || 'lab';
+    const tests = order.order_tests || order.tests || [];
+
+    if (type === 'lab' && tests.length > 0) {
+      const testCount = getPanelTestCount(order);
+      const groupedTests = getGroupedTestsByPanel(order, true);
+      const displayItems = groupedTests.split(', ').filter(Boolean).slice(0, 2);
+      const totalItems = groupedTests.split(', ').filter(Boolean).length;
+      return {
+        title: `${testCount} test${testCount !== 1 ? 's' : ''}`,
+        detail: `${displayItems.join(', ')}${totalItems > 2 ? ` +${totalItems - 2} more` : ''}`,
+        receiptItems: tests.map((test: any) => ({
+          code: test.testCode || test.test_code || '',
+          name: test.testName || test.test_name || '',
+          price: test.price || 0,
+        })),
+      };
+    }
+
+    const fallbackLabel = {
+      consultation: 'Consultation fee',
+      pharmacy: 'Medication order',
+      procedure: 'Procedure charge',
+      admission: 'Admission charge',
+      other: 'Clinical service',
+    }[type] || 'Clinical service';
+
+    return {
+      title: fallbackLabel,
+      detail: order.notes || order.referredByDoctor || 'Created from clinical workflow',
+      receiptItems: [{
+        code: String(type).toUpperCase(),
+        name: fallbackLabel,
+        price: order.total || order.totalAmount || 0,
+      }],
+    };
+  };
+
+  const getDestinationLabel = (order: any) => {
+    const type = order.orderType || 'lab';
+    if (order.status === 'awaiting_payment') return 'Awaiting reception payment';
+    if (type === 'lab' && order.status === 'pending_collection') return 'Lab queue';
+    if (type === 'pharmacy' && order.status === 'paid') return 'Pharmacy queue';
+    if (type === 'consultation' && order.status === 'paid') return 'Nurse vitals / doctor flow';
+    if (order.status === 'completed') return 'Completed';
+    return order.status?.replace(/_/g, ' ') || 'Pending';
+  };
+
   return (
     <RoleLayout 
-      title="Orders" 
-      subtitle="View and manage test orders"
+      title="Clinical Orders" 
+      subtitle="Confirm payments for doctor-created services and route patients to the right department"
       role={currentRole}
       userName={profile?.fullName}
     >
@@ -112,10 +181,24 @@ export default function OrdersPage() {
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="awaiting_payment">Awaiting Payment</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="pending_collection">Pending Collection</SelectItem>
+              <SelectItem value="pending_collection">Lab Queue</SelectItem>
               <SelectItem value="collected">Collected</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-44">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="consultation">Consultation</SelectItem>
+              <SelectItem value="lab">Lab</SelectItem>
+              <SelectItem value="pharmacy">Pharmacy</SelectItem>
+              <SelectItem value="procedure">Procedure</SelectItem>
+              <SelectItem value="admission">Admission</SelectItem>
+              <SelectItem value="other">Other</SelectItem>
             </SelectContent>
           </Select>
           <Select
@@ -149,20 +232,29 @@ export default function OrdersPage() {
             <thead>
               <tr>
                 <th>Order #</th>
+                <th>Type</th>
                 <th>Patient</th>
-                <th>Tests</th>
-                <th>Total</th>
+                <th>Service / Items</th>
+                <th>Amount</th>
                 <th>Priority</th>
                 <th>Payment</th>
-                <th>Status</th>
+                <th>Department Status</th>
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {paginatedOrders?.map(order => (
+              {paginatedOrders?.map(order => {
+                const clinicalItems = getClinicalItems(order);
+                return (
                 <tr key={order.id || order._id}>
-                  <td className="font-mono text-sm">{order.orderNumber || order.order_number}</td>
+                  <td>
+                    <div>
+                      <p className="font-mono text-sm">{order.orderNumber || order.order_number}</p>
+                      {order.visitId && <p className="text-xs text-muted-foreground">Visit attached</p>}
+                    </div>
+                  </td>
+                  <td>{getOrderTypeBadge(order)}</td>
                   <td>
                     <div>
                       <p className="font-medium">
@@ -174,22 +266,10 @@ export default function OrdersPage() {
                     </div>
                   </td>
                   <td>
-                    {(() => {
-                      const testCount = getPanelTestCount(order);
-                      const groupedTests = getGroupedTestsByPanel(order, true); // hide component counts
-                      const displayItems = groupedTests.split(', ').slice(0, 2);
-                      const totalItems = groupedTests.split(', ').length;
-                      
-                      return (
-                        <div>
-                          <p className="font-medium">{testCount} test{testCount !== 1 ? 's' : ''}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {displayItems.join(', ')}
-                            {totalItems > 2 && ` +${totalItems - 2} more`}
-                          </p>
-                        </div>
-                      );
-                    })()}
+                    <div>
+                      <p className="font-medium">{clinicalItems.title}</p>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{clinicalItems.detail}</p>
+                    </div>
                   </td>
                   <td className="font-medium">Le {Number(order.total || order.totalAmount).toLocaleString()}</td>
                   <td>
@@ -208,7 +288,7 @@ export default function OrdersPage() {
                   </td>
                   <td>
                     <Badge variant="outline" className={cn('capitalize', statusStyles[order.status])}>
-                      {order.status.replace(/_/g, ' ')}
+                      {getDestinationLabel(order)}
                     </Badge>
                   </td>
                   <td className="text-muted-foreground text-sm">
@@ -216,7 +296,7 @@ export default function OrdersPage() {
                   </td>
                   <td>
                     <div className="flex gap-1">
-                      <Button variant="ghost" size="sm">
+                      <Button variant="ghost" size="sm" onClick={() => setViewOrder(order)}>
                         <Eye className="w-4 h-4" />
                       </Button>
                       {(order.paymentStatus || order.payment_status) !== 'paid' && (
@@ -232,18 +312,6 @@ export default function OrdersPage() {
                           Pay
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setAssignOrder(order);
-                          const currentDoctorId = typeof order.doctorId === 'string' ? order.doctorId : order.doctorId?._id;
-                          setAssignDoctorId(currentDoctorId || 'none');
-                          setAssignDoctorText(order.referredByDoctor || '');
-                        }}
-                      >
-                        <Stethoscope className="w-4 h-4" />
-                      </Button>
                       {isAdmin && (
                         <Button
                           variant="ghost"
@@ -260,11 +328,11 @@ export default function OrdersPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              )})}
               {(!paginatedOrders || paginatedOrders.length === 0) && (
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-muted-foreground">
-                    No orders found
+                  <td colSpan={10} className="text-center py-8 text-muted-foreground">
+                    No clinical orders found
                   </td>
                 </tr>
               )}
@@ -317,36 +385,7 @@ export default function OrdersPage() {
             patientId: selectedOrder.patient?.patientId || selectedOrder.patients?.patient_id || '',
             patientPhone: selectedOrder.patient?.phone || selectedOrder.patients?.phone,
             tests: (() => {
-              // Group by panel for display
-              const allTests = selectedOrder.order_tests || selectedOrder.tests || [];
-              const panelGroups = new Map<string, { code: string; name: string; price: number }>();
-              const individualTests: typeof allTests = [];
-              
-              for (const t of allTests) {
-                const panelCode = t.panelCode || t.panel_code;
-                const panelName = t.panelName || t.panel_name;
-                if (panelCode || panelName) {
-                  const key = panelCode || panelName;
-                  if (!panelGroups.has(key)) {
-                    panelGroups.set(key, {
-                      code: panelCode || '',
-                      name: panelName || panelCode || '',
-                      price: t.price || 0,
-                    });
-                  }
-                } else {
-                  individualTests.push(t);
-                }
-              }
-              
-              return [
-                ...Array.from(panelGroups.values()).map(p => ({ code: p.code, name: p.name, price: p.price })),
-                ...individualTests.map(t => ({
-                  code: t.testCode || t.test_code || '',
-                  name: t.testName || t.test_name || '',
-                  price: t.price || 0,
-                }))
-              ];
+              return getClinicalItems(selectedOrder).receiptItems;
             })(),
             subtotal: selectedOrder.subtotal || selectedOrder.total || selectedOrder.totalAmount || 0,
             discount: selectedOrder.discount || 0,
@@ -356,13 +395,62 @@ export default function OrdersPage() {
           cashierName={profile?.fullName || 'Receptionist'}
         />
       )}
+      <Dialog open={!!viewOrder} onOpenChange={(open) => !open && setViewOrder(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Clinical Order Details</DialogTitle>
+            <DialogDescription>
+              {viewOrder?.orderNumber || viewOrder?.order_number} - {viewOrder ? getPatientName(viewOrder) : ''}
+            </DialogDescription>
+          </DialogHeader>
+          {viewOrder && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Type</p>
+                  <div className="mt-1">{getOrderTypeBadge(viewOrder)}</div>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Payment</p>
+                  <p className="font-medium capitalize">{viewOrder.paymentStatus || viewOrder.payment_status}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Destination</p>
+                  <p className="font-medium capitalize">{getDestinationLabel(viewOrder)}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Amount</p>
+                  <p className="font-medium">Le {Number(viewOrder.total || viewOrder.totalAmount || 0).toLocaleString()}</p>
+                </div>
+              </div>
+              <div className="border rounded-lg p-3">
+                <p className="text-sm font-medium mb-2">Items</p>
+                <div className="space-y-2">
+                  {getClinicalItems(viewOrder).receiptItems.map((item, index) => (
+                    <div key={`${item.code}-${index}`} className="flex items-center justify-between text-sm">
+                      <span>{item.code ? `${item.code} - ` : ''}{item.name}</span>
+                      <span className="font-medium">Le {Number(item.price || 0).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {viewOrder.orderedBy?.fullName && (
+                <p className="text-sm text-muted-foreground">Ordered by {viewOrder.orderedBy.fullName}</p>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setViewOrder(null)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Delete Order Confirmation */}
       <Dialog open={!!deleteConfirmId} onOpenChange={(open) => !open && setDeleteConfirmId(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete Order</DialogTitle>
             <DialogDescription>
-              Permanently delete order <strong>{deleteConfirmNum}</strong>? This will also remove all associated tests and payments.
+              Permanently delete clinical order <strong>{deleteConfirmNum}</strong>? This will also remove associated items and payments.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -379,69 +467,6 @@ export default function OrdersPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!assignOrder} onOpenChange={(open) => !open && setAssignOrder(null)}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Assign Doctor</DialogTitle>
-            <DialogDescription>
-              Attach a referring doctor to order <strong>{assignOrder?.orderNumber}</strong>.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3">
-            <Select
-              value={assignDoctorId}
-              onValueChange={(value) => {
-                setAssignDoctorId(value);
-                if (value === 'none') return;
-                const selected = doctors.find((d: any) => d._id === value);
-                if (selected) setAssignDoctorText(selected.fullName);
-              }}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select doctor" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No doctor</SelectItem>
-                {doctors.map((doctor: any) => (
-                  <SelectItem key={doctor._id} value={doctor._id}>{doctor.fullName}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {assignDoctorId === 'none' && (
-              <Input
-                placeholder="Or type doctor name"
-                value={assignDoctorText}
-                onChange={(e) => setAssignDoctorText(e.target.value)}
-              />
-            )}
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignOrder(null)}>Cancel</Button>
-            <Button
-              onClick={async () => {
-                if (!assignOrder) return;
-                try {
-                  await assignDoctor.mutateAsync({
-                    orderId: assignOrder.id || (assignOrder as any)._id || '',
-                    data: {
-                      doctorId: assignDoctorId !== 'none' ? assignDoctorId : undefined,
-                      referredByDoctor: assignDoctorId === 'none' ? (assignDoctorText.trim() || undefined) : undefined,
-                    },
-                  });
-                  toast.success('Doctor assigned');
-                  setAssignOrder(null);
-                } catch {
-                  toast.error('Failed to assign doctor');
-                }
-              }}
-              disabled={assignDoctor.isPending}
-            >
-              {assignDoctor.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Save
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </RoleLayout>
   );
 }

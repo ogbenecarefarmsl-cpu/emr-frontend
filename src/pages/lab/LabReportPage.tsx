@@ -23,7 +23,7 @@ export default function LabReportPage() {
   const navigate = useNavigate();
   const { profile, primaryRole } = useAuth();
 
-  const canEditResults = primaryRole === 'lab_tech' || primaryRole === 'receptionist' || primaryRole === 'admin';
+  const canEditResults = primaryRole === 'lab_tech' || primaryRole === 'admin';
   const isAdmin = primaryRole === 'admin';
 
   // Edit result dialog state
@@ -218,8 +218,8 @@ export default function LabReportPage() {
 
   return (
     <RoleLayout
-      title="Lab Report"
-      subtitle="View and print laboratory test results"
+      title={primaryRole === 'receptionist' ? 'Print Lab Result' : 'Lab Report'}
+      subtitle={primaryRole === 'receptionist' ? 'Doctor-ordered result ready for front-desk printing' : 'View and print laboratory test results'}
       role={layoutRole}
       userName={profile?.fullName}
     >
@@ -249,7 +249,7 @@ export default function LabReportPage() {
             </Button>
           )}
 
-          {/* Edit Results Button - lab tech, receptionist, and admin */}
+          {/* Edit Results Button - lab tech and admin */}
           {canEditResults && currentResults.length > 0 && (
             <Button
               variant="outline"
