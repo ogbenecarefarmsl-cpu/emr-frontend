@@ -660,13 +660,14 @@ function WalletPanel({ patientId }: { patientId: string }) {
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [amount, setAmount] = useState('');
   const [notes, setNotes] = useState('');
+  const [depositMethod, setDepositMethod] = useState('cash');
 
   const handleDeposit = async () => {
     const num = Number(amount);
     if (!num || num <= 0) { toast.error('Enter a valid positive amount'); return; }
-    await deposit.mutateAsync({ id: patientId, amount: num, notes: notes || undefined });
+    await deposit.mutateAsync({ id: patientId, amount: num, notes: notes || undefined, paymentMethod: depositMethod });
     toast.success(`Le ${num.toLocaleString()} deposited`);
-    setDepositOpen(false); setAmount(''); setNotes('');
+    setDepositOpen(false); setAmount(''); setNotes(''); setDepositMethod('cash');
   };
 
   const handleWithdraw = async () => {
@@ -711,6 +712,19 @@ function WalletPanel({ patientId }: { patientId: string }) {
                   <div>
                     <Label>Amount (Le)</Label>
                     <Input type="number" min="1" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Enter amount" />
+                  </div>
+                  <div>
+                    <Label>Payment Method</Label>
+                    <Select value={depositMethod} onValueChange={setDepositMethod}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="orange_money">Orange Money</SelectItem>
+                        <SelectItem value="afrimoney">Afrimoney</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <Label>Notes (optional)</Label>
@@ -771,6 +785,7 @@ function WalletPanel({ patientId }: { patientId: string }) {
                   <th>Amount</th>
                   <th>Balance Before</th>
                   <th>Balance After</th>
+                  <th>Method</th>
                   <th>Notes</th>
                   <th>By</th>
                 </tr>
@@ -793,6 +808,7 @@ function WalletPanel({ patientId }: { patientId: string }) {
                     </td>
                     <td className="font-mono text-sm">Le {tx.balanceBefore?.toLocaleString() || '-'}</td>
                     <td className="font-mono text-sm">Le {tx.balanceAfter?.toLocaleString() || '-'}</td>
+                    <td className="text-sm capitalize">{tx.paymentMethod?.replace(/_/g, ' ') || '-'}</td>
                     <td className="text-sm text-muted-foreground max-w-[200px] truncate">{tx.notes || '-'}</td>
                     <td className="text-sm">{tx.performedBy?.fullName || '-'}</td>
                   </tr>

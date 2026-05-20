@@ -196,8 +196,8 @@ export function useUpdatePatient() {
 export function useDepositWallet() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, amount, notes }: { id: string; amount: number; notes?: string }) => {
-      return await patientsAPI.depositWallet(id, amount, notes);
+    mutationFn: async ({ id, amount, notes, paymentMethod }: { id: string; amount: number; notes?: string; paymentMethod?: string }) => {
+      return await patientsAPI.depositWallet(id, amount, notes, paymentMethod);
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['patients', variables.id, 'wallet'] });

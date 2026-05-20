@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Dialog,
@@ -27,6 +27,7 @@ import { toast } from 'sonner';
 import { CreditCard, Banknote, Smartphone, Printer, Check, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
 import { useAddPayment } from '@/hooks/useOrders';
+import { usePatientWallet } from '@/hooks/usePatients';
 
 interface PaymentDialogProps {
   open: boolean;
@@ -36,6 +37,7 @@ interface PaymentDialogProps {
     orderNumber: string;
     patientName: string;
     patientId: string;
+    patientObjectId?: string;
     patientPhone?: string;
     tests: Array<{
       code: string;
@@ -60,16 +62,26 @@ export function PaymentDialog({
   const { printBothCopies } = useThermalPrint();
   const { settings, thermalConnected } = usePrinterContext();
   const addPayment = useAddPayment();
+  const { data: wallet } = usePatientWallet(order.patientObjectId || '');
   const patientReceiptRef = useRef<HTMLDivElement>(null);
   const labReceiptRef = useRef<HTMLDivElement>(null);
 
-  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'card' | 'mobile-money' | 'wallet'>('cash');
+  const [paymentMethod, setPaymentMethod] = useState<'cash' | 'orange_money' | 'afrimoney' | 'wallet'>('cash');
   const [amountPaid, setAmountPaid] = useState<string>(order.total.toString());
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [paymentComplete, setPaymentComplete] = useState(false);
 
   const receiptNumber = `RCP-${format(new Date(), 'yyyyMMdd')}-${order.id.slice(0, 3).toUpperCase()}`;
+  const walletBalance = Number(wallet?.balance || 0);
+  const canUseWallet = !!order.patientObjectId && walletBalance >= order.total;
+
+  useEffect(() => {
+    if (open && canUseWallet && !paymentComplete) {
+      setPaymentMethod('wallet');
+      setAmountPaid(order.total.toString());
+    }
+  }, [open, canUseWallet, order.total, paymentComplete]);
   
   const receiptData = {
     receiptNumber,
@@ -134,6 +146,11 @@ export function PaymentDialog({
   };
 
   const handleProcessPayment = async () => {
+    if (paymentMethod === 'wallet' && !canUseWallet) {
+      toast.error(`Wallet balance is insufficient. Available: Le ${walletBalance.toLocaleString()}`);
+      return;
+    }
+
     if (receiptData.amountPaid < order.total) {
       toast.error('Amount paid is less than total');
       return;
@@ -230,7 +247,16 @@ export function PaymentDialog({
               {/* Payment Method */}
               <div className="space-y-2">
                 <Label>Payment Method</Label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Patient wallet</span>
+                    <span className="font-semibold">Le {walletBalance.toLocaleString()}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {canUseWallet ? 'Enough balance available. Wallet payment is selected automatically.' : 'Use cash or mobile money if the wallet cannot cover this bill.'}
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                   <Button
                     type="button"
                     variant={paymentMethod === 'cash' ? 'default' : 'outline'}
@@ -242,26 +268,27 @@ export function PaymentDialog({
                   </Button>
                   <Button
                     type="button"
-                    variant={paymentMethod === 'card' ? 'default' : 'outline'}
+                    variant={paymentMethod === 'orange_money' ? 'default' : 'outline'}
                     className="h-20 flex flex-col gap-2"
-                    onClick={() => setPaymentMethod('card')}
+                    onClick={() => setPaymentMethod('orange_money')}
                   >
-                    <CreditCard className="w-6 h-6" />
-                    <span>Card</span>
+                    <Smartphone className="w-6 h-6" />
+                    <span>Orange Money</span>
                   </Button>
                   <Button
                     type="button"
-                    variant={paymentMethod === 'mobile-money' ? 'default' : 'outline'}
+                    variant={paymentMethod === 'afrimoney' ? 'default' : 'outline'}
                     className="h-20 flex flex-col gap-2"
-                    onClick={() => setPaymentMethod('mobile-money')}
+                    onClick={() => setPaymentMethod('afrimoney')}
                   >
                     <Smartphone className="w-6 h-6" />
-                    <span>Mobile Money</span>
+                    <span>Afrimoney</span>
                   </Button>
                   <Button
                     type="button"
                     variant={paymentMethod === 'wallet' ? 'default' : 'outline'}
                     className="h-20 flex flex-col gap-2"
+                    disabled={!canUseWallet}
                     onClick={() => setPaymentMethod('wallet')}
                   >
                     <Wallet className="w-6 h-6" />

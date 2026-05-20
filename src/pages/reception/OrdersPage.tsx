@@ -383,6 +383,10 @@ export default function OrdersPage() {
             orderNumber: selectedOrder.orderNumber || selectedOrder.order_number || '',
             patientName: getPatientName(selectedOrder),
             patientId: selectedOrder.patient?.patientId || selectedOrder.patients?.patient_id || '',
+            patientObjectId:
+              typeof selectedOrder.patientId === 'object'
+                ? selectedOrder.patientId?._id || selectedOrder.patientId?.id
+                : selectedOrder.patientId || selectedOrder.patient?.id || selectedOrder.patient?._id || selectedOrder.patients?.id || selectedOrder.patients?._id,
             patientPhone: selectedOrder.patient?.phone || selectedOrder.patients?.phone,
             tests: (() => {
               return getClinicalItems(selectedOrder).receiptItems;

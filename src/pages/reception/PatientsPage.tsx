@@ -157,6 +157,7 @@ export default function PatientsPage() {
                 <th>Age</th>
                 <th>Gender</th>
                 <th>Phone</th>
+                <th>Wallet</th>
                 <th>Registered</th>
                 <th>Actions</th>
               </tr>
@@ -175,6 +176,11 @@ export default function PatientsPage() {
                     </span>
                   </td>
                   <td className="text-muted-foreground">{patient.phone || '-'}</td>
+                  <td>
+                    <span className="font-semibold text-status-normal">
+                      Le {Number(patient.walletBalance || 0).toLocaleString()}
+                    </span>
+                  </td>
                   <td className="text-muted-foreground text-sm">
                     {format(new Date(patient.createdAt), 'MMM dd, yyyy')}
                   </td>

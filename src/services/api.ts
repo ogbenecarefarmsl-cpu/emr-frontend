@@ -257,8 +257,8 @@ export const patientsAPI = {
     return response.data;
   },
 
-  depositWallet: async (id: string, amount: number, notes?: string) => {
-    const response = await api.post(`/patients/${id}/wallet/deposit`, { amount, notes });
+  depositWallet: async (id: string, amount: number, notes?: string, paymentMethod = 'cash') => {
+    const response = await api.post(`/patients/${id}/wallet/deposit`, { amount, notes, paymentMethod });
     return response.data;
   },
 
