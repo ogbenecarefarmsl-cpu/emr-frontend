@@ -2,6 +2,7 @@
  * Smart Connection Manager
  * Automatically detects and switches between local network and cloud backends
  */
+import { joinApiUrl, normalizeApiBaseUrl } from './apiUrl';
 
 interface BackendConfig {
   url: string;
@@ -38,13 +39,13 @@ class ConnectionManager {
         const config = JSON.parse(saved);
         this.backends = [
           {
-            url: config.localUrl || import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000',
+            url: normalizeApiBaseUrl(config.localUrl || import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000'),
             priority: 1,
             timeout: config.localTimeout || 2000,
             name: 'Local Network',
           },
           {
-            url: config.cloudUrl || import.meta.env.VITE_CLOUD_API_URL || '',
+            url: normalizeApiBaseUrl(config.cloudUrl || import.meta.env.VITE_CLOUD_API_URL || ''),
             priority: 2,
             timeout: config.cloudTimeout || 5000,
             name: 'Cloud Server',
@@ -53,19 +54,19 @@ class ConnectionManager {
       } else {
         this.backends = [
           {
-            url: import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000',
+            url: normalizeApiBaseUrl(import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000'),
             priority: 1,
             timeout: 2000,
             name: 'Local Network',
           },
           {
-            url: import.meta.env.VITE_CLOUD_API_URL || '',
+            url: normalizeApiBaseUrl(import.meta.env.VITE_CLOUD_API_URL || ''),
             priority: 2,
             timeout: 5000,
             name: 'Cloud Server',
           },
           {
-            url: import.meta.env.VITE_API_URL || 'http://localhost:3000',
+            url: normalizeApiBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:3000'),
             priority: 3,
             timeout: 3000,
             name: 'Development',
@@ -76,13 +77,13 @@ class ConnectionManager {
       console.error('Failed to load connection config:', error);
       this.backends = [
         {
-          url: import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000',
+          url: normalizeApiBaseUrl(import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000'),
           priority: 1,
           timeout: 2000,
           name: 'Local Network',
         },
         {
-          url: import.meta.env.VITE_CLOUD_API_URL || '',
+          url: normalizeApiBaseUrl(import.meta.env.VITE_CLOUD_API_URL || ''),
           priority: 2,
           timeout: 5000,
           name: 'Cloud Server',
@@ -104,7 +105,7 @@ class ConnectionManager {
    */
   async syncConfigurationFromServer(serverUrl: string): Promise<boolean> {
     try {
-      const response = await fetch(`${serverUrl}/settings/connection/config`, {
+      const response = await fetch(joinApiUrl(serverUrl, '/settings/connection/config'), {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('access_token')}`,
@@ -165,7 +166,7 @@ class ConnectionManager {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const response = await fetch(`${url}/health`, {
+      const response = await fetch(joinApiUrl(url, '/health'), {
         signal: controller.signal,
         method: 'HEAD',
       });
@@ -183,7 +184,7 @@ class ConnectionManager {
   async measureLatency(url: string): Promise<number> {
     const start = Date.now();
     try {
-      await fetch(`${url}/health`, { method: 'HEAD' });
+      await fetch(joinApiUrl(url, '/health'), { method: 'HEAD' });
       return Date.now() - start;
     } catch {
       return Infinity;

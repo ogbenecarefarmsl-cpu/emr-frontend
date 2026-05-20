@@ -68,6 +68,11 @@ import PrescriptionForm from "./pages/doctor/PrescriptionForm";
 
 // Nurse Pages
 import NurseDashboard from "./pages/nurse/NurseDashboard";
+import NurseAdmissionsPage from "./pages/nurse/NurseAdmissionsPage";
+import NurseMarPage from "./pages/nurse/NurseMarPage";
+import NurseObservationPage from "./pages/nurse/NurseObservationPage";
+import NurseProceduresPage from "./pages/nurse/NurseProceduresPage";
+import NurseTriagePage from "./pages/nurse/NurseTriagePage";
 
 // Pharmacy Pages
 import PharmacyDashboard from "./pages/pharmacy/PharmacyDashboard";
@@ -343,6 +348,21 @@ function AppRoutes() {
       {/* Nurse Routes */}
       <Route path="/nurse" element={
         <RoleGuard allowedRoles={['nurse', 'admin']}><NurseDashboard /></RoleGuard>
+      } />
+      <Route path="/nurse/triage" element={
+        <RoleGuard allowedRoles={['nurse', 'admin']}><NurseTriagePage /></RoleGuard>
+      } />
+      <Route path="/nurse/admissions" element={
+        <RoleGuard allowedRoles={['nurse', 'admin']}><NurseAdmissionsPage /></RoleGuard>
+      } />
+      <Route path="/nurse/mar" element={
+        <RoleGuard allowedRoles={['nurse', 'admin']}><NurseMarPage /></RoleGuard>
+      } />
+      <Route path="/nurse/observation" element={
+        <RoleGuard allowedRoles={['nurse', 'admin']}><NurseObservationPage /></RoleGuard>
+      } />
+      <Route path="/nurse/procedures" element={
+        <RoleGuard allowedRoles={['nurse', 'admin']}><NurseProceduresPage /></RoleGuard>
       } />
 
       {/* Pharmacy Routes */}

@@ -22,8 +22,9 @@ import {
 } from '@/services/api';
 import axios from 'axios';
 import { getAccessToken } from '@/services/api';
+import { getConfiguredApiBaseUrl, joinApiUrl } from '@/services/apiUrl';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = getConfiguredApiBaseUrl();
 
 // ── Types ────────────────────────────────────────────────────────
 export type ConnectionMode = 'online' | 'lan-only' | 'offline';
@@ -123,7 +124,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
 
     // 1. Try the configured API URL
     try {
-      await axios.get(`${API_BASE_URL}/health`, requestConfig);
+      await axios.get(joinApiUrl(API_BASE_URL, '/health'), requestConfig);
       setIsApiReachable(true);
       setConnectionMode('online');
       return true;
@@ -137,7 +138,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         const result = await window.electronAPI.discoverBackend();
         if (result?.url) {
           // Verify the discovered URL actually works
-          await axios.get(`${result.url}/health`, {
+          await axios.get(joinApiUrl(result.url, '/health'), {
             ...requestConfig,
             timeout: 3_000,
           });
@@ -386,7 +387,7 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
     // In browser mode, just try hitting /health
     try {
-      await axios.get(`${url}/health`, { timeout: 3000 });
+      await axios.get(joinApiUrl(url, '/health'), { timeout: 3000 });
       setLanBackendUrl(url);
       setIsApiReachable(true);
       setConnectionMode('lan-only');

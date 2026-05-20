@@ -5,6 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { notificationService } from '@/services/notificationService';
 import { soundService } from '@/services/soundService';
+import { normalizeApiBaseUrl } from '@/services/apiUrl';
 
 interface WebSocketContextType {
   socket: Socket | null;
@@ -54,7 +55,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
     };
 
     // Get backend URL from environment or use LAN IP
-    const backendUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+    const backendUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:3000');
     const token = localStorage.getItem('access_token'); // Use same key as in api.ts
 
     // Create socket connection

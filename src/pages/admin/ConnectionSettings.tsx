@@ -8,6 +8,7 @@ import { ConnectionStatusDetailed } from '@/components/connection/ConnectionStat
 import { connectionManager } from '@/services/connectionManager';
 import { configSyncService } from '@/services/configSyncService';
 import api from '@/services/api';
+import { joinApiUrl } from '@/services/apiUrl';
 import { Server, Cloud, Wifi, Save, RefreshCw, AlertCircle, CheckCircle, Users } from 'lucide-react';
 
 interface ConnectionConfig {
@@ -84,7 +85,7 @@ export default function ConnectionSettings() {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      const response = await fetch(`${url}/health`, {
+      const response = await fetch(joinApiUrl(url, '/health'), {
         signal: controller.signal,
         method: 'GET',
       });

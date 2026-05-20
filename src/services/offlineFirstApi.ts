@@ -12,8 +12,9 @@
 import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import { db, queueMutation, bulkUpsert } from './offlineDb';
 import { getAccessToken } from './api';
+import { getConfiguredApiBaseUrl, joinApiUrl } from './apiUrl';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = getConfiguredApiBaseUrl();
 
 // Request deduplication cache
 const pendingRequests = new Map<string, Promise<any>>();
@@ -52,7 +53,7 @@ async function isOnline(): Promise<boolean> {
   
   try {
     const token = getAccessToken();
-    await axios.get(`${API_BASE_URL}/health`, {
+    await axios.get(joinApiUrl(API_BASE_URL, '/health'), {
       timeout: 3000,
       headers: token ? { Authorization: `Bearer ${token}` } : {}
     });

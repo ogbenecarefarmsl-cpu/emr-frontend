@@ -33,6 +33,7 @@ import { patientService } from '@/services/patientService';
 import { prescriptionService } from '@/services/prescriptionService';
 import { useDoctorQueue, useVisitStats } from '@/hooks/useVisits';
 import { useExpenditureSummary } from '@/hooks/useExpenditures';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 export default function ReceptionDashboard() {
