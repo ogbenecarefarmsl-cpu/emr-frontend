@@ -38,7 +38,7 @@ import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
 // Icons
 import {
   Loader2, Clock, CheckCircle, User, Stethoscope, FileText, FlaskConical, Pill,
-  ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
+  ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save, Maximize2, Minimize2,
   Send, Heart, Users, ClipboardList, UserCheck, BedDouble, Inbox, ExternalLink, Activity
 } from 'lucide-react';
 
@@ -177,6 +177,7 @@ export default function DoctorDashboard() {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [historyTab, setHistoryTab] = useState('visits');
+  const [focusMode, setFocusMode] = useState(false);
   const [queueSectionsOpen, setQueueSectionsOpen] = useState({
     waiting: true,
     active: true,
@@ -617,9 +618,12 @@ export default function DoctorDashboard() {
       </div>
 
       {/* Main Layout: Queue + Patient Panel */}
-      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-6 items-start">
+      <div className={cn(
+        "grid grid-cols-1 gap-6 items-start",
+        focusMode ? "xl:grid-cols-1" : "xl:grid-cols-[320px_minmax(0,1fr)]"
+      )}>
         {/* Left Panel: Patient Queue */}
-        <div className="space-y-4 xl:sticky xl:top-4">
+        <div className={cn("space-y-4 xl:sticky xl:top-4", focusMode && "hidden")}>
           {/* Waiting Queue */}
           <div className="bg-card border rounded-xl shadow-sm">
             <button
@@ -902,6 +906,23 @@ export default function DoctorDashboard() {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setFocusMode((current) => !current)}
+                    >
+                      {focusMode ? (
+                        <>
+                          <Minimize2 className="w-3.5 h-3.5 mr-1.5" />
+                          Exit Focus
+                        </>
+                      ) : (
+                        <>
+                          <Maximize2 className="w-3.5 h-3.5 mr-1.5" />
+                          Focus View
+                        </>
+                      )}
+                    </Button>
                     <Badge variant="outline">{selectedVisit.visitNumber}</Badge>
                     <Badge className={visitStatusTone(selectedVisit.status)}>
                       {statusLabel(selectedVisit.status)}
@@ -1136,15 +1157,47 @@ export default function DoctorDashboard() {
                         </Button>
                       </div>
                     </div>
-                    <div className="rounded-xl border p-4 bg-background">
-                      <Label className="text-sm font-semibold text-blue-600">S - Subjective</Label>
-                      <Textarea
-                        value={soapForm.subjective}
-                        onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})}
-                        placeholder="Patient's description of symptoms, history of present illness..."
-                        rows={5}
-                        className="mt-2 resize-y"
-                      />
+                    <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
+                      <div className="rounded-xl border p-4 bg-background">
+                        <Label className="text-sm font-semibold text-blue-600">S - Subjective</Label>
+                        <Textarea
+                          value={soapForm.subjective}
+                          onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})}
+                          placeholder="Patient's description of symptoms, history of present illness..."
+                          rows={8}
+                          className="mt-2 resize-y"
+                        />
+                      </div>
+                      <div className="rounded-xl border p-4 bg-background">
+                        <Label className="text-sm font-semibold text-green-600">O - Objective</Label>
+                        <Textarea
+                          value={soapForm.objective}
+                          onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})}
+                          placeholder="Physical exam findings, vitals, observations..."
+                          rows={8}
+                          className="mt-2 resize-y"
+                        />
+                      </div>
+                      <div className="rounded-xl border p-4 bg-background">
+                        <Label className="text-sm font-semibold text-purple-600">A - Assessment</Label>
+                        <Textarea
+                          value={soapForm.assessment}
+                          onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})}
+                          placeholder="Clinical impression, differential diagnosis..."
+                          rows={7}
+                          className="mt-2 resize-y"
+                        />
+                      </div>
+                      <div className="rounded-xl border p-4 bg-background">
+                        <Label className="text-sm font-semibold text-orange-600">P - Plan</Label>
+                        <Textarea
+                          value={soapForm.plan}
+                          onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})}
+                          placeholder="Treatment plan, medications, follow-up..."
+                          rows={7}
+                          className="mt-2 resize-y"
+                        />
+                      </div>
                     </div>
 
                     {/* Triage Vitals - Auto-populated from nurse triage */}
@@ -1194,36 +1247,6 @@ export default function DoctorDashboard() {
                       </div>
                     )}
 
-                    <div className="rounded-xl border p-4 bg-background">
-                      <Label className="text-sm font-semibold text-green-600">O - Objective</Label>
-                      <Textarea
-                        value={soapForm.objective}
-                        onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})}
-                        placeholder="Physical exam findings, vitals, observations..."
-                        rows={5}
-                        className="mt-2 resize-y"
-                      />
-                    </div>
-                    <div className="rounded-xl border p-4 bg-background">
-                      <Label className="text-sm font-semibold text-purple-600">A - Assessment</Label>
-                      <Textarea
-                        value={soapForm.assessment}
-                        onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})}
-                        placeholder="Clinical impression, differential diagnosis..."
-                        rows={4}
-                        className="mt-2 resize-y"
-                      />
-                    </div>
-                    <div className="rounded-xl border p-4 bg-background">
-                      <Label className="text-sm font-semibold text-orange-600">P - Plan</Label>
-                      <Textarea
-                        value={soapForm.plan}
-                        onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})}
-                        placeholder="Treatment plan, medications, follow-up..."
-                        rows={4}
-                        className="mt-2 resize-y"
-                      />
-                    </div>
                     <div className="rounded-xl border p-4 bg-background">
                       <Label className="text-sm font-semibold">Diagnosis</Label>
                       <Input
