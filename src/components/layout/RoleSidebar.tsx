@@ -118,9 +118,10 @@ interface RoleSidebarProps {
   role: UserRole;
   userName?: string;
   onClose?: () => void;
+  collapsed?: boolean;
 }
 
-export function RoleSidebar({ role, userName, onClose }: RoleSidebarProps) {
+export function RoleSidebar({ role, userName, onClose, collapsed = false }: RoleSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
@@ -132,15 +133,18 @@ export function RoleSidebar({ role, userName, onClose }: RoleSidebarProps) {
   };
 
   return (
-    <aside className="w-64 bg-sidebar text-sidebar-foreground flex flex-col h-screen">
+    <aside className={cn(
+      "bg-sidebar text-sidebar-foreground flex flex-col h-screen transition-[width] duration-200 overflow-hidden",
+      collapsed ? "lg:w-20 w-64" : "w-64"
+    )}>
       {/* Logo */}
-      <div className="p-5 border-b border-sidebar-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+      <div className={cn("border-b border-sidebar-border", collapsed ? "lg:p-4 p-5" : "p-5")}>
+        <div className={cn("flex items-center justify-between", collapsed && "lg:justify-center")}>
+          <div className="flex items-center gap-3 min-w-0">
             <img 
               src="/harbour-emr-logo.svg" 
               alt="Harbour EMR Logo" 
-              className="h-12 w-auto object-contain"
+              className={cn("h-12 w-auto object-contain transition-all", collapsed && "lg:h-9")}
             />
           </div>
           {/* Close button for mobile */}
@@ -156,7 +160,7 @@ export function RoleSidebar({ role, userName, onClose }: RoleSidebarProps) {
       </div>
 
       {/* User Info */}
-      {userName && (
+      {userName && !collapsed && (
         <div className="px-6 py-3 border-b border-sidebar-border bg-sidebar-accent/30">
           <p className="text-xs text-sidebar-foreground/60">Logged in as</p>
           <p className="font-medium text-sm">{userName}</p>
@@ -164,7 +168,7 @@ export function RoleSidebar({ role, userName, onClose }: RoleSidebarProps) {
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+      <nav className={cn("flex-1 py-4 space-y-0.5 overflow-y-auto", collapsed ? "lg:px-3 px-3" : "px-3")}>
         {navItems.map(({ to, icon: Icon, label }) => {
           const isActive = location.pathname === to;
           return (
@@ -172,15 +176,17 @@ export function RoleSidebar({ role, userName, onClose }: RoleSidebarProps) {
               key={to}
               to={to}
               onClick={onClose}
+              title={collapsed ? label : undefined}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
+                collapsed && 'lg:justify-center lg:px-2',
                 isActive 
                   ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm shadow-sidebar-primary/25 font-semibold' 
                   : 'hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium'
               )}
             >
               <Icon className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span>{label}</span>
+              <span className={cn(collapsed && "lg:hidden")}>{label}</span>
             </NavLink>
           );
         })}
@@ -191,15 +197,19 @@ export function RoleSidebar({ role, userName, onClose }: RoleSidebarProps) {
         <Button
           onClick={handleLogout}
           variant="ghost"
-          className="w-full justify-start gap-3 text-sidebar-foreground hover:bg-sidebar-accent"
+          title={collapsed ? 'Logout' : undefined}
+          className={cn(
+            "w-full gap-3 text-sidebar-foreground hover:bg-sidebar-accent",
+            collapsed ? "lg:justify-center lg:px-2 justify-start" : "justify-start"
+          )}
         >
           <LogOut className="w-5 h-5" />
-          <span className="font-medium">Logout</span>
+          <span className={cn("font-medium", collapsed && "lg:hidden")}>Logout</span>
         </Button>
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-sidebar-border">
+      <div className={cn("p-4 border-t border-sidebar-border", collapsed && "lg:hidden")}>
         <div className="text-xs text-sidebar-foreground/50">
           <p>Harbour EMR v1.0.0</p>
           <p>HL7 • ASTM • FHIR Compatible</p>

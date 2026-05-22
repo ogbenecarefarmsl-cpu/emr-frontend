@@ -38,7 +38,7 @@ import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
 // Icons
 import {
   Loader2, Clock, CheckCircle, User, Stethoscope, FileText, FlaskConical, Pill,
-  ChevronRight, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
+  ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
   Send, Heart, Users, ClipboardList, UserCheck, BedDouble, Inbox, ExternalLink, Activity
 } from 'lucide-react';
 
@@ -177,6 +177,12 @@ export default function DoctorDashboard() {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [historyTab, setHistoryTab] = useState('visits');
+  const [queueSectionsOpen, setQueueSectionsOpen] = useState({
+    waiting: true,
+    active: true,
+    results: true,
+    referrals: true,
+  });
 
   // Lab order modal state
   const [labOrderModalOpen, setLabOrderModalOpen] = useState(false);
@@ -560,6 +566,9 @@ export default function DoctorDashboard() {
   const currentActiveVisit = activePatients.find((v: Visit) => v.status === 'in_consultation') || activePatients[0];
   const canContinueClinicalWork = !!selectedVisit && ['in_consultation', 'results_ready', 'awaiting_doctor_review'].includes(selectedVisit.status);
   const canCloseEncounter = !!selectedVisit && !['awaiting_lab', 'awaiting_results', 'awaiting_pharmacy', 'awaiting_dispensing'].includes(selectedVisit.status);
+  const toggleQueueSection = (section: keyof typeof queueSectionsOpen) => {
+    setQueueSectionsOpen((current) => ({ ...current, [section]: !current[section] }));
+  };
 
   // Auto-select the active patient if available
   useEffect(() => {
@@ -613,14 +622,23 @@ export default function DoctorDashboard() {
         <div className="space-y-4 xl:sticky xl:top-4">
           {/* Waiting Queue */}
           <div className="bg-card border rounded-xl shadow-sm">
-            <div className="px-4 py-3 border-b flex items-center justify-between">
+            <button
+              type="button"
+              className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+              onClick={() => toggleQueueSection('waiting')}
+            >
               <h3 className="font-semibold text-sm flex items-center gap-2">
                 <Clock className="w-4 h-4 text-amber-500" />
                 Waiting Queue
+                {waitingQueue.length > 0 && <span className="h-2 w-2 rounded-full bg-amber-500" />}
               </h3>
-              <Badge variant="secondary">{waitingQueue.length}</Badge>
-            </div>
-            <ScrollArea className="max-h-72">
+              <span className="flex items-center gap-2">
+                <Badge variant="secondary">{waitingQueue.length}</Badge>
+                <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", !queueSectionsOpen.waiting && "-rotate-90")} />
+              </span>
+            </button>
+            {queueSectionsOpen.waiting && (
+            <ScrollArea className="h-[18rem]">
               {waitingQueue.length === 0 ? (
                 <div className="p-6 text-center text-muted-foreground text-sm">
                   No patients waiting
@@ -666,18 +684,28 @@ export default function DoctorDashboard() {
                 </div>
               )}
             </ScrollArea>
+            )}
           </div>
 
           {/* My Open Encounters */}
           <div className="bg-card border rounded-xl shadow-sm">
-            <div className="px-4 py-3 border-b flex items-center justify-between">
+            <button
+              type="button"
+              className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+              onClick={() => toggleQueueSection('active')}
+            >
               <h3 className="font-semibold text-sm flex items-center gap-2">
                 <Stethoscope className="w-4 h-4 text-blue-500" />
                 My Open Encounters
+                {activePatients.length > 0 && <span className="h-2 w-2 rounded-full bg-blue-500" />}
               </h3>
-              <Badge variant="secondary">{activePatients.length}</Badge>
-            </div>
-            <ScrollArea className="max-h-80">
+              <span className="flex items-center gap-2">
+                <Badge variant="secondary">{activePatients.length}</Badge>
+                <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", !queueSectionsOpen.active && "-rotate-90")} />
+              </span>
+            </button>
+            {queueSectionsOpen.active && (
+            <ScrollArea className="h-[20rem]">
               {activePatients.length === 0 ? (
                 <div className="p-6 text-center text-muted-foreground text-sm">
                   No open encounters
@@ -727,7 +755,8 @@ export default function DoctorDashboard() {
                 </div>
               )}
             </ScrollArea>
-            {activePatients.length > 0 && (
+            )}
+            {queueSectionsOpen.active && activePatients.length > 0 && (
               <div className="px-4 py-3 border-t grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
                 <span>Lab pay: {awaitingLabPayment.length}</span>
                 <span>Results: {awaitingResults.length}</span>
@@ -740,13 +769,23 @@ export default function DoctorDashboard() {
           {/* Results Ready */}
           {resultsReady.length > 0 && (
             <div className="bg-card border rounded-xl shadow-sm border-l-4 border-l-green-500">
-              <div className="px-4 py-3 border-b flex items-center justify-between">
+              <button
+                type="button"
+                className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+                onClick={() => toggleQueueSection('results')}
+              >
                 <h3 className="font-semibold text-sm flex items-center gap-2">
                   <CheckCircle className="w-4 h-4 text-green-500" />
                   Results Ready
+                  <span className="h-2 w-2 rounded-full bg-green-500" />
                 </h3>
-                <Badge variant="default" className="bg-green-500">{resultsReady.length}</Badge>
-              </div>
+                <span className="flex items-center gap-2">
+                  <Badge variant="default" className="bg-green-500">{resultsReady.length}</Badge>
+                  <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", !queueSectionsOpen.results && "-rotate-90")} />
+                </span>
+              </button>
+              {queueSectionsOpen.results && (
+              <ScrollArea className="h-[14rem]">
               <div className="divide-y">
                 {resultsReady.map((visit: Visit) => (
                   <div
@@ -770,19 +809,31 @@ export default function DoctorDashboard() {
                   </div>
                 ))}
               </div>
+              </ScrollArea>
+              )}
             </div>
           )}
 
           {/* Incoming Referrals (for specialists) */}
           {incomingReferrals.length > 0 && (
             <div className="bg-card border rounded-xl shadow-sm border-l-4 border-l-purple-500">
-              <div className="px-4 py-3 border-b flex items-center justify-between">
+              <button
+                type="button"
+                className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+                onClick={() => toggleQueueSection('referrals')}
+              >
                 <h3 className="font-semibold text-sm flex items-center gap-2">
                   <Inbox className="w-4 h-4 text-purple-500" />
                   Incoming Referrals
+                  <span className="h-2 w-2 rounded-full bg-purple-500" />
                 </h3>
-                <Badge className="bg-purple-500">{incomingReferrals.length}</Badge>
-              </div>
+                <span className="flex items-center gap-2">
+                  <Badge className="bg-purple-500">{incomingReferrals.length}</Badge>
+                  <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", !queueSectionsOpen.referrals && "-rotate-90")} />
+                </span>
+              </button>
+              {queueSectionsOpen.referrals && (
+              <ScrollArea className="h-[14rem]">
               <div className="divide-y">
                 {incomingReferrals.map((visit: any) => (
                   <div key={visit._id} className="p-3 hover:bg-muted/50 transition-colors">
@@ -822,6 +873,8 @@ export default function DoctorDashboard() {
                   </div>
                 ))}
               </div>
+              </ScrollArea>
+              )}
             </div>
           )}
         </div>

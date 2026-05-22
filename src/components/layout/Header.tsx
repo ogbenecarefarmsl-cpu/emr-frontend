@@ -1,4 +1,4 @@
-import { Bell, Search, Menu } from 'lucide-react';
+import { Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/components/offline/OfflineIndicator';
@@ -6,16 +6,32 @@ import { OfflineIndicator } from '@/components/offline/OfflineIndicator';
 interface HeaderProps {
   title: string;
   subtitle?: string;
+  sidebarCollapsed?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-export function Header({ title, subtitle }: HeaderProps) {
+export function Header({ title, subtitle, sidebarCollapsed, onToggleSidebar }: HeaderProps) {
   return (
     <header className="bg-card/80 backdrop-blur-sm border-b px-6 py-4 flex items-center justify-between sticky top-0 z-30">
-      <div className="min-w-0">
-        <h1 className="text-xl font-bold text-foreground truncate">{title}</h1>
-        {subtitle && (
-          <p className="text-sm text-muted-foreground mt-0.5 truncate">{subtitle}</p>
+      <div className="min-w-0 flex items-center gap-3">
+        {onToggleSidebar && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="hidden lg:inline-flex h-9 w-9"
+            onClick={onToggleSidebar}
+            title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
+          </Button>
         )}
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-foreground truncate">{title}</h1>
+          {subtitle && (
+            <p className="text-sm text-muted-foreground mt-0.5 truncate">{subtitle}</p>
+          )}
+        </div>
       </div>
 
       <div className="flex items-center gap-3 flex-shrink-0">

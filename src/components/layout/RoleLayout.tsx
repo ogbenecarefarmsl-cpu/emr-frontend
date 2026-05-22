@@ -3,7 +3,7 @@ import { RoleSidebar } from './RoleSidebar';
 import { Header } from './Header';
 import { UpdateBanner } from './UpdateBanner';
 import { UserRole } from '@/types/lis';
-import { Menu, X } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface RoleLayoutProps {
@@ -16,6 +16,7 @@ interface RoleLayoutProps {
 
 export function RoleLayout({ children, title, subtitle, role, userName }: RoleLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -29,15 +30,24 @@ export function RoleLayout({ children, title, subtitle, role, userName }: RoleLa
 
       {/* Sidebar - hidden on mobile, shown on lg+ */}
       <div className={`
-        fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-200 ease-in-out
+        fixed inset-y-0 left-0 z-50 transform transition-[width,transform] duration-200 ease-in-out
+        ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'} w-64
         lg:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <RoleSidebar role={role} userName={userName} onClose={() => setSidebarOpen(false)} />
+        <RoleSidebar
+          role={role}
+          userName={userName}
+          onClose={() => setSidebarOpen(false)}
+          collapsed={sidebarCollapsed}
+        />
       </div>
 
       {/* Main content */}
-      <div className="lg:ml-64 min-h-screen flex flex-col">
+      <div className={`
+        min-h-screen flex flex-col transition-[margin] duration-200
+        ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-64'}
+      `}>
         {/* Mobile header bar */}
         <div className="lg:hidden sticky top-0 z-30 bg-card border-b px-4 py-3 flex items-center gap-3">
           <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="h-9 w-9">
@@ -50,7 +60,12 @@ export function RoleLayout({ children, title, subtitle, role, userName }: RoleLa
 
         {/* Desktop header */}
         <div className="hidden lg:block">
-          <Header title={title} subtitle={subtitle} />
+          <Header
+            title={title}
+            subtitle={subtitle}
+            sidebarCollapsed={sidebarCollapsed}
+            onToggleSidebar={() => setSidebarCollapsed((value) => !value)}
+          />
         </div>
 
         <UpdateBanner />
