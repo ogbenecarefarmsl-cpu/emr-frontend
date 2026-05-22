@@ -293,6 +293,12 @@ export default function DoctorDashboard() {
     const visitId = selectedVisit?._id || selectedVisit?.id;
     return orderVisitId === visitId && (order.orderType || order.order_type) === 'lab';
   });
+  const currentVisitId = selectedVisit?._id || selectedVisit?.id;
+  const currentVisitOrders = (Array.isArray(patientOrders) ? patientOrders : [])
+    .filter((order: any) => {
+      const orderVisitId = typeof order.visitId === 'object' ? order.visitId?._id : order.visitId;
+      return orderVisitId === currentVisitId;
+    });
   const labOrderId = selectedVisit?.orders?.find((o: any) => o.orderType === 'lab')?._id ||
     currentVisitLabOrder?._id ||
     currentVisitLabOrder?.id ||
@@ -565,6 +571,28 @@ export default function DoctorDashboard() {
   const currentActiveVisit = activePatients.find((v: Visit) => v.status === 'in_consultation') || activePatients[0];
   const canContinueClinicalWork = !!selectedVisit && ['in_consultation', 'results_ready', 'awaiting_doctor_review'].includes(selectedVisit.status);
   const canCloseEncounter = !!selectedVisit && !['awaiting_lab', 'awaiting_results', 'awaiting_pharmacy', 'awaiting_dispensing'].includes(selectedVisit.status);
+  const closureBlockers = useMemo(() => {
+    if (!selectedVisit) return [];
+    const blockers: string[] = [];
+    const status = selectedVisit.status;
+    if (status === 'awaiting_lab') blockers.push('Lab order payment is still pending.');
+    if (status === 'awaiting_results') blockers.push('Lab processing is still in progress.');
+    if (status === 'awaiting_pharmacy') blockers.push('Pharmacy order payment is still pending.');
+    if (status === 'awaiting_dispensing') blockers.push('Pharmacy dispensing is still pending.');
+
+    const activeClinicalOrders = currentVisitOrders.filter((order: any) => {
+      const type = order.orderType || order.order_type;
+      return type === 'lab' || type === 'pharmacy';
+    });
+    const hasUnpaidClinical = activeClinicalOrders.some((order: any) => (order.paymentStatus || order.payment_status) !== 'paid');
+    const hasUnreleasedLab = activeClinicalOrders.some((order: any) => (order.orderType || order.order_type) === 'lab' && (order.status || '') !== 'completed');
+    const hasUndispensedPharmacy = activeClinicalOrders.some((order: any) => (order.orderType || order.order_type) === 'pharmacy' && (order.status || '') !== 'completed');
+
+    if (hasUnpaidClinical) blockers.push('One or more clinical orders are not fully paid.');
+    if (hasUnreleasedLab) blockers.push('One or more lab orders are not completed/released yet.');
+    if (hasUndispensedPharmacy) blockers.push('One or more pharmacy orders are not dispensed yet.');
+    return Array.from(new Set(blockers));
+  }, [selectedVisit?._id, selectedVisit?.status, currentVisitOrders]);
   const toggleQueueSection = (section: keyof typeof queueSectionsOpen) => {
     setQueueSectionsOpen((current) => ({ ...current, [section]: !current[section] }));
   };
@@ -883,6 +911,16 @@ export default function DoctorDashboard() {
 
                   {/* Quick Actions */}
                   <div className="mt-6 rounded-xl border bg-muted/20 p-4">
+                    {closureBlockers.length > 0 && (
+                      <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+                        <p className="text-xs font-semibold text-amber-800">Cannot close encounter yet</p>
+                        <ul className="mt-1 text-xs text-amber-700 space-y-1">
+                          {closureBlockers.map((blocker) => (
+                            <li key={blocker}>- {blocker}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
                         <h3 className="font-semibold text-sm">Next clinical action</h3>
@@ -906,6 +944,7 @@ export default function DoctorDashboard() {
                         <Button
                           onClick={handleCompleteAndNext}
                           disabled={completeVisit.isPending || !canCloseEncounter}
+                          title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}
                         >
                           <CheckCircle className="w-4 h-4 mr-2" />
                           Complete & Next
@@ -917,6 +956,16 @@ export default function DoctorDashboard() {
 
                 {/* Orders & Plan Tab */}
                 <TabsContent value="orders" className="p-6 mt-0">
+                  {closureBlockers.length > 0 && (
+                    <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+                      <p className="text-xs font-semibold text-amber-800">Closure readiness</p>
+                      <ul className="mt-1 text-xs text-amber-700 space-y-1">
+                        {closureBlockers.map((blocker) => (
+                          <li key={blocker}>- {blocker}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <Button
                       variant="outline"
@@ -985,6 +1034,7 @@ export default function DoctorDashboard() {
                     <Button
                       onClick={handleCompleteAndNext}
                       disabled={completeVisit.isPending || !canCloseEncounter}
+                      title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
                       Complete & Next
