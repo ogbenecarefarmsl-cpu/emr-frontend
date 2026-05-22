@@ -132,6 +132,37 @@ const getFlagLabel = (flag?: string) => {
   return 'N/A';
 };
 
+const patientDisplayName = (visit?: Visit | null) => {
+  const patient = visit?.patientId;
+  const name = [patient?.firstName, patient?.lastName].filter(Boolean).join(' ').trim();
+  return name || 'Unnamed patient';
+};
+
+const patientAgeLabel = (patient: any) => {
+  if (patient?.age) return `${patient.age} yrs`;
+  if (!patient?.dateOfBirth) return 'Age N/A';
+  const birthDate = new Date(patient.dateOfBirth);
+  if (Number.isNaN(birthDate.getTime())) return 'Age N/A';
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDelta = today.getMonth() - birthDate.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < birthDate.getDate())) age -= 1;
+  return `${age} yrs`;
+};
+
+const statusLabel = (status?: string) => status?.replace(/_/g, ' ') || 'not set';
+
+const visitStatusTone = (status?: string) => cn(
+  status === 'in_consultation' && 'bg-blue-500 text-white',
+  status === 'results_ready' && 'bg-green-500 text-white',
+  status === 'awaiting_lab' && 'bg-amber-500 text-white',
+  status === 'awaiting_pharmacy' && 'bg-purple-500 text-white',
+  status === 'awaiting_results' && 'bg-orange-500 text-white',
+  status === 'awaiting_dispensing' && 'bg-fuchsia-500 text-white',
+  status === 'awaiting_doctor_review' && 'bg-cyan-600 text-white',
+  status === 'admitted' && 'bg-blue-600 text-white',
+);
+
 export default function DoctorDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
@@ -260,6 +291,9 @@ export default function DoctorDashboard() {
     currentVisitLabOrder?.id ||
     selectedVisit?.consultationOrderId;
   const { data: labResults = [] } = useResults(labOrderId);
+  const abnormalLabResults = labResults.filter((result: LabResult) => result.flag && result.flag !== 'normal');
+  const selectedPatient = selectedVisit?.patientId || {};
+  const selectedWalletBalance = Number(selectedPatient.walletBalance || selectedPatient.wallet?.balance || 0);
 
   // Filter tests based on search
   const filteredTests = useMemo(() => {
@@ -536,7 +570,7 @@ export default function DoctorDashboard() {
 
   if (isLoading) {
     return (
-      <RoleLayout title="Doctor Dashboard" subtitle="Manage your consultations" role="doctor" userName={profile?.fullName}>
+      <RoleLayout title="Doctor Workbench" subtitle="Queues, active encounters, SOAP notes, orders and patient history" role="doctor" userName={profile?.fullName}>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -545,7 +579,7 @@ export default function DoctorDashboard() {
   }
 
   return (
-    <RoleLayout title="Doctor Dashboard" subtitle="Manage your consultations" role="doctor" userName={profile?.fullName}>
+    <RoleLayout title="Doctor Workbench" subtitle="Queues, active encounters, SOAP notes, orders and patient history" role="doctor" userName={profile?.fullName}>
       {/* Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <MetricCard
@@ -574,9 +608,9 @@ export default function DoctorDashboard() {
       </div>
 
       {/* Main Layout: Queue + Patient Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-[320px_minmax(0,1fr)] gap-6 items-start">
         {/* Left Panel: Patient Queue */}
-        <div className="lg:col-span-1 space-y-4">
+        <div className="space-y-4 xl:sticky xl:top-4">
           {/* Waiting Queue */}
           <div className="bg-card border rounded-xl shadow-sm">
             <div className="px-4 py-3 border-b flex items-center justify-between">
@@ -586,7 +620,7 @@ export default function DoctorDashboard() {
               </h3>
               <Badge variant="secondary">{waitingQueue.length}</Badge>
             </div>
-            <ScrollArea className="max-h-80">
+            <ScrollArea className="max-h-72">
               {waitingQueue.length === 0 ? (
                 <div className="p-6 text-center text-muted-foreground text-sm">
                   No patients waiting
@@ -604,9 +638,7 @@ export default function DoctorDashboard() {
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <p className="font-medium text-sm">
-                            {visit.patientId?.firstName} {visit.patientId?.lastName}
-                          </p>
+                          <p className="font-medium text-sm">{patientDisplayName(visit)}</p>
                           <p className="text-xs text-muted-foreground">
                             {visit.visitNumber} - {visit.patientId?.patientId}
                           </p>
@@ -645,7 +677,7 @@ export default function DoctorDashboard() {
               </h3>
               <Badge variant="secondary">{activePatients.length}</Badge>
             </div>
-            <ScrollArea className="max-h-96">
+            <ScrollArea className="max-h-80">
               {activePatients.length === 0 ? (
                 <div className="p-6 text-center text-muted-foreground text-sm">
                   No open encounters
@@ -667,9 +699,7 @@ export default function DoctorDashboard() {
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">
-                            {visit.patientId?.firstName} {visit.patientId?.lastName}
-                          </p>
+                          <p className="font-medium text-sm truncate">{patientDisplayName(visit)}</p>
                           <p className="text-xs text-muted-foreground">{visit.visitNumber}</p>
                           {visit.chiefComplaint && (
                             <p className="text-xs text-muted-foreground mt-1 truncate max-w-48">
@@ -689,7 +719,7 @@ export default function DoctorDashboard() {
                             visit.status === 'admitted' && "bg-blue-50 text-blue-700 border-blue-200"
                           )}
                         >
-                          {visit.status?.replace(/_/g, ' ')}
+                          {statusLabel(visit.status)}
                         </Badge>
                       </div>
                     </button>
@@ -732,9 +762,7 @@ export default function DoctorDashboard() {
                   >
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="font-medium text-sm">
-                          {visit.patientId?.firstName} {visit.patientId?.lastName}
-                        </p>
+                        <p className="font-medium text-sm">{patientDisplayName(visit)}</p>
                         <p className="text-xs text-muted-foreground">{visit.visitNumber}</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
@@ -760,9 +788,7 @@ export default function DoctorDashboard() {
                   <div key={visit._id} className="p-3 hover:bg-muted/50 transition-colors">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
-                        <p className="font-medium text-sm">
-                          {visit.patientId?.firstName} {visit.patientId?.lastName}
-                        </p>
+                        <p className="font-medium text-sm">{patientDisplayName(visit)}</p>
                         <p className="text-xs text-muted-foreground">{visit.visitNumber}</p>
                         {visit.doctorId && (
                           <p className="text-xs text-muted-foreground mt-0.5">
@@ -801,22 +827,19 @@ export default function DoctorDashboard() {
         </div>
 
         {/* Right Panel: Active Patient Workspace */}
-        <div className="lg:col-span-2">
+        <div className="min-w-0">
           {selectedVisit ? (
-            <div className="bg-card border rounded-xl shadow-sm">
+            <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
               {/* Patient Header */}
-              <div className="px-5 py-4 border-b bg-gradient-to-r from-primary/5 to-transparent">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h2 className="text-lg font-semibold">
-                      {selectedVisit.patientId?.firstName} {selectedVisit.patientId?.lastName}
-                    </h2>
-                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                      <span>{selectedVisit.patientId?.patientId}</span>
-                      <span>-</span>
+              <div className="px-6 py-5 border-b bg-gradient-to-r from-primary/5 via-primary/3 to-transparent">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0">
+                    <h2 className="text-2xl font-semibold tracking-normal">{patientDisplayName(selectedVisit)}</h2>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-muted-foreground">
+                      <span>{selectedVisit.patientId?.patientId || selectedVisit.patientId?.mrn || 'No hospital number'}</span>
                       <span>{selectedVisit.patientId?.gender || 'N/A'}</span>
-                      <span>-</span>
-                      <span>{selectedVisit.patientId?.age || selectedVisit.patientId?.dateOfBirth ? `${selectedVisit.patientId?.age || ''} yrs` : 'Age N/A'}</span>
+                      <span>{patientAgeLabel(selectedVisit.patientId)}</span>
+                      {selectedVisit.patientId?.phone && <span>{selectedVisit.patientId.phone}</span>}
                     </div>
                     {selectedVisit.patientId?.allergies?.length > 0 && (
                       <div className="flex items-center gap-1 mt-2">
@@ -825,32 +848,37 @@ export default function DoctorDashboard() {
                       </div>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                     <Badge variant="outline">{selectedVisit.visitNumber}</Badge>
-                    <Badge className={cn(
-                      selectedVisit.status === 'in_consultation' && 'bg-blue-500',
-                      selectedVisit.status === 'results_ready' && 'bg-green-500',
-                      selectedVisit.status === 'awaiting_lab' && 'bg-amber-500',
-                      selectedVisit.status === 'awaiting_pharmacy' && 'bg-purple-500',
-                      selectedVisit.status === 'awaiting_results' && 'bg-orange-500',
-                      selectedVisit.status === 'awaiting_dispensing' && 'bg-fuchsia-500',
-                      selectedVisit.status === 'awaiting_doctor_review' && 'bg-cyan-600',
-                      selectedVisit.status === 'admitted' && 'bg-blue-600',
-                    )}>
-                      {selectedVisit.status?.replace(/_/g, ' ')}
+                    <Badge className={visitStatusTone(selectedVisit.status)}>
+                      {statusLabel(selectedVisit.status)}
                     </Badge>
                   </div>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+                  {[
+                    { label: 'Visit type', value: selectedVisit.visitType || 'General' },
+                    { label: 'Category', value: selectedPatient.patientCategory || selectedPatient.category || 'Private' },
+                    { label: 'Wallet', value: `NGN ${selectedWalletBalance.toLocaleString()}` },
+                    { label: 'Triage', value: selectedVisit.triagePriority ? statusLabel(selectedVisit.triagePriority) : 'Not recorded' },
+                  ].map((item) => (
+                    <div key={item.label} className="rounded-lg border bg-background/80 px-3 py-2">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{item.label}</p>
+                      <p className="text-sm font-medium truncate">{item.value}</p>
+                    </div>
+                  ))}
                 </div>
               </div>
 
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <div className="px-5 pt-3 border-b">
-                  <TabsList className="bg-transparent h-auto p-0">
-                    <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Overview</TabsTrigger>
-                    <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">SOAP Notes</TabsTrigger>
+                <div className="px-6 pt-3 border-b overflow-x-auto">
+                  <TabsList className="bg-transparent h-auto p-0 min-w-max">
+                    <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Summary</TabsTrigger>
+                    <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">SOAP</TabsTrigger>
+                    <TabsTrigger value="orders" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Orders & Plan</TabsTrigger>
                     <TabsTrigger value="lab-results" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none relative">
-                      Lab Results
+                      Results
                       {labResults.length > 0 && (
                         <Badge className="ml-1.5 h-4 min-w-4 text-[10px]">{labResults.length}</Badge>
                       )}
@@ -924,59 +952,109 @@ export default function DoctorDashboard() {
                   </div>
 
                   {/* Quick Actions */}
-                  <div className="mt-6 flex flex-wrap gap-3">
+                  <div className="mt-6 rounded-xl border bg-muted/20 p-4">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="font-semibold text-sm">Next clinical action</h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Open the focused workspace you need instead of scrolling through the whole chart.
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" onClick={() => setActiveTab('soap')}>
+                          <FileText className="w-4 h-4 mr-2" />
+                          SOAP
+                        </Button>
+                        <Button variant="outline" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
+                          <ClipboardList className="w-4 h-4 mr-2" />
+                          Orders
+                        </Button>
+                        <Button variant="outline" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}>
+                          <FlaskConical className="w-4 h-4 mr-2" />
+                          Results
+                        </Button>
+                        <Button
+                          onClick={handleCompleteAndNext}
+                          disabled={completeVisit.isPending || !canCloseEncounter}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Complete & Next
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* Orders & Plan Tab */}
+                <TabsContent value="orders" className="p-6 mt-0">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     <Button
                       variant="outline"
-                      onClick={handleAddSoapNote}
-                      disabled={!selectedVisit}
-                    >
-                      <FileText className="w-4 h-4 mr-2" />
-                      Add SOAP Note
-                    </Button>
-                    <Button
-                      variant="outline"
+                      className="h-auto justify-start p-4"
                       onClick={() => setLabOrderModalOpen(true)}
                       disabled={!canContinueClinicalWork}
                     >
-                      <FlaskConical className="w-4 h-4 mr-2" />
-                      Order Lab Tests
+                      <FlaskConical className="w-5 h-5 mr-3 text-blue-500" />
+                      <span className="text-left">
+                        <span className="block font-medium">Order Lab Tests</span>
+                        <span className="block text-xs text-muted-foreground">Creates a clinical lab order awaiting reception payment.</span>
+                      </span>
                     </Button>
                     <Button
                       variant="outline"
+                      className="h-auto justify-start p-4"
                       onClick={() => setPrescriptionModalOpen(true)}
                       disabled={!canContinueClinicalWork}
                     >
-                      <Pill className="w-4 h-4 mr-2" />
-                      Prescribe Medication
+                      <Pill className="w-5 h-5 mr-3 text-purple-500" />
+                      <span className="text-left">
+                        <span className="block font-medium">Prescribe Medication</span>
+                        <span className="block text-xs text-muted-foreground">Uses active inventory and sends paid orders to pharmacy.</span>
+                      </span>
                     </Button>
                     <Button
                       variant="outline"
-                      onClick={handleSaveVitalsAndSOAP}
-                      disabled={updateVisit.isPending}
-                    >
-                      <Save className="w-4 h-4 mr-2" />
-                      Save SOAP Note
-                    </Button>
-                    <Button
-                      variant="outline"
+                      className="h-auto justify-start p-4"
                       onClick={() => setReferralOpen(true)}
                       disabled={!canContinueClinicalWork}
                     >
-                      <UserCheck className="w-4 h-4 mr-2" />
-                      Refer to Specialist
+                      <UserCheck className="w-5 h-5 mr-3 text-cyan-600" />
+                      <span className="text-left">
+                        <span className="block font-medium">Refer Patient</span>
+                        <span className="block text-xs text-muted-foreground">Send to another doctor or specialist with clinical context.</span>
+                      </span>
                     </Button>
                     <Button
                       variant="outline"
+                      className="h-auto justify-start p-4"
                       onClick={() => setAdmitOpen(true)}
                       disabled={!canContinueClinicalWork}
                     >
-                      <BedDouble className="w-4 h-4 mr-2" />
-                      Admit Patient
+                      <BedDouble className="w-5 h-5 mr-3 text-emerald-600" />
+                      <span className="text-left">
+                        <span className="block font-medium">Admit Patient</span>
+                        <span className="block text-xs text-muted-foreground">Start inpatient care, nursing notes, medication charts and handover.</span>
+                      </span>
                     </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6">
+                    {[
+                      { label: 'Awaiting lab payment', value: awaitingLabPayment.length },
+                      { label: 'Awaiting results', value: awaitingResults.length },
+                      { label: 'Pharmacy workflow', value: awaitingPharmacy.length + awaitingDispensing.length },
+                    ].map((item) => (
+                      <div key={item.label} className="rounded-lg border p-4">
+                        <p className="text-xs text-muted-foreground">{item.label}</p>
+                        <p className="text-2xl font-semibold mt-1">{item.value}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-6 flex justify-end">
                     <Button
                       onClick={handleCompleteAndNext}
                       disabled={completeVisit.isPending || !canCloseEncounter}
-                      className="ml-auto"
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
                       Complete & Next
@@ -985,28 +1063,34 @@ export default function DoctorDashboard() {
                 </TabsContent>
 
                 {/* SOAP Notes Tab */}
-                <TabsContent value="soap" className="p-5 mt-0">
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between gap-3 border rounded-lg p-4 bg-muted/20">
+                <TabsContent value="soap" className="p-6 mt-0">
+                  <div className="space-y-5">
+                    <div className="flex flex-col gap-3 border rounded-xl p-4 bg-muted/20 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <h3 className="font-semibold text-sm">SOAP Note Editor</h3>
+                        <h3 className="font-semibold text-sm">SOAP Workspace</h3>
                         <p className="text-xs text-muted-foreground mt-1">
                           Save creates a clinical timeline note for follow-up, admission review, and future visits.
                         </p>
                       </div>
-                      <Button variant="outline" size="sm" onClick={handleAddSoapNote}>
-                        <Plus className="w-3.5 h-3.5 mr-1.5" />
-                        New Note
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={handleAddSoapNote}>
+                          <Plus className="w-3.5 h-3.5 mr-1.5" />
+                          New Note
+                        </Button>
+                        <Button size="sm" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
+                          <Save className="w-3.5 h-3.5 mr-1.5" />
+                          Save
+                        </Button>
+                      </div>
                     </div>
-                    <div>
+                    <div className="rounded-xl border p-4 bg-background">
                       <Label className="text-sm font-semibold text-blue-600">S - Subjective</Label>
                       <Textarea
                         value={soapForm.subjective}
                         onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})}
                         placeholder="Patient's description of symptoms, history of present illness..."
-                        rows={3}
-                        className="mt-1"
+                        rows={5}
+                        className="mt-2 resize-y"
                       />
                     </div>
 
@@ -1017,7 +1101,7 @@ export default function DoctorDashboard() {
                           <Activity className="w-4 h-4" />
                           Triage Vitals (from Nurse)
                         </h4>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 text-xs">
                           {selectedVisit.temperature && <div><span className="text-muted-foreground">Temp:</span> <span className="font-medium">{selectedVisit.temperature}°C</span></div>}
                           {selectedVisit.bloodPressure && <div><span className="text-muted-foreground">BP:</span> <span className="font-medium">{selectedVisit.bloodPressure}</span></div>}
                           {selectedVisit.heartRate && <div><span className="text-muted-foreground">HR:</span> <span className="font-medium">{selectedVisit.heartRate} bpm</span></div>}
@@ -1057,47 +1141,51 @@ export default function DoctorDashboard() {
                       </div>
                     )}
 
-                    <div>
+                    <div className="rounded-xl border p-4 bg-background">
                       <Label className="text-sm font-semibold text-green-600">O - Objective</Label>
                       <Textarea
                         value={soapForm.objective}
                         onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})}
                         placeholder="Physical exam findings, vitals, observations..."
-                        rows={3}
-                        className="mt-1"
+                        rows={5}
+                        className="mt-2 resize-y"
                       />
                     </div>
-                    <div>
+                    <div className="rounded-xl border p-4 bg-background">
                       <Label className="text-sm font-semibold text-purple-600">A - Assessment</Label>
                       <Textarea
                         value={soapForm.assessment}
                         onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})}
                         placeholder="Clinical impression, differential diagnosis..."
-                        rows={3}
-                        className="mt-1"
+                        rows={4}
+                        className="mt-2 resize-y"
                       />
                     </div>
-                    <div>
+                    <div className="rounded-xl border p-4 bg-background">
                       <Label className="text-sm font-semibold text-orange-600">P - Plan</Label>
                       <Textarea
                         value={soapForm.plan}
                         onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})}
                         placeholder="Treatment plan, medications, follow-up..."
-                        rows={3}
-                        className="mt-1"
+                        rows={4}
+                        className="mt-2 resize-y"
                       />
                     </div>
-                    <div>
+                    <div className="rounded-xl border p-4 bg-background">
                       <Label className="text-sm font-semibold">Diagnosis</Label>
                       <Input
                         value={soapForm.diagnosis}
                         onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})}
                         placeholder="Primary diagnosis"
-                        className="mt-1"
+                        className="mt-2"
                       />
                     </div>
-                    <div className="flex justify-end gap-3">
-                      <Button variant="outline" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
+                    <div className="flex flex-wrap justify-end gap-3">
+                      <Button variant="outline" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
+                        <ClipboardList className="w-4 h-4 mr-2" />
+                        Orders & Plan
+                      </Button>
+                      <Button onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
                         <Save className="w-4 h-4 mr-2" />
                         Save SOAP Note
                       </Button>
@@ -1106,7 +1194,7 @@ export default function DoctorDashboard() {
                 </TabsContent>
 
                 {/* Lab Results Tab */}
-                <TabsContent value="lab-results" className="p-5 mt-0">
+                <TabsContent value="lab-results" className="p-6 mt-0">
                   {labResults.length === 0 ? (
                     <div className="text-center py-12 text-muted-foreground">
                       <FlaskConical className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -1115,8 +1203,13 @@ export default function DoctorDashboard() {
                     </div>
                   ) : (
                     <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-sm">Lab Results</h3>
+                      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <h3 className="font-semibold text-sm">Lab Results</h3>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {labResults.length} result{labResults.length === 1 ? '' : 's'} released, {abnormalLabResults.length} flagged.
+                          </p>
+                        </div>
                         <Button
                           variant="outline"
                           size="sm"
