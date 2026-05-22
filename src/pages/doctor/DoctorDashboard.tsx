@@ -10,7 +10,7 @@ import { prescriptionService } from '@/services/prescriptionService';
 import { soapNoteService } from '@/services/soapNoteService';
 import { patientService } from '@/services/patientService';
 import { SoapNoteTypeEnum } from '@/types/soap-note';
-import { useDoctorDashboard, useAcceptPatient, useUpdateVisit, useCompleteVisit, usePatientVisits, useReferToSpecialist, useAcceptReferral } from '@/hooks/useVisits';
+import { useDoctorDashboard, useAcceptPatient, useUpdateVisit, useCompleteVisit, usePatientVisits, useReferToSpecialist } from '@/hooks/useVisits';
 import { useActiveTests } from '@/hooks/useTestCatalog';
 import { useResults } from '@/hooks/useResults';
 
@@ -39,8 +39,8 @@ import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
 // Icons
 import {
   Loader2, Clock, CheckCircle, User, Stethoscope, FileText, FlaskConical, Pill,
-  ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
-  Send, Heart, Users, ClipboardList, UserCheck, BedDouble, Inbox, ExternalLink, Activity
+  ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
+  Send, Heart, Users, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity
 } from 'lucide-react';
 
 // Types
@@ -204,7 +204,6 @@ export default function DoctorDashboard() {
     notes: '',
   });
   const referToSpecialist = useReferToSpecialist();
-  const acceptReferral = useAcceptReferral();
   const { data: specialists = [] } = useQuery({
     queryKey: ['doctors', 'specialists'],
     queryFn: () => doctorsAPI.getSpecialists(),
@@ -346,8 +345,9 @@ export default function DoctorDashboard() {
   // Handlers
   const handleAcceptPatient = async (visit: Visit) => {
     try {
-      await acceptPatient.mutateAsync(visit._id || visit.id || '');
-      setSelectedVisit(visit);
+      const acceptedVisit = await acceptPatient.mutateAsync(visit._id || visit.id || '');
+      setSelectedVisit((acceptedVisit as Visit) || visit);
+      setActiveTab('overview');
       toast.success(`Accepted patient: ${visit.patientId?.firstName} ${visit.patientId?.lastName}`);
     } catch (error) {
       toast.error('Failed to accept patient');
@@ -435,7 +435,7 @@ export default function DoctorDashboard() {
       setSelectedVisit(null);
       const nextInQueue = waitingQueue.find((v: Visit) => v.status === 'in_queue');
       if (nextInQueue) {
-        handleAcceptPatient(nextInQueue);
+        await handleAcceptPatient(nextInQueue);
       }
     } catch (error) {
       toast.error('Failed to complete visit');
@@ -558,10 +558,7 @@ export default function DoctorDashboard() {
   const awaitingResults = dashboardData?.awaitingResults || [];
   const awaitingPharmacy = dashboardData?.awaitingPharmacy || [];
   const awaitingDispensing = dashboardData?.awaitingDispensing || [];
-  const awaitingDoctorReview = dashboardData?.awaitingDoctorReview || [];
-  const admittedPatients = dashboardData?.admittedPatients || [];
   const resultsReady = dashboardData?.resultsReady || [];
-  const incomingReferrals = dashboardData?.incomingReferrals || [];
   const openEncounterCount = activePatients.length;
 
   // Get the active visit for the doctor (if any)
@@ -759,267 +756,6 @@ export default function DoctorDashboard() {
 
       {/* Main Layout: Queue + Patient Panel */}
       <div className="grid grid-cols-1 gap-6 items-start">
-        {/* Left Panel: Patient Queue */}
-        <div className="hidden">
-          {/* Waiting Queue */}
-          <div className="bg-card border rounded-xl shadow-sm">
-            <button
-              type="button"
-              className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
-              onClick={() => toggleQueueSection('waiting')}
-            >
-              <h3 className="font-semibold text-sm flex items-center gap-2">
-                <Clock className="w-4 h-4 text-amber-500" />
-                Waiting Queue
-                {waitingQueue.length > 0 && <span className="h-2 w-2 rounded-full bg-amber-500" />}
-              </h3>
-              <span className="flex items-center gap-2">
-                <Badge variant="secondary">{waitingQueue.length}</Badge>
-                <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", !queueSectionsOpen.waiting && "-rotate-90")} />
-              </span>
-            </button>
-            {queueSectionsOpen.waiting && (
-            <ScrollArea className="h-[18rem]">
-              {waitingQueue.length === 0 ? (
-                <div className="p-6 text-center text-muted-foreground text-sm">
-                  No patients waiting
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {waitingQueue.map((visit: Visit) => (
-                    <div
-                      key={visit._id || visit.id}
-                      className={cn(
-                        "p-3 hover:bg-muted/50 cursor-pointer transition-colors",
-                        selectedVisit?._id === visit._id && "bg-primary/5 border-l-2 border-primary"
-                      )}
-                      onClick={() => setSelectedVisit(visit)}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="font-medium text-sm">{patientDisplayName(visit)}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {visit.visitNumber} - {visit.patientId?.patientId}
-                          </p>
-                          {visit.chiefComplaint && (
-                            <p className="text-xs text-muted-foreground mt-1 truncate max-w-48">
-                              {visit.chiefComplaint}
-                            </p>
-                          )}
-                        </div>
-                        {visit.status === 'in_queue' && (
-                          <Button
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAcceptPatient(visit);
-                            }}
-                            disabled={acceptPatient.isPending}
-                          >
-                            Accept
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-            )}
-          </div>
-
-          {/* My Open Encounters */}
-          <div className="bg-card border rounded-xl shadow-sm">
-            <button
-              type="button"
-              className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
-              onClick={() => toggleQueueSection('active')}
-            >
-              <h3 className="font-semibold text-sm flex items-center gap-2">
-                <Stethoscope className="w-4 h-4 text-blue-500" />
-                My Open Encounters
-                {activePatients.length > 0 && <span className="h-2 w-2 rounded-full bg-blue-500" />}
-              </h3>
-              <span className="flex items-center gap-2">
-                <Badge variant="secondary">{activePatients.length}</Badge>
-                <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", !queueSectionsOpen.active && "-rotate-90")} />
-              </span>
-            </button>
-            {queueSectionsOpen.active && (
-            <ScrollArea className="h-[20rem]">
-              {activePatients.length === 0 ? (
-                <div className="p-6 text-center text-muted-foreground text-sm">
-                  No open encounters
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {activePatients.map((visit: Visit) => (
-                    <button
-                      key={visit._id || visit.id}
-                      type="button"
-                      className={cn(
-                        "w-full p-3 text-left hover:bg-muted/50 transition-colors",
-                        selectedVisit?._id === visit._id && "bg-primary/5 border-l-2 border-primary"
-                      )}
-                      onClick={() => {
-                        setSelectedVisit(visit);
-                        if (visit.status === 'results_ready') setActiveTab('lab-results');
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="font-medium text-sm truncate">{patientDisplayName(visit)}</p>
-                          <p className="text-xs text-muted-foreground">{visit.visitNumber}</p>
-                          {visit.chiefComplaint && (
-                            <p className="text-xs text-muted-foreground mt-1 truncate max-w-48">
-                              {visit.chiefComplaint}
-                            </p>
-                          )}
-                        </div>
-                        <Badge
-                          variant="outline"
-                          className={cn(
-                            "capitalize shrink-0 text-[10px]",
-                            visit.status === 'results_ready' && "bg-green-50 text-green-700 border-green-200",
-                            visit.status === 'awaiting_results' && "bg-amber-50 text-amber-700 border-amber-200",
-                            visit.status === 'awaiting_lab' && "bg-orange-50 text-orange-700 border-orange-200",
-                            visit.status === 'awaiting_pharmacy' && "bg-purple-50 text-purple-700 border-purple-200",
-                            visit.status === 'awaiting_dispensing' && "bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200",
-                            visit.status === 'admitted' && "bg-blue-50 text-blue-700 border-blue-200"
-                          )}
-                        >
-                          {statusLabel(visit.status)}
-                        </Badge>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-            )}
-            {queueSectionsOpen.active && activePatients.length > 0 && (
-              <div className="px-4 py-3 border-t grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
-                <span>Lab pay: {awaitingLabPayment.length}</span>
-                <span>Results: {awaitingResults.length}</span>
-                <span>Pharmacy: {awaitingPharmacy.length + awaitingDispensing.length}</span>
-                <span>Review: {resultsReady.length + awaitingDoctorReview.length + admittedPatients.length}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Results Ready */}
-          {resultsReady.length > 0 && (
-            <div className="bg-card border rounded-xl shadow-sm border-l-4 border-l-green-500">
-              <button
-                type="button"
-                className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
-                onClick={() => toggleQueueSection('results')}
-              >
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-500" />
-                  Results Ready
-                  <span className="h-2 w-2 rounded-full bg-green-500" />
-                </h3>
-                <span className="flex items-center gap-2">
-                  <Badge variant="default" className="bg-green-500">{resultsReady.length}</Badge>
-                  <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", !queueSectionsOpen.results && "-rotate-90")} />
-                </span>
-              </button>
-              {queueSectionsOpen.results && (
-              <ScrollArea className="h-[14rem]">
-              <div className="divide-y">
-                {resultsReady.map((visit: Visit) => (
-                  <div
-                    key={visit._id || visit.id}
-                    className={cn(
-                      "p-3 hover:bg-muted/50 cursor-pointer transition-colors",
-                      selectedVisit?._id === visit._id && "bg-green-50"
-                    )}
-                    onClick={() => {
-                      setSelectedVisit(visit);
-                      setActiveTab('lab-results');
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-sm">{patientDisplayName(visit)}</p>
-                        <p className="text-xs text-muted-foreground">{visit.visitNumber}</p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-              </ScrollArea>
-              )}
-            </div>
-          )}
-
-          {/* Incoming Referrals (for specialists) */}
-          {incomingReferrals.length > 0 && (
-            <div className="bg-card border rounded-xl shadow-sm border-l-4 border-l-purple-500">
-              <button
-                type="button"
-                className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
-                onClick={() => toggleQueueSection('referrals')}
-              >
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <Inbox className="w-4 h-4 text-purple-500" />
-                  Incoming Referrals
-                  <span className="h-2 w-2 rounded-full bg-purple-500" />
-                </h3>
-                <span className="flex items-center gap-2">
-                  <Badge className="bg-purple-500">{incomingReferrals.length}</Badge>
-                  <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", !queueSectionsOpen.referrals && "-rotate-90")} />
-                </span>
-              </button>
-              {queueSectionsOpen.referrals && (
-              <ScrollArea className="h-[14rem]">
-              <div className="divide-y">
-                {incomingReferrals.map((visit: any) => (
-                  <div key={visit._id} className="p-3 hover:bg-muted/50 transition-colors">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="font-medium text-sm">{patientDisplayName(visit)}</p>
-                        <p className="text-xs text-muted-foreground">{visit.visitNumber}</p>
-                        {visit.doctorId && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Referred by: {visit.doctorId.fullName}
-                          </p>
-                        )}
-                        {visit.referralReason && (
-                          <p className="text-xs text-purple-700 mt-1 italic line-clamp-2">
-                            "{visit.referralReason}"
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-shrink-0"
-                        onClick={async () => {
-                          try {
-                            await acceptReferral.mutateAsync(visit._id);
-                            setSelectedVisit(visit);
-                            toast.success('Referral accepted');
-                          } catch {
-                            toast.error('Failed to accept referral');
-                          }
-                        }}
-                        disabled={acceptReferral.isPending}
-                      >
-                        Accept
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              </ScrollArea>
-              )}
-            </div>
-          )}
-        </div>
-
         {/* Right Panel: Active Patient Workspace */}
         <div className="min-w-0">
           {selectedVisit ? (
