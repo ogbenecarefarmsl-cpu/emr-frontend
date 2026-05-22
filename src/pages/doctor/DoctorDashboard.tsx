@@ -572,6 +572,22 @@ export default function DoctorDashboard() {
     setQueueSectionsOpen((current) => ({ ...current, [section]: !current[section] }));
   };
 
+  useEffect(() => {
+    const onOpenWorklist = (event: Event) => {
+      const customEvent = event as CustomEvent<{ section?: 'waiting' | 'active' }>;
+      const section = customEvent.detail?.section;
+      if (section === 'waiting') {
+        setQueueSectionsOpen((current) => ({ ...current, waiting: true }));
+      }
+      if (section === 'active') {
+        setQueueSectionsOpen((current) => ({ ...current, active: true }));
+      }
+      setWorklistOpen(true);
+    };
+    window.addEventListener('doctor-worklist:open', onOpenWorklist as EventListener);
+    return () => window.removeEventListener('doctor-worklist:open', onOpenWorklist as EventListener);
+  }, []);
+
   // Auto-select the active patient if available
   useEffect(() => {
     if (currentActiveVisit && !selectedVisit) {
@@ -1027,10 +1043,6 @@ export default function DoctorDashboard() {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                    <Button variant="outline" size="sm" onClick={() => setWorklistOpen(true)}>
-                      <Users className="w-3.5 h-3.5 mr-1.5" />
-                      Worklist
-                    </Button>
                     <Badge variant="outline">{selectedVisit.visitNumber}</Badge>
                     <Badge className={visitStatusTone(selectedVisit.status)}>
                       {statusLabel(selectedVisit.status)}
