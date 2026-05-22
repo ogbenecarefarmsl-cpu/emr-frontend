@@ -50,6 +50,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { to: '/admin/payments', icon: CreditCard, label: 'Billing & Payments' },
     { to: '/inventory', icon: Package, label: 'Inventory Status' },
     { to: '/admin/doctors', icon: UserRoundCog, label: 'Doctors' },
+    { to: '/admin/management-kpis', icon: BarChart3, label: 'Management KPIs' },
     { to: '/admin/reports', icon: BarChart3, label: 'Revenue Reports' },
     { to: '/admin/daily-report', icon: FileBarChart, label: 'Daily Summary' },
     { to: '/admin/reconciliation', icon: Calculator, label: 'Cash Reconciliation' },

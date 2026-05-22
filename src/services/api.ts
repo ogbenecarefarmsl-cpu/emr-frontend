@@ -1087,6 +1087,10 @@ export const adminAPI = {
     const response = await api.get('/admin/dashboard', { params: date ? { date } : {} });
     return response.data;
   },
+  getManagementKpis: async (startDate?: string, endDate?: string) => {
+    const response = await api.get('/admin/management-kpis', { params: { startDate, endDate } });
+    return response.data;
+  },
   getRevenueReport: async (startDate: string, endDate: string) => {
     const response = await api.get('/admin/revenue', { params: { startDate, endDate } });
     return response.data;

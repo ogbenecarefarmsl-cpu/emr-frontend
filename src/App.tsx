@@ -61,6 +61,7 @@ import PrinterSettings from "./pages/admin/PrinterSettings";
 import DoctorsPage from "./pages/admin/DoctorsPage";
 import RoomsPage from "./pages/admin/RoomsPage";
 import ConnectionSettings from "./pages/admin/ConnectionSettings";
+import ManagementKpisPage from "./pages/admin/ManagementKpisPage";
 
 // Doctor Pages
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
@@ -299,6 +300,9 @@ function AppRoutes() {
       } />
       <Route path="/admin/doctor-referral-report" element={
         <RoleGuard allowedRoles={['admin']}><DoctorReferralReport /></RoleGuard>
+      } />
+      <Route path="/admin/management-kpis" element={
+        <RoleGuard allowedRoles={['admin']}><ManagementKpisPage /></RoleGuard>
       } />
       <Route path="/reception/doctor-referral-report" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><DoctorReferralReport /></RoleGuard>
