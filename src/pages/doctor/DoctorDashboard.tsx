@@ -25,6 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 // Dashboard components
 import { MetricCard } from '@/components/dashboard/MetricCard';
@@ -38,7 +39,7 @@ import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
 // Icons
 import {
   Loader2, Clock, CheckCircle, User, Stethoscope, FileText, FlaskConical, Pill,
-  ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save, Maximize2, Minimize2,
+  ChevronRight, ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
   Send, Heart, Users, ClipboardList, UserCheck, BedDouble, Inbox, ExternalLink, Activity
 } from 'lucide-react';
 
@@ -177,7 +178,7 @@ export default function DoctorDashboard() {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [activeTab, setActiveTab] = useState('overview');
   const [historyTab, setHistoryTab] = useState('visits');
-  const [focusMode, setFocusMode] = useState(false);
+  const [worklistOpen, setWorklistOpen] = useState(false);
   const [queueSectionsOpen, setQueueSectionsOpen] = useState({
     waiting: true,
     active: true,
@@ -617,13 +618,133 @@ export default function DoctorDashboard() {
         />
       </div>
 
+      <Sheet open={worklistOpen} onOpenChange={setWorklistOpen}>
+        <SheetContent side="right" className="w-[420px] sm:w-[460px] p-0 overflow-y-auto">
+          <SheetHeader className="px-4 py-4 border-b">
+            <SheetTitle>Doctor Worklist</SheetTitle>
+            <SheetDescription>Waiting queue and active encounters.</SheetDescription>
+          </SheetHeader>
+          <div className="p-4 space-y-4">
+            <div className="bg-card border rounded-xl shadow-sm">
+              <button
+                type="button"
+                className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+                onClick={() => toggleQueueSection('waiting')}
+              >
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-500" />
+                  Waiting Queue
+                  {waitingQueue.length > 0 && <span className="h-2 w-2 rounded-full bg-amber-500" />}
+                </h3>
+                <span className="flex items-center gap-2">
+                  <Badge variant="secondary">{waitingQueue.length}</Badge>
+                  <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", !queueSectionsOpen.waiting && "-rotate-90")} />
+                </span>
+              </button>
+              {queueSectionsOpen.waiting && (
+                <ScrollArea className="h-[18rem]">
+                  {waitingQueue.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground text-sm">No patients waiting</div>
+                  ) : (
+                    <div className="divide-y">
+                      {waitingQueue.map((visit: Visit) => (
+                        <div
+                          key={visit._id || visit.id}
+                          className={cn(
+                            "p-3 hover:bg-muted/50 cursor-pointer transition-colors",
+                            selectedVisit?._id === visit._id && "bg-primary/5 border-l-2 border-primary"
+                          )}
+                          onClick={() => {
+                            setSelectedVisit(visit);
+                            setWorklistOpen(false);
+                          }}
+                        >
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="font-medium text-sm">{patientDisplayName(visit)}</p>
+                              <p className="text-xs text-muted-foreground">{visit.visitNumber} - {visit.patientId?.patientId}</p>
+                            </div>
+                            {visit.status === 'in_queue' && (
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAcceptPatient(visit);
+                                }}
+                                disabled={acceptPatient.isPending}
+                              >
+                                Accept
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              )}
+            </div>
+
+            <div className="bg-card border rounded-xl shadow-sm">
+              <button
+                type="button"
+                className="w-full px-4 py-3 border-b flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+                onClick={() => toggleQueueSection('active')}
+              >
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Stethoscope className="w-4 h-4 text-blue-500" />
+                  My Open Encounters
+                  {activePatients.length > 0 && <span className="h-2 w-2 rounded-full bg-blue-500" />}
+                </h3>
+                <span className="flex items-center gap-2">
+                  <Badge variant="secondary">{activePatients.length}</Badge>
+                  <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", !queueSectionsOpen.active && "-rotate-90")} />
+                </span>
+              </button>
+              {queueSectionsOpen.active && (
+                <ScrollArea className="h-[22rem]">
+                  {activePatients.length === 0 ? (
+                    <div className="p-6 text-center text-muted-foreground text-sm">No open encounters</div>
+                  ) : (
+                    <div className="divide-y">
+                      {activePatients.map((visit: Visit) => (
+                        <button
+                          key={visit._id || visit.id}
+                          type="button"
+                          className={cn(
+                            "w-full p-3 text-left hover:bg-muted/50 transition-colors",
+                            selectedVisit?._id === visit._id && "bg-primary/5 border-l-2 border-primary"
+                          )}
+                          onClick={() => {
+                            setSelectedVisit(visit);
+                            if (visit.status === 'results_ready') setActiveTab('lab-results');
+                            setWorklistOpen(false);
+                          }}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-medium text-sm truncate">{patientDisplayName(visit)}</p>
+                              <p className="text-xs text-muted-foreground">{visit.visitNumber}</p>
+                            </div>
+                            <Badge variant="outline" className="capitalize shrink-0 text-[10px]">
+                              {statusLabel(visit.status)}
+                            </Badge>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* Main Layout: Queue + Patient Panel */}
-      <div className={cn(
-        "grid grid-cols-1 gap-6 items-start",
-        focusMode ? "xl:grid-cols-1" : "xl:grid-cols-[320px_minmax(0,1fr)]"
-      )}>
+      <div className="grid grid-cols-1 gap-6 items-start">
         {/* Left Panel: Patient Queue */}
-        <div className={cn("space-y-4 xl:sticky xl:top-4", focusMode && "hidden")}>
+        <div className="hidden">
           {/* Waiting Queue */}
           <div className="bg-card border rounded-xl shadow-sm">
             <button
@@ -906,22 +1027,9 @@ export default function DoctorDashboard() {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setFocusMode((current) => !current)}
-                    >
-                      {focusMode ? (
-                        <>
-                          <Minimize2 className="w-3.5 h-3.5 mr-1.5" />
-                          Exit Focus
-                        </>
-                      ) : (
-                        <>
-                          <Maximize2 className="w-3.5 h-3.5 mr-1.5" />
-                          Focus View
-                        </>
-                      )}
+                    <Button variant="outline" size="sm" onClick={() => setWorklistOpen(true)}>
+                      <Users className="w-3.5 h-3.5 mr-1.5" />
+                      Worklist
                     </Button>
                     <Badge variant="outline">{selectedVisit.visitNumber}</Badge>
                     <Badge className={visitStatusTone(selectedVisit.status)}>
