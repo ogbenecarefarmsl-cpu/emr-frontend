@@ -1,34 +1,55 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Activity, TrendingUp } from 'lucide-react';
 
+type VitalSigns = {
+  bloodPressure?: string;
+  temperature?: number;
+  heartRate?: number;
+  respiratoryRate?: number;
+  weight?: number;
+  height?: number;
+  oxygenSaturation?: number;
+  bmi?: number;
+};
+
+type VitalsReading = VitalSigns & {
+  date: string | Date;
+  source?: string;
+  recordedBy?: any;
+  vitalSigns?: VitalSigns;
+};
+
 interface VitalsTrendsProps {
-  vitalsHistory?: Array<{
-    date: string | Date;
-    vitalSigns?: {
-      bloodPressure?: string;
-      temperature?: number;
-      heartRate?: number;
-      respiratoryRate?: number;
-      weight?: number;
-      height?: number;
-      oxygenSaturation?: number;
-      bmi?: number;
-    };
-  }>;
+  vitalsHistory?: VitalsReading[];
 }
 
 export function VitalsTrends({ vitalsHistory = [] }: VitalsTrendsProps) {
   if (vitalsHistory.length === 0) return null;
 
-  const sorted = [...vitalsHistory].sort((a, b) =>
-    new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  const normalizeReading = (reading: VitalsReading) => ({
+    ...reading,
+    vitalSigns: {
+      ...(reading.vitalSigns || {}),
+      bloodPressure: reading.vitalSigns?.bloodPressure ?? reading.bloodPressure,
+      temperature: reading.vitalSigns?.temperature ?? reading.temperature,
+      heartRate: reading.vitalSigns?.heartRate ?? reading.heartRate,
+      respiratoryRate: reading.vitalSigns?.respiratoryRate ?? reading.respiratoryRate,
+      weight: reading.vitalSigns?.weight ?? reading.weight,
+      height: reading.vitalSigns?.height ?? reading.height,
+      oxygenSaturation: reading.vitalSigns?.oxygenSaturation ?? reading.oxygenSaturation,
+      bmi: reading.vitalSigns?.bmi ?? reading.bmi,
+    },
+  });
+
+  const sorted = [...vitalsHistory]
+    .map(normalizeReading)
+    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   const latest = sorted[0]?.vitalSigns || {};
   const previous = sorted[1]?.vitalSigns || {};
 
   const getTrend = (current?: number, prev?: number) => {
-    if (!current || !prev) return null;
+    if (current == null || prev == null) return null;
     if (current > prev) return 'up';
     if (current < prev) return 'down';
     return 'stable';
@@ -38,8 +59,8 @@ export function VitalsTrends({ vitalsHistory = [] }: VitalsTrendsProps) {
     const trend = getTrend(value, prev);
     if (!trend || trend === 'stable') return null;
     return (
-      <span className={`text-xs ${trend === 'up' ? 'text-red-500' : 'text-green-500'}`}>
-        {trend === 'up' ? '↑' : '↓'}
+      <span className={`text-[10px] font-medium ${trend === 'up' ? 'text-red-500' : 'text-green-500'}`}>
+        {trend}
       </span>
     );
   };
@@ -49,24 +70,24 @@ export function VitalsTrends({ vitalsHistory = [] }: VitalsTrendsProps) {
       <CardHeader className="pb-3">
         <CardTitle className="text-sm flex items-center gap-2">
           <Activity className="w-4 h-4 text-blue-500" />
-          Vitals Trends
+          Vitals Trend
         </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             { label: 'BP', value: latest.bloodPressure, unit: '', prev: previous.bloodPressure },
-            { label: 'Temp', value: latest.temperature, unit: '°C', prev: previous.temperature },
-            { label: 'HR', value: latest.heartRate, unit: 'bpm', prev: previous.heartRate },
+            { label: 'Temp', value: latest.temperature, unit: ' C', prev: previous.temperature },
+            { label: 'HR', value: latest.heartRate, unit: ' bpm', prev: previous.heartRate },
             { label: 'RR', value: latest.respiratoryRate, unit: '/min', prev: previous.respiratoryRate },
-            { label: 'Weight', value: latest.weight, unit: 'kg', prev: previous.weight },
+            { label: 'Weight', value: latest.weight, unit: ' kg', prev: previous.weight },
             { label: 'SpO2', value: latest.oxygenSaturation, unit: '%', prev: previous.oxygenSaturation },
           ].map((vital) => (
             <div key={vital.label} className="p-3 bg-muted/30 rounded-lg border">
               <p className="text-xs text-muted-foreground">{vital.label}</p>
               <div className="flex items-center gap-1 mt-1">
                 <p className="text-lg font-semibold">
-                  {vital.value !== undefined && vital.value !== null ? `${vital.value}${vital.unit}` : '—'}
+                  {vital.value !== undefined && vital.value !== null ? `${vital.value}${vital.unit}` : '-'}
                 </p>
                 {typeof vital.value === 'number' && typeof vital.prev === 'number' && (
                   <TrendArrow value={vital.value} prev={vital.prev} />
@@ -87,6 +108,7 @@ export function VitalsTrends({ vitalsHistory = [] }: VitalsTrendsProps) {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left py-1.5 px-2 font-medium text-muted-foreground">Date</th>
+                    <th className="text-left py-1.5 px-2 font-medium text-muted-foreground">Source</th>
                     <th className="text-left py-1.5 px-2 font-medium text-muted-foreground">BP</th>
                     <th className="text-left py-1.5 px-2 font-medium text-muted-foreground">Temp</th>
                     <th className="text-left py-1.5 px-2 font-medium text-muted-foreground">HR</th>
@@ -95,14 +117,15 @@ export function VitalsTrends({ vitalsHistory = [] }: VitalsTrendsProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {sorted.slice(0, 5).map((v, idx) => (
+                  {sorted.slice(0, 5).map((reading, idx) => (
                     <tr key={idx} className="border-b last:border-b-0">
-                      <td className="py-1.5 px-2">{new Date(v.date).toLocaleDateString()}</td>
-                      <td className="py-1.5 px-2">{v.vitalSigns?.bloodPressure || '—'}</td>
-                      <td className="py-1.5 px-2">{v.vitalSigns?.temperature ? `${v.vitalSigns.temperature}°` : '—'}</td>
-                      <td className="py-1.5 px-2">{v.vitalSigns?.heartRate || '—'}</td>
-                      <td className="py-1.5 px-2">{v.vitalSigns?.weight ? `${v.vitalSigns.weight}kg` : '—'}</td>
-                      <td className="py-1.5 px-2">{v.vitalSigns?.oxygenSaturation ? `${v.vitalSigns.oxygenSaturation}%` : '—'}</td>
+                      <td className="py-1.5 px-2">{new Date(reading.date).toLocaleDateString()}</td>
+                      <td className="py-1.5 px-2 capitalize">{reading.source || 'clinical'}</td>
+                      <td className="py-1.5 px-2">{reading.vitalSigns?.bloodPressure || '-'}</td>
+                      <td className="py-1.5 px-2">{reading.vitalSigns?.temperature != null ? `${reading.vitalSigns.temperature} C` : '-'}</td>
+                      <td className="py-1.5 px-2">{reading.vitalSigns?.heartRate ?? '-'}</td>
+                      <td className="py-1.5 px-2">{reading.vitalSigns?.weight != null ? `${reading.vitalSigns.weight} kg` : '-'}</td>
+                      <td className="py-1.5 px-2">{reading.vitalSigns?.oxygenSaturation != null ? `${reading.vitalSigns.oxygenSaturation}%` : '-'}</td>
                     </tr>
                   ))}
                 </tbody>

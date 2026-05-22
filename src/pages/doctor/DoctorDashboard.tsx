@@ -282,7 +282,7 @@ export default function DoctorDashboard() {
   const { data: patientChart, isLoading: chartLoading } = useQuery({
     queryKey: ['patient-chart', patientId],
     queryFn: () => patientService.getChart(patientId),
-    enabled: !!patientId && activeTab === 'history',
+    enabled: !!patientId,
     staleTime: 60 * 1000,
   });
 
