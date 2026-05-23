@@ -73,6 +73,12 @@ function normalizeOrder(order: any): OrderWithDetails {
     balance: order.balance ?? ((order.total ?? order.totalAmount ?? 0) - (order.amountPaid ?? order.paidAmount ?? 0)),
     paymentStatus: order.paymentStatus || order.payment_status,
     paymentMethod: order.paymentMethod || order.payment_method,
+    lisExternalRequestId: order.lisExternalRequestId,
+    lisOrderNumber: order.lisOrderNumber,
+    lisSyncStatus: order.lisSyncStatus,
+    lisSyncError: order.lisSyncError,
+    lisSyncedAt: order.lisSyncedAt,
+    lisResultsFetchedAt: order.lisResultsFetchedAt,
     createdAt: order.createdAt || order.created_at,
     updatedAt: order.updatedAt || order.updated_at,
   };
@@ -98,6 +104,12 @@ interface Order {
   notes?: string;
   referredByDoctor?: string;
   doctorId?: string | { _id: string; fullName: string; phone?: string; facility?: string };
+  lisExternalRequestId?: string;
+  lisOrderNumber?: string;
+  lisSyncStatus?: 'not_synced' | 'synced' | 'failed';
+  lisSyncError?: string;
+  lisSyncedAt?: string;
+  lisResultsFetchedAt?: string;
   createdAt: string;
   updatedAt?: string;
 }

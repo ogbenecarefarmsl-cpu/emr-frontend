@@ -1,19 +1,21 @@
 import { useState } from 'react';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOrders, useDeleteOrder } from '@/hooks/useOrders';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Search, CreditCard, Loader2, Eye, Trash2, FlaskConical, Pill, Stethoscope, ClipboardList, BedDouble, ReceiptText } from 'lucide-react';
+import { Search, CreditCard, Loader2, Eye, Trash2, FlaskConical, Pill, Stethoscope, ClipboardList, BedDouble, ReceiptText, RefreshCw, Cloud } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { OrderWithDetails } from '@/hooks/useOrders';
 import { getPatientName, getGroupedTestsByPanel, getPanelTestCount } from '@/utils/orderHelpers';
 import { PaymentDialog } from '@/components/orders/PaymentDialog';
 import { toast } from 'sonner';
+import { ordersAPI } from '@/services/api';
 
 export default function OrdersPage() {
   const { profile, primaryRole } = useAuth();
@@ -32,6 +34,15 @@ export default function OrdersPage() {
   
   const { data: orders, isLoading } = useOrders(statusFilter as any);
   const deleteOrder = useDeleteOrder();
+  const queryClient = useQueryClient();
+  const syncToLis = useMutation({
+    mutationFn: (orderId: string) => ordersAPI.syncToLis(orderId),
+    onSuccess: () => {
+      toast.success('Order synced to LIS');
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: () => toast.error('Failed to sync order to LIS'),
+  });
 
   const handleDeleteOrder = async () => {
     if (!deleteConfirmId) return;
@@ -53,13 +64,15 @@ export default function OrdersPage() {
     const lastName = (order.patientId?.lastName || order.patients?.last_name || '').toLowerCase();
     const patientId = (order.patientId?.patientId || order.patients?.patient_id || '').toLowerCase();
     const orderType = (order.orderType || '').toLowerCase();
+    const lisOrderNumber = (order.lisOrderNumber || '').toLowerCase();
     
     return (
       orderNum.includes(search) ||
       firstName.includes(search) ||
       lastName.includes(search) ||
       patientId.includes(search) ||
-      orderType.includes(search)
+      orderType.includes(search) ||
+      lisOrderNumber.includes(search)
     );
   }) : [];
 
@@ -154,6 +167,24 @@ export default function OrdersPage() {
     return order.status?.replace(/_/g, ' ') || 'Pending';
   };
 
+  const getLisBadge = (order: any) => {
+    if ((order.orderType || 'lab') !== 'lab') return null;
+    const status = order.lisSyncStatus || 'not_synced';
+    const className =
+      status === 'synced'
+        ? 'bg-status-normal/10 text-status-normal border-status-normal/20'
+        : status === 'failed'
+          ? 'bg-status-critical/10 text-status-critical border-status-critical/20'
+          : 'bg-muted text-muted-foreground border-muted';
+
+    return (
+      <Badge variant="outline" className={cn('gap-1', className)} title={order.lisSyncError || undefined}>
+        <Cloud className="w-3 h-3" />
+        LIS {status.replace('_', ' ')}
+      </Badge>
+    );
+  };
+
   return (
     <RoleLayout 
       title="Clinical Orders" 
@@ -239,6 +270,7 @@ export default function OrdersPage() {
                 <th>Priority</th>
                 <th>Payment</th>
                 <th>Department Status</th>
+                <th>LIS</th>
                 <th>Created</th>
                 <th>Actions</th>
               </tr>
@@ -291,6 +323,14 @@ export default function OrdersPage() {
                       {getDestinationLabel(order)}
                     </Badge>
                   </td>
+                  <td>
+                    <div className="space-y-1">
+                      {getLisBadge(order)}
+                      {order.lisOrderNumber && (
+                        <p className="text-xs text-muted-foreground font-mono">{order.lisOrderNumber}</p>
+                      )}
+                    </div>
+                  </td>
                   <td className="text-muted-foreground text-sm">
                     {format(new Date(order.createdAt || order.created_at), 'MMM dd, HH:mm')}
                   </td>
@@ -325,13 +365,24 @@ export default function OrdersPage() {
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       )}
+                      {(order.orderType || 'lab') === 'lab' && order.lisSyncStatus !== 'synced' && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => syncToLis.mutate(order.id || (order as any)._id)}
+                          disabled={syncToLis.isPending}
+                          title={order.lisSyncError || 'Sync to LIS'}
+                        >
+                          <RefreshCw className={cn('w-4 h-4', syncToLis.isPending && 'animate-spin')} />
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
               )})}
               {(!paginatedOrders || paginatedOrders.length === 0) && (
                 <tr>
-                  <td colSpan={10} className="text-center py-8 text-muted-foreground">
+                  <td colSpan={11} className="text-center py-8 text-muted-foreground">
                     No clinical orders found
                   </td>
                 </tr>

@@ -330,6 +330,16 @@ export const ordersAPI = {
     return response.data;
   },
 
+  syncToLis: async (id: string) => {
+    const response = await api.post(`/orders/${id}/sync-lis`);
+    return response.data;
+  },
+
+  fetchLisResults: async (id: string) => {
+    const response = await api.post(`/orders/${id}/fetch-lis-results`);
+    return response.data;
+  },
+
   addPayment: async (id: string, data: { amount: number; paymentMethod: string; notes?: string }) => {
     const response = await api.post(`/orders/${id}/payment`, data);
     return response.data;

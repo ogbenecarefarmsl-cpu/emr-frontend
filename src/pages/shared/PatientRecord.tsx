@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { patientService } from '@/services/patientService';
+import { ordersAPI } from '@/services/api';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
@@ -9,18 +10,29 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical, Clock, AlertTriangle, ChevronDown, ChevronRight, Calendar, TrendingUp, Droplets, ExternalLink } from 'lucide-react';
+import { Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical, Clock, AlertTriangle, ChevronDown, Calendar, Droplets, ExternalLink, RefreshCw, Cloud } from 'lucide-react';
+import { toast } from 'sonner';
 
 const PatientRecord = () => {
   const { patientId } = useParams();
   const navigate = useNavigate();
   const { primaryRole, profile } = useAuth();
   const layoutRole = primaryRole || 'doctor';
+  const queryClient = useQueryClient();
 
   const { data: chart, isLoading: chartLoading } = useQuery({
     queryKey: ['patient-chart', patientId],
     queryFn: () => patientService.getChart(patientId!),
     enabled: !!patientId,
+  });
+
+  const fetchLisResults = useMutation({
+    mutationFn: (orderId: string) => ordersAPI.fetchLisResults(orderId),
+    onSuccess: (data) => {
+      toast.success(`Imported ${data.imported || 0} LIS result${data.imported === 1 ? '' : 's'}`);
+      queryClient.invalidateQueries({ queryKey: ['patient-chart', patientId] });
+    },
+    onError: () => toast.error('Could not fetch LIS results'),
   });
 
   if (chartLoading) {
@@ -81,6 +93,23 @@ const PatientRecord = () => {
     };
     const config = statusMap[status] || { variant: 'outline' as const, label: status };
     return <Badge variant={config.variant}>{config.label}</Badge>;
+  };
+
+  const getLisBadge = (order: any) => {
+    if (!order.lisSyncStatus) return null;
+    const className =
+      order.lisSyncStatus === 'synced'
+        ? 'bg-green-50 text-green-700 border-green-200'
+        : order.lisSyncStatus === 'failed'
+          ? 'bg-red-50 text-red-700 border-red-200'
+          : 'bg-muted text-muted-foreground border-border';
+
+    return (
+      <Badge variant="outline" className={`gap-1 ${className}`} title={order.lisSyncError || undefined}>
+        <Cloud className="w-3 h-3" />
+        LIS {String(order.lisSyncStatus).replace('_', ' ')}
+      </Badge>
+    );
   };
 
   const groupResultsByPanel = (order: any) => {
@@ -317,6 +346,20 @@ const PatientRecord = () => {
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusBadge(order.status)}
+                          {getLisBadge(order)}
+                          {order.lisSyncStatus === 'synced' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 text-xs gap-1"
+                              onClick={() => fetchLisResults.mutate(order._id)}
+                              disabled={fetchLisResults.isPending}
+                              title={order.lisResultsFetchedAt ? `Last fetched ${formatDate(order.lisResultsFetchedAt)}` : 'Fetch LIS results'}
+                            >
+                              <RefreshCw className={`w-3 h-3 ${fetchLisResults.isPending ? 'animate-spin' : ''}`} />
+                              Sync Results
+                            </Button>
+                          )}
                           {order.status === 'completed' && (
                             <Button
                               variant="outline"
