@@ -981,26 +981,6 @@ export const visitsAPI = {
     return response.data;
   },
 
-  orderLab: async (id: string) => {
-    const response = await api.patch(`/visits/${id}/order-lab`);
-    return response.data;
-  },
-
-  prescribeMedication: async (id: string) => {
-    const response = await api.patch(`/visits/${id}/prescribe`);
-    return response.data;
-  },
-
-  markLabPaid: async (id: string) => {
-    const response = await api.patch(`/visits/${id}/mark-lab-paid`);
-    return response.data;
-  },
-
-  markPharmacyPaid: async (id: string) => {
-    const response = await api.patch(`/visits/${id}/mark-pharmacy-paid`);
-    return response.data;
-  },
-
   resultsReleased: async (id: string) => {
     const response = await api.patch(`/visits/${id}/results-released`);
     return response.data;

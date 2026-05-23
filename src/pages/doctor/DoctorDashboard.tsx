@@ -633,7 +633,7 @@ export default function DoctorDashboard() {
   return (
     <RoleLayout title="Doctor Workbench" subtitle="Queues, active encounters, SOAP notes, orders and patient history" role="doctor" userName={profile?.fullName}>
       {/* Metrics Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
         <MetricCard
           title="Waiting in Queue"
           value={stats.waiting}
@@ -813,16 +813,16 @@ export default function DoctorDashboard() {
                     </Badge>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 mt-5">
                   {[
                     { label: 'Visit type', value: selectedVisit.visitType || 'General' },
                     { label: 'Category', value: selectedPatient.patientCategory || selectedPatient.category || 'Private' },
                     { label: 'Wallet', value: `NGN ${selectedWalletBalance.toLocaleString()}` },
                     { label: 'Triage', value: selectedVisit.triagePriority ? statusLabel(selectedVisit.triagePriority) : 'Not recorded' },
                   ].map((item) => (
-                    <div key={item.label} className="rounded-lg border bg-background/80 px-3 py-2">
+                    <div key={item.label} className="rounded-lg border bg-background/80 px-3 py-2 min-w-0">
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{item.label}</p>
-                      <p className="text-sm font-medium truncate">{item.value}</p>
+                      <p className="text-sm font-medium leading-snug break-words">{item.value}</p>
                     </div>
                   ))}
                 </div>
@@ -847,14 +847,14 @@ export default function DoctorDashboard() {
 
                 {/* Overview Tab */}
                 <TabsContent value="overview" className="p-5 mt-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     {/* Vitals Card */}
                     <div className="border rounded-lg p-4">
                       <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                         <Heart className="w-4 h-4 text-red-500" />
                         Vitals
                       </h3>
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {[
                           { label: 'Temperature (°C)', value: vitalsForm.temperature, icon: '🌡' },
                           { label: 'Blood Pressure', value: vitalsForm.bloodPressure, icon: '❤' },
@@ -863,9 +863,9 @@ export default function DoctorDashboard() {
                           { label: 'Weight (kg)', value: vitalsForm.weight, icon: '⚖' },
                           { label: 'SpO2 (%)', value: vitalsForm.oxygenSaturation, icon: '🔵' },
                         ].map((vital) => (
-                          <div key={vital.label} className="p-2 rounded-lg bg-muted/50 border">
+                          <div key={vital.label} className="p-2 rounded-lg bg-muted/50 border min-w-0">
                             <div className="text-xs text-muted-foreground">{vital.label}</div>
-                            <div className="text-sm font-medium mt-0.5">{vital.value || '—'}</div>
+                            <div className="text-sm font-medium mt-0.5 break-words">{vital.value || '-'}</div>
                           </div>
                         ))}
                       </div>
@@ -955,7 +955,7 @@ export default function DoctorDashboard() {
                 </TabsContent>
 
                 {/* Orders & Plan Tab */}
-                <TabsContent value="orders" className="p-6 mt-0">
+                <TabsContent value="orders" className="p-5 md:p-6 mt-0">
                   {closureBlockers.length > 0 && (
                     <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
                       <p className="text-xs font-semibold text-amber-800">Closure readiness</p>
@@ -966,7 +966,7 @@ export default function DoctorDashboard() {
                       </ul>
                     </div>
                   )}
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     <Button
                       variant="outline"
                       className="h-auto justify-start p-4"
