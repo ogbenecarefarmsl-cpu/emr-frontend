@@ -335,6 +335,16 @@ export const ordersAPI = {
     return response.data;
   },
 
+  getLisCatalog: async () => {
+    const response = await api.get('/orders/lis-catalog');
+    return response.data;
+  },
+
+  syncLisPayment: async (id: string) => {
+    const response = await api.post(`/orders/${id}/sync-lis-payment`);
+    return response.data;
+  },
+
   fetchLisResults: async (id: string) => {
     const response = await api.post(`/orders/${id}/fetch-lis-results`);
     return response.data;

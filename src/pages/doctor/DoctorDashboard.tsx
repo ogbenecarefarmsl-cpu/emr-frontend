@@ -11,7 +11,6 @@ import { soapNoteService } from '@/services/soapNoteService';
 import { patientService } from '@/services/patientService';
 import { SoapNoteTypeEnum } from '@/types/soap-note';
 import { useDoctorDashboard, useAcceptPatient, useUpdateVisit, useCompleteVisit, usePatientVisits, useReferToSpecialist } from '@/hooks/useVisits';
-import { useActiveTests } from '@/hooks/useTestCatalog';
 import { useResults } from '@/hooks/useResults';
 
 // UI Components
@@ -261,8 +260,12 @@ export default function DoctorDashboard() {
     diagnosis: '',
   });
 
-  // Fetch active tests for lab order modal
-  const { data: tests = [] } = useActiveTests();
+  // Fetch LIS orderables for lab order modal (LIS is source of truth).
+  const { data: tests = [] } = useQuery({
+    queryKey: ['orders', 'lis-catalog'],
+    queryFn: () => ordersAPI.getLisCatalog(),
+    staleTime: 60 * 1000,
+  });
 
   // Fetch medications for prescription modal
   const { data: medications = [] } = useQuery({
