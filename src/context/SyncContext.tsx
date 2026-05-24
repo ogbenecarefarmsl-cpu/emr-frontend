@@ -26,6 +26,11 @@ import { getConfiguredApiBaseUrl, joinApiUrl } from '@/services/apiUrl';
 
 const API_BASE_URL = getConfiguredApiBaseUrl();
 
+const isSecurePage = () =>
+  typeof window !== 'undefined' && window.location.protocol === 'https:';
+
+const isInsecureTarget = (url: string) => isSecurePage() && /^http:\/\//i.test(url);
+
 // ── Types ────────────────────────────────────────────────────────
 export type ConnectionMode = 'online' | 'lan-only' | 'offline';
 
@@ -123,20 +128,22 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     };
 
     // 1. Try the configured API URL
-    try {
-      await axios.get(joinApiUrl(API_BASE_URL, '/health'), requestConfig);
-      setIsApiReachable(true);
-      setConnectionMode('online');
-      return true;
-    } catch {
-      // configured URL failed
+    if (!isInsecureTarget(API_BASE_URL)) {
+      try {
+        await axios.get(joinApiUrl(API_BASE_URL, '/health'), requestConfig);
+        setIsApiReachable(true);
+        setConnectionMode('online');
+        return true;
+      } catch {
+        // configured URL failed
+      }
     }
 
     // 2. In Electron, try LAN discovery
     if (window.electronAPI?.discoverBackend) {
       try {
         const result = await window.electronAPI.discoverBackend();
-        if (result?.url) {
+        if (result?.url && !isInsecureTarget(result.url)) {
           // Verify the discovered URL actually works
           await axios.get(joinApiUrl(result.url, '/health'), {
             ...requestConfig,
@@ -387,6 +394,9 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     }
     // In browser mode, just try hitting /health
     try {
+      if (isInsecureTarget(url)) {
+        return 'Cannot use HTTP backend from HTTPS app. Use an HTTPS backend URL.';
+      }
       await axios.get(joinApiUrl(url, '/health'), { timeout: 3000 });
       setLanBackendUrl(url);
       setIsApiReachable(true);
