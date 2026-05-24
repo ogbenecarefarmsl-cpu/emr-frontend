@@ -13,6 +13,26 @@ function parseStoolValue(value: string): { label: string; val: string }[] | null
   return pairs.length >= 2 ? pairs : null;
 }
 
+const PANEL_RESULT_ORDER: Record<string, string[]> = {
+  FBC: [
+    'WBC', 'NEUTA', 'LYMPHA', 'MONOA', 'EOSA', 'BASOA',
+    'RBC', 'HB', 'HCT', 'MCV', 'MCH', 'MCHC', 'RDWCV', 'RDWSD',
+    'PLT', 'MPV', 'PDW', 'PLTCT', 'PLCC', 'PLCR',
+  ],
+  ELEC: ['K', 'NA', 'CL', 'ICA', 'NCA', 'TCA', 'TCO2', 'PH'],
+};
+
+function orderPanelResults<T extends { testCode?: string }>(panelCode: string | undefined, results: T[]): T[] {
+  const order = PANEL_RESULT_ORDER[(panelCode || '').toUpperCase()];
+  if (!order) return results;
+
+  return [...results].sort((a, b) => {
+    const aIndex = order.indexOf((a.testCode || '').toUpperCase());
+    const bIndex = order.indexOf((b.testCode || '').toUpperCase());
+    return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+  });
+}
+
 interface PaginatedCategorySectionProps {
   pageCategory: PageCategory;
   template?: ReportTemplate;
@@ -60,16 +80,17 @@ export function PaginatedCategorySection({ pageCategory, template }: PaginatedCa
 
       {/* Render each panel */}
       {pageCategory.panels.map((panel, panelIndex) => {
+        const orderedResults = orderPanelResults(panel.panelCode, panel.results);
         const panelTitle = panel.panelName || panel.panelCode;
         const showPanelHeader = Boolean(panelTitle);
 
         // Check if tests have subcategories (e.g., urinalysis)
-        const hasSubcategories = panel.results.some(r => r.subcategory);
+        const hasSubcategories = orderedResults.some(r => r.subcategory);
         
         // Group results by subcategory if they exist
-        const subcategoryMap = new Map<string, typeof panel.results>();
+        const subcategoryMap = new Map<string, typeof orderedResults>();
         if (hasSubcategories) {
-          for (const result of panel.results) {
+          for (const result of orderedResults) {
             const subcategory = result.subcategory || 'Other';
             if (!subcategoryMap.has(subcategory)) {
               subcategoryMap.set(subcategory, []);
@@ -300,14 +321,6 @@ export function PaginatedCategorySection({ pageCategory, template }: PaginatedCa
                 ) : (
                   // Render results without subcategory grouping
                   (() => {
-                    const ELEC_ORDER = ['K', 'NA', 'CL', 'ICA', 'NCA', 'TCA', 'TCO2', 'PH'];
-                    const orderedResults = panel.panelCode === 'ELEC'
-                      ? [...panel.results].sort((a, b) => {
-                          const ia = ELEC_ORDER.indexOf((a.testCode || '').toUpperCase());
-                          const ib = ELEC_ORDER.indexOf((b.testCode || '').toUpperCase());
-                          return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-                        })
-                      : panel.results;
                     return orderedResults.map((result, resultIndex) => {
                       const firstColumnValue = result.testName || result.testCode;
                     // Exclude WBC comments from third column (FBC panel messages shown as panel footer instead)
@@ -447,9 +460,9 @@ export function PaginatedCategorySection({ pageCategory, template }: PaginatedCa
             </table>
 
             {/* FBC Panel Interpretation Message - display after FBC panel */}
-            {panel.panelCode === 'FBC' && panel.results.some(r => r.testCode === 'WBC' && r.comments) && (
+            {panel.panelCode === 'FBC' && orderedResults.some(r => r.testCode === 'WBC' && r.comments) && (
               <div className="mt-1 px-3 py-1 text-xs font-medium text-gray-700 border-t border-gray-200">
-                {panel.results.find(r => r.testCode === 'WBC')?.comments}
+                {orderedResults.find(r => r.testCode === 'WBC')?.comments}
               </div>
             )}
           </Fragment>

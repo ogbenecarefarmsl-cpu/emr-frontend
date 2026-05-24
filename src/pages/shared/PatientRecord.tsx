@@ -13,6 +13,17 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical, Clock, AlertTriangle, ChevronDown, Calendar, Droplets, ExternalLink, RefreshCw, Cloud } from 'lucide-react';
 import { toast } from 'sonner';
 
+const FBC_TEST_ORDER = [
+  'WBC', 'NEUTA', 'LYMPHA', 'MONOA', 'EOSA', 'BASOA',
+  'RBC', 'HB', 'HCT', 'MCV', 'MCH', 'MCHC', 'RDWCV', 'RDWSD',
+  'PLT', 'MPV', 'PDW', 'PLTCT', 'PLCC', 'PLCR',
+];
+
+function getFbcOrderIndex(testCode: string | undefined) {
+  const index = FBC_TEST_ORDER.indexOf((testCode || '').toUpperCase());
+  return index === -1 ? 999 : index;
+}
+
 const PatientRecord = () => {
   const { patientId } = useParams();
   const navigate = useNavigate();
@@ -116,9 +127,17 @@ const PatientRecord = () => {
     const panels: Record<string, { name: string; tests: any[] }> = {};
     const standalone: any[] = [];
 
-    order.orderTests?.forEach((test: any) => {
+    const orderedTests = [...(order.orderTests || [])].sort((a: any, b: any) => {
+      if (a.panelCode === 'FBC' && b.panelCode === 'FBC') {
+        return getFbcOrderIndex(a.testCode) - getFbcOrderIndex(b.testCode);
+      }
+      return 0;
+    });
+
+    orderedTests.forEach((test: any) => {
       const result = order.results?.find((r: any) =>
-        r.orderTestId?.toString() === test._id?.toString()
+        r.orderTestId?.toString() === test._id?.toString() ||
+        (r.testCode || '').toUpperCase() === (test.testCode || '').toUpperCase()
       );
       const testWithResult = { ...test, result };
 

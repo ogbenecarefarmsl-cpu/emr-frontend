@@ -8,6 +8,25 @@ interface CategorySectionProps {
   pageBreakBefore?: boolean;
 }
 
+const PANEL_RESULT_ORDER: Record<string, string[]> = {
+  FBC: [
+    'WBC', 'NEUTA', 'LYMPHA', 'MONOA', 'EOSA', 'BASOA',
+    'RBC', 'HB', 'HCT', 'MCV', 'MCH', 'MCHC', 'RDWCV', 'RDWSD',
+    'PLT', 'MPV', 'PDW', 'PLTCT', 'PLCC', 'PLCR',
+  ],
+};
+
+function orderPanelResults<T extends { testCode?: string }>(panelCode: string | undefined, results: T[]): T[] {
+  const order = PANEL_RESULT_ORDER[(panelCode || '').toUpperCase()];
+  if (!order) return results;
+
+  return [...results].sort((a, b) => {
+    const aIndex = order.indexOf((a.testCode || '').toUpperCase());
+    const bIndex = order.indexOf((b.testCode || '').toUpperCase());
+    return (aIndex === -1 ? 999 : aIndex) - (bIndex === -1 ? 999 : bIndex);
+  });
+}
+
 export function CategorySection({ category, template, pageBreakBefore = false }: CategorySectionProps) {
   const colors = template?.colors;
   const resultsSection = template?.resultsSection;
@@ -63,18 +82,19 @@ export function CategorySection({ category, template, pageBreakBefore = false }:
       </h3>
 
       {groupedResults.map((group, groupIndex) => {
+        const orderedResults = orderPanelResults(group.panelCode, group.results);
         const sectionTitle =
           group.panelName ||
           group.panelCode ||
           (hasPanelGrouping ? category.categoryDisplayName : category.categoryDisplayName);
 
         // Check if tests have subcategories (e.g., urinalysis)
-        const hasSubcategories = group.results.some(r => r.subcategory);
+        const hasSubcategories = orderedResults.some(r => r.subcategory);
         
         // Group results by subcategory if they exist
-        const subcategoryMap = new Map<string, typeof group.results>();
+        const subcategoryMap = new Map<string, typeof orderedResults>();
         if (hasSubcategories) {
-          for (const result of group.results) {
+          for (const result of orderedResults) {
             const subcategory = result.subcategory || 'Other';
             if (!subcategoryMap.has(subcategory)) {
               subcategoryMap.set(subcategory, []);
@@ -177,7 +197,7 @@ export function CategorySection({ category, template, pageBreakBefore = false }:
                           </td>
                         </tr>
                         {/* Results for this subcategory */}
-                        {results.map((result) => {
+                        {results.map((result, resultIndex) => {
                           const firstColumnValue = result.testName || result.testCode;
                           // Exclude WBC comments from third column (FBC panel messages shown as panel footer instead)
                           const thirdColumnValue = useThreeColumns
@@ -231,7 +251,7 @@ export function CategorySection({ category, template, pageBreakBefore = false }:
                   </>
                 ) : (
                   // Render results without subcategory grouping
-                  group.results.map((result, resultIndex) => {
+                  orderedResults.map((result, resultIndex) => {
                     const firstColumnValue = result.testName || result.testCode;
                     // Exclude WBC comments from third column (FBC panel messages shown as panel footer instead)
                     const thirdColumnValue = useThreeColumns
@@ -285,9 +305,9 @@ export function CategorySection({ category, template, pageBreakBefore = false }:
             </table>
 
             {/* FBC Panel Interpretation Message - display after FBC panel */}
-            {group.panelCode === 'FBC' && group.results.some(r => r.testCode === 'WBC' && r.comments) && (
+            {group.panelCode === 'FBC' && orderedResults.some(r => r.testCode === 'WBC' && r.comments) && (
               <div className="mt-1 px-3 py-1 text-xs font-medium text-gray-700 border-t border-gray-200">
-                {group.results.find(r => r.testCode === 'WBC')?.comments}
+                {orderedResults.find(r => r.testCode === 'WBC')?.comments}
               </div>
             )}
           </Fragment>
