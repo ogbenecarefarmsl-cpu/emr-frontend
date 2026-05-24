@@ -20,6 +20,7 @@ interface ConnectionConfig {
 }
 
 export default function ConnectionSettings() {
+  const isSecureBrowserContext = typeof window !== 'undefined' && window.location.protocol === 'https:';
   const [config, setConfig] = useState<ConnectionConfig>({
     localUrl: '',
     cloudUrl: '',
@@ -71,7 +72,7 @@ export default function ConnectionSettings() {
     } else {
       // Set defaults from environment
       setConfig({
-        localUrl: import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000',
+        localUrl: import.meta.env.VITE_LOCAL_API_URL || (isSecureBrowserContext ? '' : 'http://192.168.1.100:3000'),
         cloudUrl: import.meta.env.VITE_CLOUD_API_URL || '',
         localTimeout: 2000,
         cloudTimeout: 5000,
@@ -81,6 +82,10 @@ export default function ConnectionSettings() {
   };
 
   const testConnection = async (url: string, timeout: number): Promise<boolean> => {
+    if (isSecureBrowserContext && url.startsWith('http:')) {
+      return false;
+    }
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);

@@ -29,6 +29,28 @@ class ConnectionManager {
     this.startMonitoring();
   }
 
+  private isSecureBrowserContext() {
+    return typeof window !== 'undefined' && window.location.protocol === 'https:';
+  }
+
+  private canUseBackendUrl(url: string) {
+    return !(this.isSecureBrowserContext() && url.startsWith('http:'));
+  }
+
+  private makeBackend(url: string | undefined, priority: number, timeout: number, name: string): BackendConfig | null {
+    if (!url) return null;
+
+    const normalizedUrl = normalizeApiBaseUrl(url);
+    if (!normalizedUrl || !this.canUseBackendUrl(normalizedUrl)) return null;
+
+    return {
+      url: normalizedUrl,
+      priority,
+      timeout,
+      name,
+    };
+  }
+
   /**
    * Load configuration from localStorage or use defaults
    */
@@ -38,57 +60,24 @@ class ConnectionManager {
       if (saved) {
         const config = JSON.parse(saved);
         this.backends = [
-          {
-            url: normalizeApiBaseUrl(config.localUrl || import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000'),
-            priority: 1,
-            timeout: config.localTimeout || 2000,
-            name: 'Local Network',
-          },
-          {
-            url: normalizeApiBaseUrl(config.cloudUrl || import.meta.env.VITE_CLOUD_API_URL || ''),
-            priority: 2,
-            timeout: config.cloudTimeout || 5000,
-            name: 'Cloud Server',
-          },
-        ].filter(backend => backend.url);
+          this.makeBackend(config.localUrl || import.meta.env.VITE_LOCAL_API_URL, 1, config.localTimeout || 2000, 'Local Network'),
+          this.makeBackend(config.cloudUrl || import.meta.env.VITE_CLOUD_API_URL, 2, config.cloudTimeout || 5000, 'Cloud Server'),
+          this.makeBackend(import.meta.env.VITE_API_URL || (this.isSecureBrowserContext() ? undefined : 'http://localhost:3000'), 3, 3000, 'Default API'),
+        ].filter(Boolean) as BackendConfig[];
       } else {
         this.backends = [
-          {
-            url: normalizeApiBaseUrl(import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000'),
-            priority: 1,
-            timeout: 2000,
-            name: 'Local Network',
-          },
-          {
-            url: normalizeApiBaseUrl(import.meta.env.VITE_CLOUD_API_URL || ''),
-            priority: 2,
-            timeout: 5000,
-            name: 'Cloud Server',
-          },
-          {
-            url: normalizeApiBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:3000'),
-            priority: 3,
-            timeout: 3000,
-            name: 'Development',
-          },
-        ].filter(backend => backend.url);
+          this.makeBackend(import.meta.env.VITE_LOCAL_API_URL, 1, 2000, 'Local Network'),
+          this.makeBackend(import.meta.env.VITE_CLOUD_API_URL, 2, 5000, 'Cloud Server'),
+          this.makeBackend(import.meta.env.VITE_API_URL || (this.isSecureBrowserContext() ? undefined : 'http://localhost:3000'), 3, 3000, 'Development'),
+        ].filter(Boolean) as BackendConfig[];
       }
     } catch (error) {
       console.error('Failed to load connection config:', error);
       this.backends = [
-        {
-          url: normalizeApiBaseUrl(import.meta.env.VITE_LOCAL_API_URL || 'http://192.168.1.100:3000'),
-          priority: 1,
-          timeout: 2000,
-          name: 'Local Network',
-        },
-        {
-          url: normalizeApiBaseUrl(import.meta.env.VITE_CLOUD_API_URL || ''),
-          priority: 2,
-          timeout: 5000,
-          name: 'Cloud Server',
-        },
-      ].filter(backend => backend.url);
+        this.makeBackend(import.meta.env.VITE_LOCAL_API_URL, 1, 2000, 'Local Network'),
+        this.makeBackend(import.meta.env.VITE_CLOUD_API_URL, 2, 5000, 'Cloud Server'),
+        this.makeBackend(import.meta.env.VITE_API_URL || (this.isSecureBrowserContext() ? undefined : 'http://localhost:3000'), 3, 3000, 'Default API'),
+      ].filter(Boolean) as BackendConfig[];
     }
   }
 
@@ -112,6 +101,12 @@ class ConnectionManager {
         },
       });
 
+      // Non-admin users may not have access to this endpoint.
+      // Treat as non-fatal and keep local config silently.
+      if (response.status === 401 || response.status === 403) {
+        return false;
+      }
+
       if (response.ok) {
         const data = await response.json();
         if (data && data.value) {
@@ -123,7 +118,7 @@ class ConnectionManager {
       }
       return false;
     } catch (error) {
-      console.error('Failed to sync configuration from server:', error);
+      // Keep silent on transient network issues to avoid noisy console spam in production.
       return false;
     }
   }
