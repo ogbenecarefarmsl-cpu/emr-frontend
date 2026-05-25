@@ -163,7 +163,7 @@ class ConnectionManager {
 
       const response = await fetch(joinApiUrl(url, '/health'), {
         signal: controller.signal,
-        method: 'HEAD',
+        method: 'GET',
       });
 
       clearTimeout(timeoutId);
@@ -179,7 +179,7 @@ class ConnectionManager {
   async measureLatency(url: string): Promise<number> {
     const start = Date.now();
     try {
-      await fetch(joinApiUrl(url, '/health'), { method: 'HEAD' });
+      await fetch(joinApiUrl(url, '/health'), { method: 'GET' });
       return Date.now() - start;
     } catch {
       return Infinity;
