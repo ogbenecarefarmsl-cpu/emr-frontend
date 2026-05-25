@@ -1,0 +1,391 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Doctor Workbench - Wireframe</title>
+  <style>
+    :root {
+      --bg: #f7f7f5;
+      --panel: #ffffff;
+      --ink: #1e1e1e;
+      --muted: #6f6f6f;
+      --line: #d9d9d9;
+      --accent: #bdbdbd;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    .page {
+      padding: 20px 22px 28px;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+    .title {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+    .header-right {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      box-shadow: var(--shadow);
+    }
+    .card-label {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .card-value {
+      margin-top: 6px;
+      font-size: 20px;
+      font-weight: 600;
+    }
+
+    .layout {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 16px;
+      align-items: start;
+    }
+
+    .queue {
+      display: grid;
+      gap: 12px;
+    }
+
+    .queue .section-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      padding-bottom: 6px;
+      border-bottom: 1px dashed var(--line);
+      margin-bottom: 8px;
+    }
+
+    .list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .list-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 8px;
+      background: #fafafa;
+      font-size: 12px;
+    }
+
+    .list-item .row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .pill {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 10px;
+      color: var(--muted);
+      background: #ffffff;
+    }
+
+    .workspace {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .patient-header {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(90deg, #f1f1f1, #ffffff);
+    }
+    .patient-header .name {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .patient-meta {
+      font-size: 11px;
+      color: var(--muted);
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 6px;
+    }
+
+    .patient-chips {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 8px;
+      font-size: 11px;
+      background: #fbfbfb;
+    }
+    .chip .chip-label {
+      text-transform: uppercase;
+      font-size: 9px;
+      color: var(--muted);
+      letter-spacing: 0.5px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 14px;
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .tabs .active {
+      color: var(--ink);
+      font-weight: 600;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 6px;
+    }
+
+    .content {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .block {
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      min-height: 90px;
+      background: #fcfcfc;
+    }
+    .block-title {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .block-placeholder {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .cta-bar {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      background: #fafafa;
+    }
+    .cta-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .cta {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 11px;
+      background: #ffffff;
+    }
+
+    @media (max-width: 1100px) {
+      .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .layout { grid-template-columns: 1fr; }
+      .patient-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid-2 { grid-template-columns: 1fr; }
+      .grid-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div>
+        <div class="title">Doctor Workbench</div>
+        <div class="subtitle">Queues, active encounters, SOAP notes, orders and patient history</div>
+      </div>
+      <div class="header-right">
+        <div>Dr. Placeholder</div>
+        <div class="pill">Shift: Day</div>
+      </div>
+    </div>
+
+    <div class="metrics">
+      <div class="card">
+        <div class="card-label">Waiting in queue</div>
+        <div class="card-value">12</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Open encounters</div>
+        <div class="card-value">4</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Results ready</div>
+        <div class="card-value">3</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Completed</div>
+        <div class="card-value">9</div>
+      </div>
+    </div>
+
+    <div class="layout">
+      <div class="queue">
+        <div class="card">
+          <div class="section-title">Unified Queue <span class="pill">Filters</span></div>
+          <div class="list">
+            <div class="list-item">
+              <div class="row"><strong>Patient A</strong><span class="pill">Urgent</span></div>
+              <div class="row"><span>Chief complaint here</span><span>08:20</span></div>
+            </div>
+            <div class="list-item">
+              <div class="row"><strong>Patient B</strong><span class="pill">Results</span></div>
+              <div class="row"><span>Review labs</span><span>08:45</span></div>
+            </div>
+            <div class="list-item">
+              <div class="row"><strong>Patient C</strong><span class="pill">Waiting</span></div>
+              <div class="row"><span>Fever + cough</span><span>09:05</span></div>
+            </div>
+            <div class="list-item">
+              <div class="row"><strong>Patient D</strong><span class="pill">Referral</span></div>
+              <div class="row"><span>Cardiology consult</span><span>09:12</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="workspace">
+        <div class="patient-header">
+          <div class="name">Patient A</div>
+          <div class="patient-meta">
+            <span>MRN 023444</span>
+            <span>Female</span>
+            <span>32 yrs</span>
+            <span>Allergies: Penicillin</span>
+          </div>
+          <div class="patient-chips">
+            <div class="chip"><div class="chip-label">Triage</div><div>ESI 2 - Urgent</div></div>
+            <div class="chip"><div class="chip-label">Visit type</div><div>General</div></div>
+            <div class="chip"><div class="chip-label">Category</div><div>Private</div></div>
+            <div class="chip"><div class="chip-label">Wallet</div><div>NGN 24,000</div></div>
+          </div>
+        </div>
+
+        <div class="tabs">
+          <div class="active">Summary</div>
+          <div>SOAP</div>
+          <div>Orders & Plan</div>
+          <div>Results</div>
+          <div>History</div>
+        </div>
+
+        <div class="content">
+          <div class="grid-2">
+            <div class="block">
+              <div class="block-title">Vitals Snapshot</div>
+              <div class="block-placeholder">Temp, BP, HR, RR, SpO2, Weight</div>
+            </div>
+            <div class="block">
+              <div class="block-title">Chief Complaint</div>
+              <div class="block-placeholder">Primary complaint and notes</div>
+            </div>
+          </div>
+
+          <div class="block">
+            <div class="block-title">Clinical Components</div>
+            <div class="block-placeholder">Allergies, problems, vitals trends, follow-up</div>
+          </div>
+
+          <div class="cta-bar">
+            <div>
+              <div class="block-title">Next clinical action</div>
+              <div class="block-placeholder">Open the right workspace quickly</div>
+            </div>
+            <div class="cta-actions">
+              <div class="cta">SOAP</div>
+              <div class="cta">Orders</div>
+              <div class="cta">Results</div>
+              <div class="cta">Complete & Next</div>
+            </div>
+          </div>
+
+          <div class="grid-3">
+            <div class="block">
+              <div class="block-title">Awaiting Lab Payment</div>
+              <div class="block-placeholder">Count + status</div>
+            </div>
+            <div class="block">
+              <div class="block-title">Awaiting Results</div>
+              <div class="block-placeholder">Count + status</div>
+            </div>
+            <div class="block">
+              <div class="block-title">Pharmacy Workflow</div>
+              <div class="block-placeholder">Count + status</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

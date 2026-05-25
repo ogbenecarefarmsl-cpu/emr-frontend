@@ -2,7 +2,7 @@ name = "harbour-clinicals"
 compatibility_date = "2024-01-01"
 
 [build]
-command = "pnpm install --frozen-lockfile && pnpm exec cross-env VITE_API_URL=https://coral-app-2-2g5k3.onrender.com VITE_CLOUD_API_URL=https://coral-app-2-2g5k3.onrender.com pnpm run build"
+command = "pnpm install --frozen-lockfile && pnpm exec cross-env VITE_API_URL=https://coral-app-2-2g5k3.ondigitalocean.app VITE_CLOUD_API_URL=https://coral-app-2-2g5k3.ondigitalocean.app pnpm run build"
 
 [assets]
 directory = "./dist"
