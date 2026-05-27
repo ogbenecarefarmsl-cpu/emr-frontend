@@ -68,7 +68,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { to: '/reception/register', icon: UserPlus, label: 'Register Patient' },
     { to: '/reception/visit-registration', icon: ClipboardCheck, label: 'Create Visit' },
     { to: '/reception/patients', icon: Users, label: 'Patients' },
-    { to: '/reception/payments', icon: CreditCard, label: 'Billing & Payments' },
+    { to: '/reception/payments', icon: CreditCard, label: 'Payments' },
     { to: '/reception/orders', icon: ClipboardList, label: 'Clinical Orders' },
     { to: '/reception/lab-reports', icon: FileText, label: 'Lab Reports' },
     { to: '/reception/referral-letters', icon: FileCheck, label: 'Referral Letters' },
@@ -133,7 +133,7 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
     navigate('/login');
   };
 
-  const openDoctorWorklist = (section: 'waiting' | 'active') => {
+  const openDoctorWorklist = (section: 'waiting' | 'active' | 'results') => {
     if (typeof window !== 'undefined') {
       window.dispatchEvent(new CustomEvent('doctor-worklist:open', { detail: { section } }));
     }
@@ -206,26 +206,38 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
             <button
               type="button"
               onClick={() => openDoctorWorklist('waiting')}
-              title={collapsed ? 'Waiting Queue' : undefined}
+              title={collapsed ? 'Waiting Patients' : undefined}
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium',
                 collapsed && 'lg:justify-center lg:px-2'
               )}
             >
               <Clock className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span className={cn(collapsed && "lg:hidden")}>Waiting Queue</span>
+              <span className={cn(collapsed && "lg:hidden")}>Waiting Patients</span>
             </button>
             <button
               type="button"
               onClick={() => openDoctorWorklist('active')}
-              title={collapsed ? 'My Open Encounters' : undefined}
+              title={collapsed ? "Patients I'm Seeing" : undefined}
               className={cn(
                 'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium',
                 collapsed && 'lg:justify-center lg:px-2'
               )}
             >
               <Stethoscope className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span className={cn(collapsed && "lg:hidden")}>My Open Encounters</span>
+              <span className={cn(collapsed && "lg:hidden")}>Patients I'm Seeing</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openDoctorWorklist('results')}
+              title={collapsed ? 'Results Ready' : undefined}
+              className={cn(
+                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium',
+                collapsed && 'lg:justify-center lg:px-2'
+              )}
+            >
+              <FlaskConical className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
+              <span className={cn(collapsed && "lg:hidden")}>Results Ready</span>
             </button>
           </div>
         )}

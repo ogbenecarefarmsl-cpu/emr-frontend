@@ -13,6 +13,7 @@ import { Search, CreditCard, Banknote, Smartphone, Check, Loader2, Receipt, Tren
 import { format, subDays } from 'date-fns';
 import { cn } from '@/lib/utils';
 import type { OrderWithDetails } from '@/hooks/useOrders';
+import { PendingOrders } from '@/components/reception/PendingOrders';
 
 export default function PaymentsPage() {
   const navigate = useNavigate();
@@ -148,10 +149,14 @@ export default function PaymentsPage() {
   return (
     <RoleLayout 
       title="Payments" 
-      subtitle="Process and track order payments"
+      subtitle="Pending clinical payments, wallet collections, receipts and daily income"
       role={currentRole as any}
       userName={profile?.fullName}
     >
+      <div className="mb-6">
+        <PendingOrders />
+      </div>
+
       {/* Date Range Filter */}
       <div className="flex items-center gap-3 mb-4">
         <Calendar className="w-4 h-4 text-muted-foreground" />

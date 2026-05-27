@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle } from 'lucide-react';
+import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle, Wallet } from 'lucide-react';
 
 export function PendingOrders() {
   const [activeTab, setActiveTab] = useState('all');
@@ -50,8 +50,8 @@ export function PendingOrders() {
       return (
         <div className="text-center py-8 text-muted-foreground">
           <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No pending orders</p>
-          <p className="text-sm">Orders from doctors will appear here</p>
+          <p>No pending clinical payments</p>
+          <p className="text-sm">Doctor-created lab and pharmacy orders will appear here</p>
         </div>
       );
     }
@@ -116,9 +116,17 @@ export function PendingOrders() {
                   ) : (
                     <>
                       <CreditCard className="h-4 w-4 mr-1" />
-                      Mark Paid
+                      Pay Cash
                     </>
                   )}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleMarkPaid(order._id || order.id, 'wallet')}
+                  disabled={markPaid.isPending}
+                >
+                  <Wallet className="h-4 w-4 mr-1" />
+                  Wallet
                 </Button>
               </div>
             </div>
@@ -141,7 +149,7 @@ export function PendingOrders() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CreditCard className="h-5 w-5" />
-          Pending Clinical Orders
+          Pending Clinical Payments
           <Badge variant="secondary" className="ml-auto">
             {allOrders.length} orders
           </Badge>
