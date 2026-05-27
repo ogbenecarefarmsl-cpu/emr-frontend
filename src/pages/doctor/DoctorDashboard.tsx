@@ -175,7 +175,7 @@ export default function DoctorDashboard() {
 
   // State for active patient panel
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('soap');
   const [historyTab, setHistoryTab] = useState('visits');
   const [worklistOpen, setWorklistOpen] = useState(false);
   const [queueSectionsOpen, setQueueSectionsOpen] = useState({
@@ -224,7 +224,7 @@ export default function DoctorDashboard() {
       return admissionsAPI.create({
         patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
         visitId: selectedVisit._id || selectedVisit.id,
-        doctorId: profile?.id,  // Profile ID — admission.doctorId now refs Profile
+        doctorId: profile?.id,  // Profile ID - admission.doctorId now refs Profile
         wardType: admitForm.wardType,
         bedNumber: admitForm.bedNumber || undefined,
         admissionReason: admitForm.admissionReason,
@@ -348,6 +348,7 @@ export default function DoctorDashboard() {
         plan: selectedVisit.planNotes || '',
         diagnosis: selectedVisit.diagnosis || '',
       });
+      setActiveTab(selectedVisit.status === 'results_ready' ? 'lab-results' : 'soap');
     }
   }, [selectedVisit?._id]);
 
@@ -356,7 +357,7 @@ export default function DoctorDashboard() {
     try {
       const acceptedVisit = await acceptPatient.mutateAsync(visit._id || visit.id || '');
       setSelectedVisit((acceptedVisit as Visit) || visit);
-      setActiveTab('overview');
+      setActiveTab('soap');
       toast.success(`Accepted patient: ${visit.patientId?.firstName} ${visit.patientId?.lastName}`);
     } catch (error) {
       toast.error('Failed to accept patient');
@@ -387,7 +388,7 @@ export default function DoctorDashboard() {
       await soapNoteService.create({
         patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
         visitId: selectedVisit._id || selectedVisit.id,
-        doctorId: profile?.id,  // Profile ID — soap_note.doctorId refs Profile
+        doctorId: profile?.id,  // Profile ID - soap_note.doctorId refs Profile
         noteType: SoapNoteTypeEnum.CONSULTATION,
         chiefComplaint: soapForm.subjective || selectedVisit.chiefComplaint || undefined,
         historyPresentIllness: soapForm.subjective || undefined,
@@ -625,7 +626,7 @@ export default function DoctorDashboard() {
 
   if (isLoading) {
     return (
-      <RoleLayout title="Doctor Workbench" subtitle="Queues, active encounters, SOAP notes, orders and patient history" role="doctor" userName={profile?.fullName}>
+      <RoleLayout title="Doctor Workbench" subtitle="Today's patients, clinical notes, results and orders" role="doctor" userName={profile?.fullName}>
         <div className="flex items-center justify-center h-64">
           <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
         </div>
@@ -634,17 +635,17 @@ export default function DoctorDashboard() {
   }
 
   return (
-    <RoleLayout title="Doctor Workbench" subtitle="Queues, active encounters, SOAP notes, orders and patient history" role="doctor" userName={profile?.fullName}>
+    <RoleLayout title="Doctor Workbench" subtitle="Today's patients, clinical notes, results and orders" role="doctor" userName={profile?.fullName}>
       {/* Metrics Row */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3 mb-6">
         <MetricCard
-          title="Waiting in Queue"
+          title="Waiting Patients"
           value={stats.waiting}
           icon={Users}
           variant={stats.waiting > 0 ? 'warning' : 'default'}
         />
         <MetricCard
-          title="Open Encounters"
+          title="Patients I'm Seeing"
           value={openEncounterCount}
           icon={Stethoscope}
           variant={openEncounterCount > 0 ? 'default' : 'default'}
@@ -656,7 +657,7 @@ export default function DoctorDashboard() {
           variant={resultsReady.length > 0 ? 'critical' : 'default'}
         />
         <MetricCard
-          title="Completed"
+          title="Closed Today"
           value={stats.completed}
           icon={CheckCircle}
         />
@@ -665,8 +666,8 @@ export default function DoctorDashboard() {
       <Sheet open={worklistOpen} onOpenChange={setWorklistOpen}>
         <SheetContent side="right" className="w-[420px] sm:w-[460px] p-0 overflow-y-auto">
           <SheetHeader className="px-4 py-4 border-b">
-            <SheetTitle>Doctor Worklist</SheetTitle>
-            <SheetDescription>Waiting queue and active encounters.</SheetDescription>
+            <SheetTitle>Patient Worklist</SheetTitle>
+            <SheetDescription>Select a patient to continue care.</SheetDescription>
           </SheetHeader>
           <div className="p-4 space-y-4">
             <div className="bg-card border rounded-xl shadow-sm">
@@ -677,7 +678,7 @@ export default function DoctorDashboard() {
               >
                 <h3 className="font-semibold text-sm flex items-center gap-2">
                   <Clock className="w-4 h-4 text-amber-500" />
-                  Waiting Queue
+                  Waiting Patients
                   {waitingQueue.length > 0 && <span className="h-2 w-2 rounded-full bg-amber-500" />}
                 </h3>
                 <span className="flex items-center gap-2">
@@ -688,7 +689,7 @@ export default function DoctorDashboard() {
               {queueSectionsOpen.waiting && (
                 <ScrollArea className="h-[18rem]">
                   {waitingQueue.length === 0 ? (
-                    <div className="p-6 text-center text-muted-foreground text-sm">No patients waiting</div>
+                    <div className="p-6 text-center text-muted-foreground text-sm">No waiting patients</div>
                   ) : (
                     <div className="divide-y">
                       {waitingQueue.map((visit: Visit) => (
@@ -737,7 +738,7 @@ export default function DoctorDashboard() {
               >
                 <h3 className="font-semibold text-sm flex items-center gap-2">
                   <Stethoscope className="w-4 h-4 text-blue-500" />
-                  My Open Encounters
+                  Patients I'm Seeing
                   {activePatients.length > 0 && <span className="h-2 w-2 rounded-full bg-blue-500" />}
                 </h3>
                 <span className="flex items-center gap-2">
@@ -748,7 +749,7 @@ export default function DoctorDashboard() {
               {queueSectionsOpen.active && (
                 <ScrollArea className="h-[22rem]">
                   {activePatients.length === 0 ? (
-                    <div className="p-6 text-center text-muted-foreground text-sm">No open encounters</div>
+                    <div className="p-6 text-center text-muted-foreground text-sm">No active patients</div>
                   ) : (
                     <div className="divide-y">
                       {activePatients.map((visit: Visit) => (
@@ -835,15 +836,15 @@ export default function DoctorDashboard() {
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <div className="px-6 pt-3 border-b overflow-x-auto">
                   <TabsList className="bg-transparent h-auto p-0 min-w-max">
-                    <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Summary</TabsTrigger>
-                    <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">SOAP</TabsTrigger>
-                    <TabsTrigger value="orders" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Orders & Plan</TabsTrigger>
+                    <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Consult</TabsTrigger>
+                    <TabsTrigger value="orders" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Orders</TabsTrigger>
                     <TabsTrigger value="lab-results" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none relative">
                       Results
                       {labResults.length > 0 && (
                         <Badge className="ml-1.5 h-4 min-w-4 text-[10px]">{labResults.length}</Badge>
                       )}
                     </TabsTrigger>
+                    <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Summary</TabsTrigger>
                     <TabsTrigger value="history" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">History</TabsTrigger>
                   </TabsList>
                 </div>
@@ -859,12 +860,12 @@ export default function DoctorDashboard() {
                       </h3>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {[
-                          { label: 'Temperature (°C)', value: vitalsForm.temperature, icon: '🌡' },
-                          { label: 'Blood Pressure', value: vitalsForm.bloodPressure, icon: '❤' },
-                          { label: 'Heart Rate (bpm)', value: vitalsForm.heartRate, icon: '💓' },
-                          { label: 'Resp. Rate (/min)', value: vitalsForm.respiratoryRate, icon: '🫁' },
-                          { label: 'Weight (kg)', value: vitalsForm.weight, icon: '⚖' },
-                          { label: 'SpO2 (%)', value: vitalsForm.oxygenSaturation, icon: '🔵' },
+                          { label: 'Temperature (C)', value: vitalsForm.temperature },
+                          { label: 'Blood Pressure', value: vitalsForm.bloodPressure },
+                          { label: 'Heart Rate (bpm)', value: vitalsForm.heartRate },
+                          { label: 'Resp. Rate (/min)', value: vitalsForm.respiratoryRate },
+                          { label: 'Weight (kg)', value: vitalsForm.weight },
+                          { label: 'SpO2 (%)', value: vitalsForm.oxygenSaturation },
                         ].map((vital) => (
                           <div key={vital.label} className="p-2 rounded-lg bg-muted/50 border min-w-0">
                             <div className="text-xs text-muted-foreground">{vital.label}</div>
@@ -872,7 +873,7 @@ export default function DoctorDashboard() {
                           </div>
                         ))}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">Vitals entered by nurse. Contact nursing staff to update.</p>
+                      <p className="text-xs text-muted-foreground mt-2">Latest nursing triage vitals.</p>
                     </div>
 
                     {/* Chief Complaint Card */}
@@ -926,15 +927,13 @@ export default function DoctorDashboard() {
                     )}
                     <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <h3 className="font-semibold text-sm">Next clinical action</h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Open the focused workspace you need instead of scrolling through the whole chart.
-                        </p>
+                        <h3 className="font-semibold text-sm">Clinical actions</h3>
+                        <p className="text-xs text-muted-foreground mt-1 capitalize">{statusLabel(selectedVisit.status)}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Button variant="outline" onClick={() => setActiveTab('soap')}>
                           <FileText className="w-4 h-4 mr-2" />
-                          SOAP
+                          Consult
                         </Button>
                         <Button variant="outline" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
                           <ClipboardList className="w-4 h-4 mr-2" />
@@ -950,18 +949,18 @@ export default function DoctorDashboard() {
                           title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}
                         >
                           <CheckCircle className="w-4 h-4 mr-2" />
-                          Complete & Next
+                          Close Visit
                         </Button>
                       </div>
                     </div>
                   </div>
                 </TabsContent>
 
-                {/* Orders & Plan Tab */}
+                {/* Orders Tab */}
                 <TabsContent value="orders" className="p-5 md:p-6 mt-0">
                   {closureBlockers.length > 0 && (
                     <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-                      <p className="text-xs font-semibold text-amber-800">Closure readiness</p>
+                      <p className="text-xs font-semibold text-amber-800">Before closing</p>
                       <ul className="mt-1 text-xs text-amber-700 space-y-1">
                         {closureBlockers.map((blocker) => (
                           <li key={blocker}>- {blocker}</li>
@@ -979,7 +978,7 @@ export default function DoctorDashboard() {
                       <FlaskConical className="w-5 h-5 mr-3 text-blue-500" />
                       <span className="text-left">
                         <span className="block font-medium">Order Lab Tests</span>
-                        <span className="block text-xs text-muted-foreground">Creates a clinical lab order awaiting reception payment.</span>
+                        <span className="block text-xs text-muted-foreground">Send tests to LIS.</span>
                       </span>
                     </Button>
                     <Button
@@ -991,7 +990,7 @@ export default function DoctorDashboard() {
                       <Pill className="w-5 h-5 mr-3 text-purple-500" />
                       <span className="text-left">
                         <span className="block font-medium">Prescribe Medication</span>
-                        <span className="block text-xs text-muted-foreground">Uses active inventory and sends paid orders to pharmacy.</span>
+                        <span className="block text-xs text-muted-foreground">Create medication order.</span>
                       </span>
                     </Button>
                     <Button
@@ -1003,7 +1002,7 @@ export default function DoctorDashboard() {
                       <UserCheck className="w-5 h-5 mr-3 text-cyan-600" />
                       <span className="text-left">
                         <span className="block font-medium">Refer Patient</span>
-                        <span className="block text-xs text-muted-foreground">Send to another doctor or specialist with clinical context.</span>
+                        <span className="block text-xs text-muted-foreground">Send clinical referral.</span>
                       </span>
                     </Button>
                     <Button
@@ -1015,7 +1014,7 @@ export default function DoctorDashboard() {
                       <BedDouble className="w-5 h-5 mr-3 text-emerald-600" />
                       <span className="text-left">
                         <span className="block font-medium">Admit Patient</span>
-                        <span className="block text-xs text-muted-foreground">Start inpatient care, nursing notes, medication charts and handover.</span>
+                        <span className="block text-xs text-muted-foreground">Start inpatient care.</span>
                       </span>
                     </Button>
                   </div>
@@ -1040,20 +1039,18 @@ export default function DoctorDashboard() {
                       title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
-                      Complete & Next
+                      Close Visit
                     </Button>
                   </div>
                 </TabsContent>
 
-                {/* SOAP Notes Tab */}
+                {/* Consultation Tab */}
                 <TabsContent value="soap" className="p-6 mt-0">
                   <div className="space-y-5">
-                    <div className="flex flex-col gap-3 border rounded-xl p-4 bg-muted/20 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-col gap-3 border rounded-lg p-4 bg-muted/20 md:flex-row md:items-center md:justify-between">
                       <div>
-                        <h3 className="font-semibold text-sm">SOAP Workspace</h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          Save creates a clinical timeline note for follow-up, admission review, and future visits.
-                        </p>
+                        <h3 className="font-semibold text-sm">Consultation Note</h3>
+                        <p className="text-xs text-muted-foreground mt-1">{selectedVisit.chiefComplaint || 'No chief complaint recorded'}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         <Button variant="outline" size="sm" onClick={handleAddSoapNote}>
@@ -1066,58 +1063,16 @@ export default function DoctorDashboard() {
                         </Button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 2xl:grid-cols-2 gap-4">
-                      <div className="rounded-xl border p-4 bg-background">
-                        <Label className="text-sm font-semibold text-blue-600">S - Subjective</Label>
-                        <Textarea
-                          value={soapForm.subjective}
-                          onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})}
-                          placeholder="Patient's description of symptoms, history of present illness..."
-                          rows={8}
-                          className="mt-2 resize-y"
-                        />
-                      </div>
-                      <div className="rounded-xl border p-4 bg-background">
-                        <Label className="text-sm font-semibold text-green-600">O - Objective</Label>
-                        <Textarea
-                          value={soapForm.objective}
-                          onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})}
-                          placeholder="Physical exam findings, vitals, observations..."
-                          rows={8}
-                          className="mt-2 resize-y"
-                        />
-                      </div>
-                      <div className="rounded-xl border p-4 bg-background">
-                        <Label className="text-sm font-semibold text-purple-600">A - Assessment</Label>
-                        <Textarea
-                          value={soapForm.assessment}
-                          onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})}
-                          placeholder="Clinical impression, differential diagnosis..."
-                          rows={7}
-                          className="mt-2 resize-y"
-                        />
-                      </div>
-                      <div className="rounded-xl border p-4 bg-background">
-                        <Label className="text-sm font-semibold text-orange-600">P - Plan</Label>
-                        <Textarea
-                          value={soapForm.plan}
-                          onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})}
-                          placeholder="Treatment plan, medications, follow-up..."
-                          rows={7}
-                          className="mt-2 resize-y"
-                        />
-                      </div>
-                    </div>
 
                     {/* Triage Vitals - Auto-populated from nurse triage */}
                     {(selectedVisit.temperature || selectedVisit.bloodPressure || selectedVisit.heartRate || selectedVisit.triagePriority) && (
                       <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                         <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
                           <Activity className="w-4 h-4" />
-                          Triage Vitals (from Nurse)
+                          Nurse Triage
                         </h4>
                         <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 text-xs">
-                          {selectedVisit.temperature && <div><span className="text-muted-foreground">Temp:</span> <span className="font-medium">{selectedVisit.temperature}°C</span></div>}
+                          {selectedVisit.temperature && <div><span className="text-muted-foreground">Temp:</span> <span className="font-medium">{selectedVisit.temperature} C</span></div>}
                           {selectedVisit.bloodPressure && <div><span className="text-muted-foreground">BP:</span> <span className="font-medium">{selectedVisit.bloodPressure}</span></div>}
                           {selectedVisit.heartRate && <div><span className="text-muted-foreground">HR:</span> <span className="font-medium">{selectedVisit.heartRate} bpm</span></div>}
                           {selectedVisit.respiratoryRate && <div><span className="text-muted-foreground">RR:</span> <span className="font-medium">{selectedVisit.respiratoryRate}/min</span></div>}
@@ -1138,25 +1093,10 @@ export default function DoctorDashboard() {
                             Nurse notes: {selectedVisit.triageNotes}
                           </p>
                         )}
-                        {selectedVisit.triagedAt && (
-                          <p className="text-[10px] text-muted-foreground mt-1">
-                            Recorded: {new Date(selectedVisit.triagedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        )}
                       </div>
                     )}
 
-                    {/* Emergency room indicator */}
-                    {selectedVisit.roomType === 'emergency' && (
-                      <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-red-600" />
-                        <span className="text-sm font-semibold text-red-700 dark:text-red-300">
-                          Emergency — {selectedVisit.room || 'Treatment Room'}
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="rounded-xl border p-4 bg-background">
+                    <div className="rounded-lg border p-4 bg-background">
                       <Label className="text-sm font-semibold">Diagnosis</Label>
                       <Input
                         value={soapForm.diagnosis}
@@ -1165,14 +1105,68 @@ export default function DoctorDashboard() {
                         className="mt-2"
                       />
                     </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                      <div className="rounded-lg border p-4 bg-background">
+                        <Label className="text-sm font-semibold text-blue-600">S - Subjective</Label>
+                        <Textarea
+                          value={soapForm.subjective}
+                          onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})}
+                          placeholder="Patient's description of symptoms, history of present illness..."
+                          rows={7}
+                          className="mt-2 resize-y"
+                        />
+                      </div>
+                      <div className="rounded-lg border p-4 bg-background">
+                        <Label className="text-sm font-semibold text-green-600">O - Objective</Label>
+                        <Textarea
+                          value={soapForm.objective}
+                          onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})}
+                          placeholder="Physical exam findings, vitals, observations..."
+                          rows={7}
+                          className="mt-2 resize-y"
+                        />
+                      </div>
+                      <div className="rounded-lg border p-4 bg-background">
+                        <Label className="text-sm font-semibold text-purple-600">A - Assessment</Label>
+                        <Textarea
+                          value={soapForm.assessment}
+                          onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})}
+                          placeholder="Clinical impression, differential diagnosis..."
+                          rows={6}
+                          className="mt-2 resize-y"
+                        />
+                      </div>
+                      <div className="rounded-lg border p-4 bg-background">
+                        <Label className="text-sm font-semibold text-orange-600">P - Plan</Label>
+                        <Textarea
+                          value={soapForm.plan}
+                          onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})}
+                          placeholder="Treatment plan, medications, follow-up..."
+                          rows={6}
+                          className="mt-2 resize-y"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Emergency room indicator */}
+                    {selectedVisit.roomType === 'emergency' && (
+                      <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-red-600" />
+                        <span className="text-sm font-semibold text-red-700 dark:text-red-300">
+                          Emergency - {selectedVisit.room || 'Treatment Room'}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex flex-wrap justify-end gap-3">
                       <Button variant="outline" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
                         <ClipboardList className="w-4 h-4 mr-2" />
-                        Orders & Plan
+                        Orders
                       </Button>
                       <Button onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
                         <Save className="w-4 h-4 mr-2" />
-                        Save SOAP Note
+                        Save Note
                       </Button>
                     </div>
                   </div>
