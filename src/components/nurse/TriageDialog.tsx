@@ -50,6 +50,10 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
 
   const submitTriage = async () => {
     if (!visit) return;
+    if (!doctorId) {
+      toast.error('Select a doctor before sending the patient to queue');
+      return;
+    }
     try {
       await completeTriage.mutateAsync({
         visitId: visit._id,
@@ -64,10 +68,10 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
           triagePriority: triagePriorityFromEsi(triageEsiLevel),
           triageNotes: triageNotes || undefined,
           chiefComplaint: chiefComplaint || undefined,
-          doctorId: doctorId || undefined,
+          doctorId,
         },
       });
-      toast.success(doctorId ? 'Triage complete - patient sent to selected doctor' : 'Triage complete - patient sent to doctor queue');
+      toast.success('Triage complete - patient sent to selected doctor');
       onOpenChange(false);
       onCompleted?.();
     } catch {
@@ -151,12 +155,11 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
 
           <div>
             <Label className="text-sm">Send to Doctor</Label>
-            <Select value={doctorId || 'general_queue'} onValueChange={(value) => setDoctorId(value === 'general_queue' ? '' : value)}>
+            <Select value={doctorId} onValueChange={setDoctorId}>
               <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select doctor or send to general queue" />
+                <SelectValue placeholder="Select receiving doctor" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="general_queue">General doctor queue</SelectItem>
                 {doctors.map((doctor: any) => (
                   <SelectItem key={doctor._id} value={doctor._id}>
                     {doctor.fullName}
@@ -183,9 +186,9 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submitTriage} disabled={completeTriage.isPending}>
+          <Button onClick={submitTriage} disabled={completeTriage.isPending || doctorsLoading || !doctorId}>
             {completeTriage.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-            {doctorId ? 'Send to Selected Doctor' : 'Send to Doctor Queue'}
+            Send to Selected Doctor
           </Button>
         </DialogFooter>
       </DialogContent>
