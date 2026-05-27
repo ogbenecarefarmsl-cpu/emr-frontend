@@ -337,7 +337,13 @@ export const ordersAPI = {
 
   getLisCatalog: async () => {
     const response = await api.get('/orders/lis-catalog');
-    return response.data;
+    const payload = response.data;
+    if (Array.isArray(payload)) return payload;
+    if (Array.isArray(payload?.data)) return payload.data;
+    return [
+      ...(Array.isArray(payload?.tests) ? payload.tests : []),
+      ...(Array.isArray(payload?.panels) ? payload.panels : []),
+    ];
   },
 
   syncLisPayment: async (id: string) => {

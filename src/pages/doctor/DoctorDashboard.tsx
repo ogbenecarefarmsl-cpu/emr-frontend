@@ -261,7 +261,12 @@ export default function DoctorDashboard() {
   });
 
   // Fetch LIS orderables for lab order modal (LIS is source of truth).
-  const { data: tests = [] } = useQuery({
+  const {
+    data: tests = [],
+    isLoading: testsLoading,
+    isError: testsError,
+    error: testsLoadError,
+  } = useQuery({
     queryKey: ['orders', 'lis-catalog'],
     queryFn: () => ordersAPI.getLisCatalog(),
     staleTime: 60 * 1000,
@@ -312,13 +317,14 @@ export default function DoctorDashboard() {
   const selectedWalletBalance = Number(selectedPatient.walletBalance || selectedPatient.wallet?.balance || 0);
 
   // Filter tests based on search
+  const lisOrderables = Array.isArray(tests) ? tests : [];
   const filteredTests = useMemo(() => {
-    if (!searchTest) return (tests || []).slice(0, 20);
-    return (tests || []).filter((t: Test) =>
+    if (!searchTest) return lisOrderables.slice(0, 20);
+    return lisOrderables.filter((t: Test) =>
       t.name?.toLowerCase().includes(searchTest.toLowerCase()) ||
       t.code?.toLowerCase().includes(searchTest.toLowerCase())
     ).slice(0, 20);
-  }, [tests, searchTest]);
+  }, [lisOrderables, searchTest]);
 
   // Filter medications based on search
   const filteredMedications = useMemo(() => {
@@ -523,13 +529,13 @@ export default function DoctorDashboard() {
   });
 
   const addTestToOrder = (test: Test) => {
-    if (!selectedTests.find(t => t._id === test._id)) {
+    if (!selectedTests.find(t => (t._id || t.code) === (test._id || test.code))) {
       setSelectedTests([...selectedTests, test]);
     }
   };
 
   const removeTestFromOrder = (testId: string) => {
-    setSelectedTests(selectedTests.filter(t => t._id !== testId));
+    setSelectedTests(selectedTests.filter(t => (t._id || t.code) !== testId));
   };
 
   const addMedicationToPrescription = (med: Medication) => {
@@ -1473,29 +1479,47 @@ export default function DoctorDashboard() {
                 className="mt-1"
               />
               <ScrollArea className="h-64 mt-2 border rounded-lg">
-                {filteredTests.map((test: Test) => (
-                  <div
-                    key={test._id}
-                    className="p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0 flex items-center justify-between"
-                    onClick={() => addTestToOrder(test)}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm">{test.name}</p>
-                        {test.isPanel && (
-                          <Badge variant="outline" className="text-[10px] h-5">Panel</Badge>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        {test.code} - Le {test.price?.toLocaleString()}
-                        {test.isPanel && test.panelComponents && (
-                          <span className="ml-1">({test.panelComponents.length} components)</span>
-                        )}
-                      </p>
-                    </div>
-                    <Plus className="w-4 h-4 text-muted-foreground" />
+                {testsLoading ? (
+                  <div className="h-full p-6 text-center text-muted-foreground text-sm flex flex-col items-center justify-center gap-2">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Loading LIS catalog
                   </div>
-                ))}
+                ) : testsError ? (
+                  <div className="p-6 text-center text-sm text-red-600">
+                    Could not load LIS catalog.
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {(testsLoadError as any)?.response?.data?.message || (testsLoadError as any)?.message || 'Check backend LIS connection.'}
+                    </p>
+                  </div>
+                ) : filteredTests.length === 0 ? (
+                  <div className="p-6 text-center text-muted-foreground text-sm">
+                    No LIS tests or panels found
+                  </div>
+                ) : (
+                  filteredTests.map((test: Test) => (
+                    <div
+                      key={test._id || test.code}
+                      className="p-3 hover:bg-muted/50 cursor-pointer border-b last:border-b-0 flex items-center justify-between"
+                      onClick={() => addTestToOrder(test)}
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{test.name}</p>
+                          {test.isPanel && (
+                            <Badge variant="outline" className="text-[10px] h-5">Panel</Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {test.code} - Le {test.price?.toLocaleString()}
+                          {test.isPanel && test.panelComponents && (
+                            <span className="ml-1">({test.panelComponents.length} components)</span>
+                          )}
+                        </p>
+                      </div>
+                      <Plus className="w-4 h-4 text-muted-foreground" />
+                    </div>
+                  ))
+                )}
               </ScrollArea>
             </div>
 
@@ -1510,7 +1534,7 @@ export default function DoctorDashboard() {
                 ) : (
                   <div className="divide-y">
                     {selectedTests.map((test) => (
-                      <div key={test._id} className="p-3 flex items-center justify-between">
+                      <div key={test._id || test.code} className="p-3 flex items-center justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-sm">{test.name}</p>
@@ -1527,7 +1551,7 @@ export default function DoctorDashboard() {
                             </div>
                           )}
                         </div>
-                        <Button variant="ghost" size="sm" onClick={() => removeTestFromOrder(test._id)}>
+                        <Button variant="ghost" size="sm" onClick={() => removeTestFromOrder(test._id || test.code)}>
                           <Trash2 className="w-4 h-4 text-red-500" />
                         </Button>
                       </div>
