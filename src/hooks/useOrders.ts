@@ -157,6 +157,16 @@ interface OrderUpdate {
   paidAmount?: number;
   paymentStatus?: 'pending' | 'partial' | 'paid';
   paymentMethod?: 'cash' | 'orange_money' | 'afrimoney' | 'wallet';
+  tests?: Array<{
+    testId?: string;
+    testCode: string;
+    testName: string;
+    price: number;
+    panelCode?: string;
+    panelName?: string;
+  }>;
+  discount?: number;
+  discountType?: 'fixed' | 'percentage';
   // Backend snake_case format
   payment_status?: 'pending' | 'partial' | 'paid';
   payment_method?: 'cash' | 'orange_money' | 'afrimoney' | 'wallet';

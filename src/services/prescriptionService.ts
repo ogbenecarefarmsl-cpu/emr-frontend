@@ -78,4 +78,9 @@ export const prescriptionService = {
     const response = await api.patch(`/prescriptions/${id}/cancel`, { reason });
     return response.data;
   },
+
+  async update(id: string, data: { items?: CreatePrescriptionItemInput[]; notes?: string; totalAmount?: number }): Promise<Prescription> {
+    const response = await api.patch(`/prescriptions/${id}`, data);
+    return response.data;
+  },
 };

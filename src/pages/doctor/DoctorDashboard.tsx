@@ -39,7 +39,8 @@ import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
 import {
   Loader2, Clock, CheckCircle, User, Stethoscope, FileText, FlaskConical, Pill,
   ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
-  Send, Heart, Users, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity
+  Send, Heart, Users, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
+  Pencil
 } from 'lucide-react';
 
 // Types
@@ -218,6 +219,10 @@ export default function DoctorDashboard() {
     diagnosis: '',
     notes: '',
   });
+
+  // Edit mode state
+  const [editingOrder, setEditingOrder] = useState<any>(null);
+  const [editingPrescription, setEditingPrescription] = useState<any>(null);
   const createAdmission = useMutation({
     mutationFn: async () => {
       if (!selectedVisit) return;
@@ -294,6 +299,21 @@ export default function DoctorDashboard() {
     enabled: !!patientId,
     staleTime: 60 * 1000,
   });
+
+  // Fetch prescriptions for the selected patient
+  const { data: patientPrescriptions = [] } = useQuery({
+    queryKey: ['prescriptions', 'patient', patientId],
+    queryFn: () => prescriptionService.findByPatient(patientId),
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
+
+  // Current visit prescriptions (pending and unpaid)
+  const currentVisitPrescriptions = (Array.isArray(patientPrescriptions) ? patientPrescriptions : [])
+    .filter((rx: any) => {
+      const rxVisitId = typeof rx.visitId === 'object' ? rx.visitId?._id : rx.visitId;
+      return rxVisitId === currentVisitId;
+    });
 
   // Fetch lab results for the selected visit - need to find the lab order
   const currentVisitLabOrder = patientOrders.find((order: any) => {
@@ -485,6 +505,7 @@ export default function DoctorDashboard() {
       toast.success('Lab order created. Patient should pay at reception.');
       setLabOrderModalOpen(false);
       setSelectedTests([]);
+      setEditingOrder(null);
       setSelectedVisit(prev => prev ? { ...prev, status: 'awaiting_lab' } : prev);
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -500,9 +521,6 @@ export default function DoctorDashboard() {
     mutationFn: async () => {
       if (!selectedVisit || prescriptionItems.length === 0) return;
 
-      // doctorId on prescriptions references the doctors collection (external doctors).
-      // The prescribing doctor (system user) is captured via orderedBy from the JWT.
-      // Do not pass profile.id here — it would fail validation.
       return await prescriptionService.create({
         patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
         visitId: selectedVisit._id || selectedVisit.id,
@@ -518,12 +536,67 @@ export default function DoctorDashboard() {
       toast.success('Prescription created. Patient should pay at reception.');
       setPrescriptionModalOpen(false);
       setPrescriptionItems([]);
+      setEditingPrescription(null);
       setSelectedVisit(prev => prev ? { ...prev, status: 'awaiting_pharmacy' } : prev);
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || err?.message || 'Failed to create prescription';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  // Lab order update mutation
+  const updateLabOrder = useMutation({
+    mutationFn: async () => {
+      if (!editingOrder || selectedTests.length === 0) return;
+      return await ordersAPI.update(editingOrder._id || editingOrder.id, {
+        tests: selectedTests.map(t => ({
+          testId: t._id,
+          testCode: t.code,
+          testName: t.name,
+          price: t.price,
+        })),
+        priority: editingOrder.priority,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Lab order updated');
+      setLabOrderModalOpen(false);
+      setSelectedTests([]);
+      setEditingOrder(null);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['visits'] });
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to update lab order';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  // Prescription update mutation
+  const updatePrescription = useMutation({
+    mutationFn: async () => {
+      if (!editingPrescription || prescriptionItems.length === 0) return;
+      return await prescriptionService.update(editingPrescription._id, {
+        items: prescriptionItems.map(({ unitPrice, ...item }) => ({
+          ...item,
+          instructions: item.instructions?.trim() || undefined,
+          pharmacistNote: item.pharmacistNote?.trim() || undefined,
+        })),
+        totalAmount: prescriptionItems.reduce((sum, item) => sum + (item.quantity * (item.unitPrice || 0)), 0),
+      });
+    },
+    onSuccess: () => {
+      toast.success('Prescription updated');
+      setPrescriptionModalOpen(false);
+      setPrescriptionItems([]);
+      setEditingPrescription(null);
+      queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to update prescription';
       toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
     },
   });
@@ -564,6 +637,47 @@ export default function DoctorDashboard() {
 
   const removePrescriptionItem = (index: number) => {
     setPrescriptionItems(prescriptionItems.filter((_, i) => i !== index));
+  };
+
+  // Edit helpers
+  const startEditOrder = (order: any) => {
+    const orderTests = (order.order_tests || order.tests || []).map((t: any) => ({
+      _id: t.testId || t.test_id || t._id,
+      code: t.testCode || t.test_code,
+      name: t.testName || t.test_name,
+      price: t.price || 0,
+      isPanel: !!t.panelCode,
+    }));
+    setSelectedTests(orderTests);
+    setEditingOrder(order);
+    setLabOrderModalOpen(true);
+  };
+
+  const startEditPrescription = (rx: any) => {
+    const items = (rx.items || []).map((item: any) => ({
+      medicationId: item.medicationId?._id || item.medicationId,
+      medicationName: item.medicationName,
+      dosage: item.dosage,
+      frequency: item.frequency,
+      duration: item.duration,
+      quantity: item.quantity,
+      route: item.route || 'oral',
+      unitPrice: 0,
+      instructions: item.instructions || '',
+      pharmacistNote: item.pharmacistNote || '',
+    }));
+    setPrescriptionItems(items);
+    setEditingPrescription(rx);
+    setPrescriptionModalOpen(true);
+  };
+
+  const cancelEdit = () => {
+    setEditingOrder(null);
+    setEditingPrescription(null);
+    setSelectedTests([]);
+    setPrescriptionItems([]);
+    setLabOrderModalOpen(false);
+    setPrescriptionModalOpen(false);
   };
 
   // Stats from dashboard data
@@ -1047,11 +1161,123 @@ export default function DoctorDashboard() {
                       </ul>
                     </div>
                   )}
+
+                  {/* Existing Orders for this visit */}
+                  {currentVisitOrders.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Existing Orders</h4>
+                      <div className="space-y-2">
+                        {currentVisitOrders.map((order: any) => {
+                          const orderTests = order.order_tests || order.tests || [];
+                          const orderType = order.orderType || order.order_type;
+                          const canEdit = (order.paymentStatus || order.payment_status) === 'pending' &&
+                            (order.status === 'awaiting_payment');
+                          return (
+                            <div key={order._id || order.id} className="border rounded-lg p-4 bg-card">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="text-sm font-semibold">{order.orderNumber}</p>
+                                    <Badge variant="outline" className="capitalize text-[10px]">{orderType}</Badge>
+                                    <Badge variant={
+                                      (order.status === 'completed') ? 'default' :
+                                      (order.status === 'cancelled') ? 'destructive' :
+                                      'secondary'
+                                    } className="text-[10px] capitalize">
+                                      {(order.status || '').replace(/_/g, ' ')}
+                                    </Badge>
+                                    <Badge variant={
+                                      (order.paymentStatus || order.payment_status) === 'paid' ? 'default' : 'outline'
+                                    } className="text-[10px]">
+                                      {(order.paymentStatus || order.payment_status || 'pending').replace(/_/g, ' ')}
+                                    </Badge>
+                                  </div>
+                                  <div className="mt-2 space-y-1">
+                                    {orderTests.map((test: any, idx: number) => (
+                                      <p key={idx} className="text-xs text-muted-foreground">
+                                        {test.testName || test.test_name || test.testCode || test.test_code}
+                                        {test.panelName || test.panel_name ? ` (${test.panelName || test.panel_name})` : ''}
+                                        {test.price ? ` - Le ${test.price.toLocaleString()}` : ''}
+                                      </p>
+                                    ))}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Total: Le {(order.total || 0).toLocaleString()} | Priority: {order.priority || 'routine'}
+                                  </p>
+                                </div>
+                                {canEdit && orderType === 'lab' && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => startEditOrder(order)}
+                                    disabled={!canContinueClinicalWork}
+                                  >
+                                    <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                                    Edit
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Existing Prescriptions for this visit */}
+                  {currentVisitPrescriptions.length > 0 && (
+                    <div className="mb-6">
+                      <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Existing Prescriptions</h4>
+                      <div className="space-y-2">
+                        {currentVisitPrescriptions.map((rx: any) => {
+                          const canEdit = !rx.isPaid && rx.status === 'pending';
+                          return (
+                            <div key={rx._id} className="border rounded-lg p-4 bg-card">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="text-sm font-semibold">{rx.prescriptionNumber}</p>
+                                    <Badge variant={rx.isPaid ? 'default' : 'secondary'} className="text-[10px]">
+                                      {rx.isPaid ? 'Paid' : 'Awaiting payment'}
+                                    </Badge>
+                                    <Badge variant="outline" className="text-[10px] capitalize">{rx.status}</Badge>
+                                  </div>
+                                  <div className="mt-2 space-y-1">
+                                    {(rx.items || []).map((item: any, idx: number) => (
+                                      <p key={idx} className="text-xs text-muted-foreground">
+                                        {item.medicationName} - {item.dosage}, {item.frequency}, {item.duration}
+                                        {item.quantity ? ` (Qty: ${item.quantity})` : ''}
+                                      </p>
+                                    ))}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    Total: Le {(rx.totalAmount || 0).toLocaleString()}
+                                  </p>
+                                </div>
+                                {canEdit && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => startEditPrescription(rx)}
+                                    disabled={!canContinueClinicalWork}
+                                  >
+                                    <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                                    Edit
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     <Button
                       variant="outline"
                       className="h-auto justify-start p-4"
-                      onClick={() => setLabOrderModalOpen(true)}
+                      onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}
                       disabled={!canContinueClinicalWork}
                     >
                       <FlaskConical className="w-5 h-5 mr-3 text-blue-500" />
@@ -1063,7 +1289,7 @@ export default function DoctorDashboard() {
                     <Button
                       variant="outline"
                       className="h-auto justify-start p-4"
-                      onClick={() => setPrescriptionModalOpen(true)}
+                      onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }}
                       disabled={!canContinueClinicalWork}
                     >
                       <Pill className="w-5 h-5 mr-3 text-purple-500" />
@@ -1562,10 +1788,10 @@ export default function DoctorDashboard() {
       </div>
 
       {/* Lab Order Modal */}
-      <Dialog open={labOrderModalOpen} onOpenChange={setLabOrderModalOpen}>
+      <Dialog open={labOrderModalOpen} onOpenChange={(open) => { if (!open) cancelEdit(); setLabOrderModalOpen(open); }}>
         <DialogContent className="max-w-2xl max-h-[85vh]">
           <DialogHeader>
-            <DialogTitle>Order Lab Tests</DialogTitle>
+            <DialogTitle>{editingOrder ? 'Edit Lab Order' : 'Order Lab Tests'}</DialogTitle>
           </DialogHeader>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1668,20 +1894,23 @@ export default function DoctorDashboard() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setLabOrderModalOpen(false)}>Cancel</Button>
-            <Button onClick={() => createLabOrder.mutate()} disabled={createLabOrder.isPending || selectedTests.length === 0}>
-              {createLabOrder.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-              Create Order
+            <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
+            <Button
+              onClick={() => editingOrder ? updateLabOrder.mutate() : createLabOrder.mutate()}
+              disabled={(editingOrder ? updateLabOrder.isPending : createLabOrder.isPending) || selectedTests.length === 0}
+            >
+              {(editingOrder ? updateLabOrder.isPending : createLabOrder.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+              {editingOrder ? 'Update Order' : 'Create Order'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* Prescription Modal */}
-      <Dialog open={prescriptionModalOpen} onOpenChange={setPrescriptionModalOpen}>
+      <Dialog open={prescriptionModalOpen} onOpenChange={(open) => { if (!open) cancelEdit(); setPrescriptionModalOpen(open); }}>
         <DialogContent className="max-w-3xl max-h-[85vh]">
           <DialogHeader>
-            <DialogTitle>Prescribe Medication</DialogTitle>
+            <DialogTitle>{editingPrescription ? 'Edit Prescription' : 'Prescribe Medication'}</DialogTitle>
           </DialogHeader>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1792,13 +2021,17 @@ export default function DoctorDashboard() {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setPrescriptionModalOpen(false)}>Cancel</Button>
+            <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
             <Button
-              onClick={() => createPrescription.mutate()}
-              disabled={createPrescription.isPending || prescriptionItems.length === 0 || prescriptionItems.some(i => !i.dosage || !i.frequency || !i.duration)}
+              onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()}
+              disabled={
+                (editingPrescription ? updatePrescription.isPending : createPrescription.isPending) ||
+                prescriptionItems.length === 0 ||
+                prescriptionItems.some(i => !i.dosage || !i.frequency || !i.duration)
+              }
             >
-              {createPrescription.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-              Create Prescription
+              {(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+              {editingPrescription ? 'Update Prescription' : 'Create Prescription'}
             </Button>
           </DialogFooter>
         </DialogContent>
