@@ -377,10 +377,10 @@ function AppRoutes() {
 
       {/* Pharmacy Routes */}
       <Route path="/pharmacy" element={
-        <RoleGuard allowedRoles={['pharmacist', 'admin']}><PharmacyDashboard /></RoleGuard>
+        <RoleGuard allowedRoles={['pharmacist', 'admin', 'receptionist']}><PharmacyDashboard /></RoleGuard>
       } />
       <Route path="/pharmacy/inventory" element={
-        <RoleGuard allowedRoles={['pharmacist', 'admin']}><InventoryManagement /></RoleGuard>
+        <RoleGuard allowedRoles={['pharmacist', 'admin', 'receptionist']}><InventoryManagement /></RoleGuard>
       } />
 
       {/* Inventory Routes */}

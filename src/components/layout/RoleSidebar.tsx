@@ -70,6 +70,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { to: '/reception/patients', icon: Users, label: 'Patients' },
     { to: '/reception/payments', icon: CreditCard, label: 'Payments' },
     { to: '/reception/orders', icon: ClipboardList, label: 'Clinical Orders' },
+    { to: '/pharmacy', icon: Pill, label: 'Dispensing' },
     { to: '/reception/lab-reports', icon: FileText, label: 'Lab Reports' },
     { to: '/reception/referral-letters', icon: FileCheck, label: 'Referral Letters' },
     { to: '/reception/price-list', icon: Tag, label: 'Service Pricing' },
