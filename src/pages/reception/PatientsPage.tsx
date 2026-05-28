@@ -6,10 +6,11 @@ import { useSearchPatients, useCreatePatient, useDeletePatient } from '@/hooks/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import {Search, Plus, Eye, ClipboardList, Loader2, Trash2 } from 'lucide-react';
+import {Search, Plus, Eye, ClipboardList, Loader2, Trash2, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { getPatientAgeDisplay, getPatientFullName } from '@/utils/orderHelpers';
 
@@ -163,21 +164,28 @@ export default function PatientsPage() {
               </tr>
             </thead>
             <tbody>
-              {patients?.map(patient => (
-                <tr key={patient.id || patient._id}>
+              {patients?.map(patient => {
+                const initials = `${(patient.firstName?.[0] || '').toUpperCase()}${(patient.lastName?.[0] || '').toUpperCase()}` || '?';
+                return (
+                <tr key={patient.id || patient._id} className="hover:bg-muted/30">
                   <td className="font-mono text-sm">{patient.patientId}</td>
-                  <td className="font-medium">
-                    {getPatientFullName(patient)}
+                  <td>
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-primary">{initials}</span>
+                      </div>
+                      <span className="font-medium">{getPatientFullName(patient)}</span>
+                    </div>
                   </td>
                   <td>{formatAgeDisplay(patient)}</td>
                   <td>
-                    <span className="px-2 py-1 bg-muted rounded text-xs font-medium">
+                    <Badge variant="outline" className="text-[10px] capitalize">
                       {patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : 'Other'}
-                    </span>
+                    </Badge>
                   </td>
                   <td className="text-muted-foreground">{patient.phone || '-'}</td>
                   <td>
-                    <span className="font-semibold text-status-normal">
+                    <span className="font-semibold text-emerald-600">
                       Le {Number(patient.walletBalance || 0).toLocaleString()}
                     </span>
                   </td>
@@ -191,43 +199,32 @@ export default function PatientsPage() {
                         size="sm"
                         onClick={() => {
                           const patientObjectId = patient.id || patient._id;
-                          if (!patientObjectId) {
-                            toast.error('Patient record is missing ID');
-                            return;
-                          }
-
+                          if (!patientObjectId) { toast.error('Patient record is missing ID'); return; }
                           navigate(
-                            currentRole === 'lab_tech'
-                              ? `/lab/patients/${patientObjectId}`
-                              : currentRole === 'admin'
-                                ? `/admin/patients/${patientObjectId}`
-                                : `/reception/patients/${patientObjectId}`,
+                            currentRole === 'lab_tech' ? `/lab/patients/${patientObjectId}`
+                            : currentRole === 'admin' ? `/admin/patients/${patientObjectId}`
+                            : `/reception/patients/${patientObjectId}`,
                           );
                         }}
                       >
-                        <Eye className="w-4 h-4 mr-1" />
-                        View
+                        <Eye className="w-4 h-4 mr-1" />View
                       </Button>
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="sm"
                         onClick={() => {
                           const patientObjectId = patient.id || patient._id;
-                          if (!patientObjectId) {
-                            toast.error('Patient record is missing ID');
-                            return;
-                          }
+                          if (!patientObjectId) { toast.error('Patient record is missing ID'); return; }
                           navigate(`/reception/visit-registration?patient=${patientObjectId}`);
                         }}
                       >
-                        <ClipboardList className="w-4 h-4 mr-1" />
-                        Visit
+                        <ClipboardList className="w-4 h-4 mr-1" />Visit
                       </Button>
                       {isAdmin && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-status-critical hover:text-status-critical hover:bg-status-critical/10"
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50"
                           onClick={() => {
                             setDeleteConfirmId(patient.id);
                             setDeleteConfirmName(getPatientFullName(patient));
@@ -239,11 +236,22 @@ export default function PatientsPage() {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
               {(!patients || patients.length === 0) && (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-muted-foreground">
-                    {searchTerm ? 'No patients found matching your search' : 'No patients registered yet'}
+                  <td colSpan={8} className="text-center py-12">
+                    <div className="flex flex-col items-center">
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                        <User className="w-6 h-6 text-muted-foreground/50" />
+                      </div>
+                      <p className="text-muted-foreground font-medium">
+                        {searchTerm ? 'No patients found matching your search' : 'No patients registered yet'}
+                      </p>
+                      {!searchTerm && (
+                        <p className="text-sm text-muted-foreground/70 mt-1">Click "Register Patient" to add one</p>
+                      )}
+                    </div>
                   </td>
                 </tr>
               )}

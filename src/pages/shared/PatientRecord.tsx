@@ -10,7 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical, Clock, AlertTriangle, ChevronDown, Calendar, Droplets, ExternalLink, RefreshCw, Cloud } from 'lucide-react';
+import {
+  Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical,
+  Clock, AlertTriangle, ChevronDown, Calendar, Droplets, ExternalLink, RefreshCw, Cloud,
+  Phone, Hash, TrendingUp, ClipboardList
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 const FBC_TEST_ORDER = [
@@ -58,13 +62,14 @@ const PatientRecord = () => {
 
   if (!chart?.patient) {
     return (
-      <RoleLayout title="Patient Record" subtitle="Patient not found" role={layoutRole} userName={profile?.fullName}>
+      <RoleLayout title="Patient Record" subtitle="" role={layoutRole} userName={profile?.fullName}>
         <div className="flex flex-col items-center justify-center h-64 gap-4">
-          <User className="w-16 h-16 text-muted-foreground" />
+          <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+            <User className="w-8 h-8 text-muted-foreground" />
+          </div>
           <p className="text-muted-foreground">Patient not found</p>
           <Button variant="outline" onClick={() => navigate(-1)}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Go Back
+            <ArrowLeft className="w-4 h-4 mr-2" />Go Back
           </Button>
         </div>
       </RoleLayout>
@@ -76,7 +81,6 @@ const PatientRecord = () => {
   const prescriptions = chart.prescriptions || [];
   const soapNotes = chart.soapNotes || [];
   const orders = chart.orders || [];
-  const admissions = chart.admissions || [];
   const vitalsHistory = chart.vitalsHistory || [];
   const summary = chart.summary || {};
 
@@ -89,36 +93,32 @@ const PatientRecord = () => {
       case 'low':
         return 'text-amber-600 bg-amber-50 border-amber-200';
       default:
-        return 'text-green-600 bg-green-50 border-green-200';
+        return 'text-emerald-600 bg-emerald-50 border-emerald-200';
     }
   };
 
   const getStatusBadge = (status: string) => {
-    const statusMap: Record<string, { variant: 'default' | 'secondary' | 'destructive' | 'outline'; label: string }> = {
-      completed: { variant: 'default', label: 'Completed' },
-      pending_collection: { variant: 'secondary', label: 'Pending Collection' },
-      processing: { variant: 'outline', label: 'Processing' },
-      cancelled: { variant: 'destructive', label: 'Cancelled' },
-      awaiting_payment: { variant: 'secondary', label: 'Awaiting Payment' },
-      paid: { variant: 'default', label: 'Paid' },
+    const statusMap: Record<string, { className: string; label: string }> = {
+      completed: { className: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Completed' },
+      pending_collection: { className: 'bg-purple-50 text-purple-700 border-purple-200', label: 'Pending' },
+      processing: { className: 'bg-orange-50 text-orange-700 border-orange-200', label: 'Processing' },
+      cancelled: { className: 'bg-red-50 text-red-700 border-red-200', label: 'Cancelled' },
+      awaiting_payment: { className: 'bg-amber-50 text-amber-700 border-amber-200', label: 'Unpaid' },
+      paid: { className: 'bg-blue-50 text-blue-700 border-blue-200', label: 'Paid' },
     };
-    const config = statusMap[status] || { variant: 'outline' as const, label: status };
-    return <Badge variant={config.variant}>{config.label}</Badge>;
+    const config = statusMap[status] || { className: 'bg-gray-50 text-gray-700 border-gray-200', label: status };
+    return <Badge variant="outline" className={`text-[10px] ${config.className}`}>{config.label}</Badge>;
   };
 
   const getLisBadge = (order: any) => {
     if (!order.lisSyncStatus) return null;
     const className =
-      order.lisSyncStatus === 'synced'
-        ? 'bg-green-50 text-green-700 border-green-200'
-        : order.lisSyncStatus === 'failed'
-          ? 'bg-red-50 text-red-700 border-red-200'
-          : 'bg-muted text-muted-foreground border-border';
-
+      order.lisSyncStatus === 'synced' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+      : order.lisSyncStatus === 'failed' ? 'bg-red-50 text-red-700 border-red-200'
+      : 'bg-muted text-muted-foreground border-border';
     return (
-      <Badge variant="outline" className={`gap-1 ${className}`} title={order.lisSyncError || undefined}>
-        <Cloud className="w-3 h-3" />
-        LIS {String(order.lisSyncStatus).replace('_', ' ')}
+      <Badge variant="outline" className={`gap-1 text-[10px] ${className}`} title={order.lisSyncError || undefined}>
+        <Cloud className="w-3 h-3" />LIS {String(order.lisSyncStatus).replace('_', ' ')}
       </Badge>
     );
   };
@@ -126,148 +126,140 @@ const PatientRecord = () => {
   const groupResultsByPanel = (order: any) => {
     const panels: Record<string, { name: string; tests: any[] }> = {};
     const standalone: any[] = [];
-
     const orderedTests = [...(order.orderTests || [])].sort((a: any, b: any) => {
-      if (a.panelCode === 'FBC' && b.panelCode === 'FBC') {
-        return getFbcOrderIndex(a.testCode) - getFbcOrderIndex(b.testCode);
-      }
+      if (a.panelCode === 'FBC' && b.panelCode === 'FBC') return getFbcOrderIndex(a.testCode) - getFbcOrderIndex(b.testCode);
       return 0;
     });
-
     orderedTests.forEach((test: any) => {
       const result = order.results?.find((r: any) =>
         r.orderTestId?.toString() === test._id?.toString() ||
         (r.testCode || '').toUpperCase() === (test.testCode || '').toUpperCase()
       );
       const testWithResult = { ...test, result };
-
       if (test.panelCode) {
-        if (!panels[test.panelCode]) {
-          panels[test.panelCode] = { name: test.panelName || test.panelCode, tests: [] };
-        }
+        if (!panels[test.panelCode]) panels[test.panelCode] = { name: test.panelName || test.panelCode, tests: [] };
         panels[test.panelCode].tests.push(testWithResult);
       } else {
         standalone.push(testWithResult);
       }
     });
-
     return { panels, standalone };
   };
 
-  const formatDate = (date: string | Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const formatDate = (date: string | Date) => new Date(date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  const formatTime = (date: string | Date) => new Date(date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
-  const formatTime = (date: string | Date) => {
-    return new Date(date).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
+  const getInitials = (first?: string, last?: string) => `${first?.[0] || ''}${last?.[0] || ''}`.toUpperCase() || '?';
+  const initials = getInitials(patient.firstName, patient.lastName);
 
   return (
     <RoleLayout title="Patient Record" subtitle="Longitudinal clinical history" role={layoutRole} userName={profile?.fullName}>
       <div className="space-y-6">
         {/* Patient Header */}
-        <div className="flex items-start gap-4 bg-card border rounded-xl p-6">
-          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="mt-1">
-            <ArrowLeft className="w-4 h-4" />
-          </Button>
-          <div className="flex-1">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
-                <User className="w-6 h-6 text-primary" />
+        <div className="bg-card border rounded-xl overflow-hidden">
+          <div className="bg-gradient-to-r from-primary/5 via-primary/3 to-transparent px-6 py-5">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+              <Button variant="ghost" size="icon" className="mt-1 shrink-0" onClick={() => navigate(-1)}>
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <div className="w-14 h-14 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center shrink-0">
+                <span className="text-lg font-bold text-primary">{initials}</span>
               </div>
-              <div>
-                <h1 className="text-2xl font-bold">
-                  {patient.firstName} {patient.lastName}
-                </h1>
-                <p className="text-sm text-muted-foreground">
-                  {patient.patientId} • {patient.gender === 'M' ? 'Male' : 'Female'} • {patient.age} {patient.ageUnit || 'years'}
-                </p>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-2xl font-bold tracking-tight">{patient.firstName} {patient.lastName}</h1>
+                </div>
+                <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1"><Hash className="w-3.5 h-3.5" />{patient.patientId}</span>
+                  <span className="flex items-center gap-1">
+                    <User className="w-3.5 h-3.5" />
+                    {patient.gender === 'M' ? 'Male' : patient.gender === 'F' ? 'Female' : 'Other'}
+                  </span>
+                  <span>{patient.age} {patient.ageUnit || 'years'}</span>
+                  {patient.phone && <span className="flex items-center gap-1"><Phone className="w-3.5 h-3.5" />{patient.phone}</span>}
+                </div>
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {patient.bloodType && (
+                    <Badge variant="outline" className="text-[10px] gap-1 bg-red-50 text-red-700 border-red-200">
+                      <Droplets className="w-3 h-3" />{patient.bloodType}
+                    </Badge>
+                  )}
+                  {patient.allergies?.length > 0 && (
+                    <Badge variant="destructive" className="text-[10px] gap-1">
+                      <AlertTriangle className="w-3 h-3" />{patient.allergies.join(', ')}
+                    </Badge>
+                  )}
+                  {patient.chronicConditions?.length > 0 && (
+                    <Badge variant="secondary" className="text-[10px]">{patient.chronicConditions.join(', ')}</Badge>
+                  )}
+                  {patient.insuranceProvider && (
+                    <Badge variant="outline" className="text-[10px]">{patient.insuranceProvider}</Badge>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {patient.bloodType && (
-                <Badge variant="outline" className="gap-1">
-                  <Droplets className="w-3 h-3" />
-                  {patient.bloodType}
-                </Badge>
-              )}
-              {patient.allergies?.length > 0 && (
-                <Badge variant="destructive" className="gap-1">
-                  <AlertTriangle className="w-3 h-3" />
-                  {patient.allergies.join(', ')}
-                </Badge>
-              )}
-              {patient.chronicConditions?.length > 0 && (
-                <Badge variant="secondary" className="gap-1">
-                  {patient.chronicConditions.join(', ')}
-                </Badge>
-              )}
-              {patient.insuranceProvider && (
-                <Badge variant="outline">{patient.insuranceProvider}</Badge>
-              )}
             </div>
           </div>
-        </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: 'Consultations', value: summary.totalConsultations || 0, icon: Stethoscope, color: 'text-blue-600' },
-            { label: 'Prescriptions', value: summary.totalPrescriptions || 0, icon: Pill, color: 'text-green-600' },
-            { label: 'Lab Orders', value: summary.totalLabOrders || 0, icon: FlaskConical, color: 'text-purple-600' },
-            { label: 'Last Visit', value: summary.lastVisit ? formatDate(summary.lastVisit) : 'N/A', icon: Calendar, color: 'text-amber-600' },
-          ].map((stat) => (
-            <Card key={stat.label} className="border-l-4 border-l-primary">
-              <CardContent className="pt-4">
+          {/* Quick Stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 border-t">
+            {[
+              { label: 'Consultations', value: summary.totalConsultations || 0, icon: Stethoscope, color: 'text-blue-600' },
+              { label: 'Prescriptions', value: summary.totalPrescriptions || 0, icon: Pill, color: 'text-emerald-600' },
+              { label: 'Lab Orders', value: summary.totalLabOrders || 0, icon: FlaskConical, color: 'text-purple-600' },
+              { label: 'Last Visit', value: summary.lastVisit ? formatDate(summary.lastVisit) : 'N/A', icon: Calendar, color: 'text-amber-600' },
+            ].map((stat, i) => (
+              <div key={stat.label} className={`px-5 py-4 ${i < 3 ? 'border-r' : ''}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs text-muted-foreground">{stat.label}</p>
-                    <p className="text-lg font-semibold mt-0.5">{stat.value}</p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{stat.label}</p>
+                    <p className="text-lg font-bold mt-0.5">{stat.value}</p>
                   </div>
-                  <stat.icon className={`w-5 h-5 ${stat.color}`} />
+                  <stat.icon className={`w-5 h-5 ${stat.color} opacity-60`} />
                 </div>
-              </CardContent>
-            </Card>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="timeline" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-            <TabsTrigger value="lab-results">Lab Results</TabsTrigger>
-            <TabsTrigger value="prescriptions">Prescriptions</TabsTrigger>
-            <TabsTrigger value="soap-notes">SOAP Notes</TabsTrigger>
-            <TabsTrigger value="vitals">Vitals</TabsTrigger>
+          <TabsList className="bg-transparent h-auto p-0 min-w-max border-b">
+            <TabsTrigger value="timeline" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
+              Timeline
+            </TabsTrigger>
+            <TabsTrigger value="lab-results" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
+              Lab Results <Badge variant="secondary" className="ml-1.5 h-5 text-[10px]">{orders.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="prescriptions" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
+              Prescriptions <Badge variant="secondary" className="ml-1.5 h-5 text-[10px]">{prescriptions.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="soap-notes" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
+              SOAP Notes <Badge variant="secondary" className="ml-1.5 h-5 text-[10px]">{soapNotes.length}</Badge>
+            </TabsTrigger>
+            <TabsTrigger value="vitals" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
+              Vitals
+            </TabsTrigger>
           </TabsList>
 
           {/* Timeline Tab */}
-          <TabsContent value="timeline" className="space-y-4">
+          <TabsContent value="timeline" className="space-y-3">
             {soapNotes.length === 0 && consultations.length === 0 && orders.length === 0 ? (
-              <Card>
-                <CardContent className="pt-12 text-center">
-                  <Clock className="w-12 h-12 mx-auto text-muted-foreground mb-3 opacity-50" />
-                  <p className="text-muted-foreground">No clinical history yet</p>
-                  <p className="text-sm text-muted-foreground mt-1">Encounters will appear here as they are recorded</p>
-                </CardContent>
-              </Card>
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Clock className="w-7 h-7 text-muted-foreground/50" />
+                </div>
+                <p className="font-medium text-muted-foreground">No clinical history yet</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">Encounters will appear here as they are recorded</p>
+              </div>
             ) : (
               <div className="space-y-3">
-                {/* SOAP Notes */}
                 {soapNotes.map((note: any) => (
                   <div key={note._id} className="flex gap-3">
                     <div className="flex flex-col items-center">
-                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                         <Stethoscope className="w-4 h-4 text-blue-600" />
                       </div>
-                      <div className="w-0.5 h-full bg-border mt-1" />
+                      <div className="w-0.5 flex-1 bg-border mt-1" />
                     </div>
                     <Card className="flex-1">
                       <CardHeader className="pb-2">
@@ -275,25 +267,25 @@ const PatientRecord = () => {
                           <div>
                             <CardTitle className="text-sm">Consultation</CardTitle>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : 'Clinical staff'} • {formatDate(note.createdAt)} {formatTime(note.createdAt)}
+                              {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : 'Clinical staff'} &bull; {formatDate(note.createdAt)} {formatTime(note.createdAt)}
                             </p>
                           </div>
                         </div>
                       </CardHeader>
                       <CardContent className="space-y-2 text-sm">
                         {note.chiefComplaint && (
-                          <div>
-                            <span className="font-medium text-blue-600">Complaint:</span> {note.chiefComplaint}
+                          <div className="p-2.5 bg-blue-50 rounded-lg border border-blue-200">
+                            <span className="font-semibold text-blue-700 text-xs uppercase">Complaint:</span> {note.chiefComplaint}
                           </div>
                         )}
                         {note.diagnosis && (
-                          <div>
-                            <span className="font-medium text-orange-600">Diagnosis:</span> {note.diagnosis}
+                          <div className="p-2.5 bg-orange-50 rounded-lg border border-orange-200">
+                            <span className="font-semibold text-orange-700 text-xs uppercase">Diagnosis:</span> {note.diagnosis}
                           </div>
                         )}
                         {note.treatmentPlan && (
-                          <div>
-                            <span className="font-medium text-purple-600">Plan:</span> {note.treatmentPlan}
+                          <div className="p-2.5 bg-purple-50 rounded-lg border border-purple-200">
+                            <span className="font-semibold text-purple-700 text-xs uppercase">Plan:</span> {note.treatmentPlan}
                           </div>
                         )}
                       </CardContent>
@@ -301,14 +293,13 @@ const PatientRecord = () => {
                   </div>
                 ))}
 
-                {/* Lab Orders */}
                 {orders.map((order: any) => (
                   <div key={order._id} className="flex gap-3">
                     <div className="flex flex-col items-center">
-                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
                         <FlaskConical className="w-4 h-4 text-purple-600" />
                       </div>
-                      <div className="w-0.5 h-full bg-border mt-1" />
+                      <div className="w-0.5 flex-1 bg-border mt-1" />
                     </div>
                     <Card className="flex-1">
                       <CardHeader className="pb-2">
@@ -316,7 +307,7 @@ const PatientRecord = () => {
                           <div>
                             <CardTitle className="text-sm">{order.orderNumber}</CardTitle>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {formatDate(order.createdAt)} {formatTime(order.createdAt)} • Dr. {order.doctorId?.fullName || 'N/A'}
+                              {formatDate(order.createdAt)} {formatTime(order.createdAt)} &bull; Dr. {order.doctorId?.fullName || 'N/A'}
                             </p>
                           </div>
                           {getStatusBadge(order.status)}
@@ -324,11 +315,11 @@ const PatientRecord = () => {
                       </CardHeader>
                       <CardContent>
                         <div className="flex flex-wrap gap-1">
-                          {order.orderTests?.slice(0, 5).map((test: any, idx: number) => (
-                            <Badge key={idx} variant="outline" className="text-xs">{test.testName || test.testCode}</Badge>
+                          {order.orderTests?.slice(0, 6).map((test: any, idx: number) => (
+                            <Badge key={idx} variant="secondary" className="text-[10px] font-normal">{test.testName || test.testCode}</Badge>
                           ))}
-                          {order.orderTests?.length > 5 && (
-                            <Badge variant="outline" className="text-xs">+{order.orderTests.length - 5} more</Badge>
+                          {order.orderTests?.length > 6 && (
+                            <Badge variant="secondary" className="text-[10px]">+{order.orderTests.length - 6} more</Badge>
                           )}
                         </div>
                       </CardContent>
@@ -340,14 +331,15 @@ const PatientRecord = () => {
           </TabsContent>
 
           {/* Lab Results Tab */}
-          <TabsContent value="lab-results" className="space-y-4">
+          <TabsContent value="lab-results" className="space-y-3">
             {orders.length === 0 ? (
-              <Card>
-                <CardContent className="pt-12 text-center">
-                  <FlaskConical className="w-12 h-12 mx-auto text-muted-foreground mb-3 opacity-50" />
-                  <p className="text-muted-foreground">No lab orders yet</p>
-                </CardContent>
-              </Card>
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <FlaskConical className="w-7 h-7 text-muted-foreground/50" />
+                </div>
+                <p className="font-medium text-muted-foreground">No lab orders yet</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">Lab results will appear here once ordered</p>
+              </div>
             ) : (
               orders.map((order: any) => {
                 const { panels, standalone } = groupResultsByPanel(order);
@@ -360,53 +352,42 @@ const PatientRecord = () => {
                         <div>
                           <CardTitle className="text-base">{order.orderNumber}</CardTitle>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            {formatDate(order.createdAt)} • Dr. {order.doctorId?.fullName || 'N/A'}
+                            {formatDate(order.createdAt)} &bull; Dr. {order.doctorId?.fullName || 'N/A'}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">
                           {getStatusBadge(order.status)}
                           {getLisBadge(order)}
                           {order.lisSyncStatus === 'synced' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs gap-1"
+                            <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
                               onClick={() => fetchLisResults.mutate(order._id)}
                               disabled={fetchLisResults.isPending}
                               title={order.lisResultsFetchedAt ? `Last fetched ${formatDate(order.lisResultsFetchedAt)}` : 'Fetch LIS results'}
                             >
-                              <RefreshCw className={`w-3 h-3 ${fetchLisResults.isPending ? 'animate-spin' : ''}`} />
-                              Sync Results
+                              <RefreshCw className={`w-3 h-3 ${fetchLisResults.isPending ? 'animate-spin' : ''}`} />Sync
                             </Button>
                           )}
                           {order.status === 'completed' && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs gap-1"
+                            <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
                               onClick={() => {
-                                const reportPath = primaryRole === 'receptionist'
-                                  ? `/reception/reports/${order._id}`
-                                  : `/lab/reports/${order._id}`;
+                                const reportPath = primaryRole === 'receptionist' ? `/reception/reports/${order._id}` : `/lab/reports/${order._id}`;
                                 navigate(reportPath);
                               }}
                             >
-                              <ExternalLink className="w-3 h-3" />
-                              Full Report
+                              <ExternalLink className="w-3 h-3" />Report
                             </Button>
                           )}
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="space-y-4">
-                      {/* Panel Groups */}
+                    <CardContent className="space-y-3">
                       {Object.entries(panels).map(([code, panel]: [string, any]) => (
                         <Collapsible key={code}>
                           <CollapsibleTrigger asChild>
                             <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
                               <ChevronDown className="w-4 h-4 text-muted-foreground collapsible-icon" />
                               <span className="font-medium text-sm">{panel.name}</span>
-                              <Badge variant="outline" className="ml-auto text-xs">{panel.tests.length} tests</Badge>
+                              <Badge variant="outline" className="ml-auto text-[10px]">{panel.tests.length} tests</Badge>
                             </div>
                           </CollapsibleTrigger>
                           <CollapsibleContent className="pt-2 space-y-1 pl-6">
@@ -424,7 +405,7 @@ const PatientRecord = () => {
                                     <p className="text-xs text-muted-foreground mt-0.5">{test.result.referenceRange}</p>
                                   </div>
                                 ) : (
-                                  <Badge variant="secondary" className="text-xs">Pending</Badge>
+                                  <Badge variant="secondary" className="text-[10px]">Pending</Badge>
                                 )}
                               </div>
                             ))}
@@ -432,7 +413,6 @@ const PatientRecord = () => {
                         </Collapsible>
                       ))}
 
-                      {/* Standalone Tests */}
                       {standalone.length > 0 && (
                         <div className="space-y-1">
                           {standalone.map((test: any, idx: number) => (
@@ -449,7 +429,7 @@ const PatientRecord = () => {
                                   <p className="text-xs text-muted-foreground mt-0.5">{test.result.referenceRange}</p>
                                 </div>
                               ) : (
-                                <Badge variant="secondary" className="text-xs">Pending</Badge>
+                                <Badge variant="secondary" className="text-[10px]">Pending</Badge>
                               )}
                             </div>
                           ))}
@@ -467,14 +447,15 @@ const PatientRecord = () => {
           </TabsContent>
 
           {/* Prescriptions Tab */}
-          <TabsContent value="prescriptions" className="space-y-4">
+          <TabsContent value="prescriptions" className="space-y-3">
             {prescriptions.length === 0 ? (
-              <Card>
-                <CardContent className="pt-12 text-center">
-                  <Pill className="w-12 h-12 mx-auto text-muted-foreground mb-3 opacity-50" />
-                  <p className="text-muted-foreground">No prescriptions yet</p>
-                </CardContent>
-              </Card>
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Pill className="w-7 h-7 text-muted-foreground/50" />
+                </div>
+                <p className="font-medium text-muted-foreground">No prescriptions yet</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">Prescriptions will appear here</p>
+              </div>
             ) : (
               prescriptions.map((p: any) => (
                 <Card key={p._id}>
@@ -483,10 +464,10 @@ const PatientRecord = () => {
                       <div>
                         <CardTitle className="text-base">{p.prescriptionNumber}</CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Dr. {p.prescribedBy?.fullName || p.doctorId?.fullName || 'N/A'} • {formatDate(p.createdAt)}
+                          Dr. {p.prescribedBy?.fullName || p.doctorId?.fullName || 'N/A'} &bull; {formatDate(p.createdAt)}
                         </p>
                       </div>
-                      <Badge variant={p.isPaid ? 'default' : 'destructive'}>
+                      <Badge variant={p.isPaid ? 'default' : 'destructive'} className="text-[10px]">
                         {p.isPaid ? 'Paid' : 'Unpaid'}
                       </Badge>
                     </div>
@@ -495,20 +476,20 @@ const PatientRecord = () => {
                     <div className="space-y-2">
                       {p.items?.map((item: any, idx: number) => (
                         <div key={idx} className="flex items-start gap-3 p-3 bg-muted/30 rounded-lg">
-                          <Pill className="w-4 h-4 text-primary mt-0.5" />
-                          <div className="flex-1">
+                          <Pill className="w-4 h-4 text-primary mt-0.5 shrink-0" />
+                          <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm">{item.medicationName}</p>
                             <p className="text-xs text-muted-foreground mt-0.5">
-                              {item.dosage} • {item.frequency} • {item.duration}
+                              {item.dosage} &bull; {item.frequency} &bull; {item.duration}
                             </p>
                             {item.route && (
                               <p className="text-xs text-muted-foreground">Route: {item.route}</p>
                             )}
                             {item.instructions && (
-                              <p className="text-xs text-muted-foreground mt-1">Instructions: {item.instructions}</p>
+                              <p className="text-xs text-muted-foreground mt-1 italic">"{item.instructions}"</p>
                             )}
                           </div>
-                          <Badge variant="outline" className="text-xs">{item.quantity} units</Badge>
+                          <Badge variant="outline" className="text-[10px] shrink-0">{item.quantity} units</Badge>
                         </div>
                       ))}
                     </div>
@@ -519,14 +500,15 @@ const PatientRecord = () => {
           </TabsContent>
 
           {/* SOAP Notes Tab */}
-          <TabsContent value="soap-notes" className="space-y-4">
+          <TabsContent value="soap-notes" className="space-y-3">
             {soapNotes.length === 0 ? (
-              <Card>
-                <CardContent className="pt-12 text-center">
-                  <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-3 opacity-50" />
-                  <p className="text-muted-foreground">No SOAP notes yet</p>
-                </CardContent>
-              </Card>
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <FileText className="w-7 h-7 text-muted-foreground/50" />
+                </div>
+                <p className="font-medium text-muted-foreground">No SOAP notes yet</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">Clinical notes will appear here</p>
+              </div>
             ) : (
               soapNotes.map((note: any) => (
                 <Card key={note._id}>
@@ -534,14 +516,13 @@ const PatientRecord = () => {
                     <div className="flex justify-between items-start">
                       <div>
                         <CardTitle className="text-base flex items-center gap-2">
-                          <Stethoscope className="w-4 h-4" />
-                          Consultation Note
+                          <Stethoscope className="w-4 h-4" />Consultation Note
                         </CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : 'Clinical staff'} • {formatDate(note.createdAt)} {formatTime(note.createdAt)}
+                          {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : 'Clinical staff'} &bull; {formatDate(note.createdAt)} {formatTime(note.createdAt)}
                         </p>
                       </div>
-                      {note.isSigned && <Badge>Signed</Badge>}
+                      {note.isSigned && <Badge className="text-[10px]">Signed</Badge>}
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
@@ -552,15 +533,15 @@ const PatientRecord = () => {
                       </div>
                     )}
                     {note.vitalSigns && (
-                      <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-                        <p className="text-xs font-semibold text-green-700 uppercase">Objective - Vitals</p>
-                        <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                          {note.vitalSigns.bloodPressure && <p>BP: {note.vitalSigns.bloodPressure}</p>}
-                          {note.vitalSigns.temperature && <p>Temp: {note.vitalSigns.temperature}°C</p>}
-                          {note.vitalSigns.heartRate && <p>HR: {note.vitalSigns.heartRate} bpm</p>}
-                          {note.vitalSigns.respiratoryRate && <p>RR: {note.vitalSigns.respiratoryRate}</p>}
-                          {note.vitalSigns.weight && <p>Weight: {note.vitalSigns.weight} kg</p>}
-                          {note.vitalSigns.oxygenSaturation && <p>SpO2: {note.vitalSigns.oxygenSaturation}%</p>}
+                      <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
+                        <p className="text-xs font-semibold text-emerald-700 uppercase">Objective - Vitals</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2 text-sm">
+                          {note.vitalSigns.bloodPressure && <div><span className="text-muted-foreground">BP:</span> <span className="font-medium">{note.vitalSigns.bloodPressure}</span></div>}
+                          {note.vitalSigns.temperature && <div><span className="text-muted-foreground">Temp:</span> <span className="font-medium">{note.vitalSigns.temperature}&deg;C</span></div>}
+                          {note.vitalSigns.heartRate && <div><span className="text-muted-foreground">HR:</span> <span className="font-medium">{note.vitalSigns.heartRate} bpm</span></div>}
+                          {note.vitalSigns.respiratoryRate && <div><span className="text-muted-foreground">RR:</span> <span className="font-medium">{note.vitalSigns.respiratoryRate}</span></div>}
+                          {note.vitalSigns.weight && <div><span className="text-muted-foreground">Weight:</span> <span className="font-medium">{note.vitalSigns.weight} kg</span></div>}
+                          {note.vitalSigns.oxygenSaturation && <div><span className="text-muted-foreground">SpO2:</span> <span className="font-medium">{note.vitalSigns.oxygenSaturation}%</span></div>}
                         </div>
                       </div>
                     )}
@@ -583,42 +564,43 @@ const PatientRecord = () => {
           </TabsContent>
 
           {/* Vitals Tab */}
-          <TabsContent value="vitals" className="space-y-4">
+          <TabsContent value="vitals" className="space-y-3">
             {vitalsHistory.length === 0 ? (
-              <Card>
-                <CardContent className="pt-12 text-center">
-                  <Activity className="w-12 h-12 mx-auto text-muted-foreground mb-3 opacity-50" />
-                  <p className="text-muted-foreground">No vitals recorded yet</p>
-                </CardContent>
-              </Card>
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
+                  <Activity className="w-7 h-7 text-muted-foreground/50" />
+                </div>
+                <p className="font-medium text-muted-foreground">No vitals recorded yet</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">Vitals will appear here after nurse triage</p>
+              </div>
             ) : (
               <Card>
-                <CardContent className="pt-4">
+                <CardContent className="p-0">
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Date</th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">BP</th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Temp</th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">HR</th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">RR</th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">Weight</th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">SpO2</th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground">BMI</th>
+                      <thead className="bg-muted/30">
+                        <tr>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Date</th>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">BP</th>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Temp</th>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">HR</th>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">RR</th>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">Weight</th>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">SpO2</th>
+                          <th className="text-left px-4 py-3 text-xs font-medium text-muted-foreground">BMI</th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y">
                         {vitalsHistory.map((v: any, idx: number) => (
-                          <tr key={idx} className="border-b last:border-b-0 hover:bg-muted/50">
-                            <td className="py-3 px-4">{formatDate(v.date)}</td>
-                            <td className="py-3 px-4">{v.vitalSigns?.bloodPressure || '—'}</td>
-                            <td className="py-3 px-4">{v.vitalSigns?.temperature ? `${v.vitalSigns.temperature}°C` : '—'}</td>
-                            <td className="py-3 px-4">{v.vitalSigns?.heartRate ? `${v.vitalSigns.heartRate} bpm` : '—'}</td>
-                            <td className="py-3 px-4">{v.vitalSigns?.respiratoryRate || '—'}</td>
-                            <td className="py-3 px-4">{v.vitalSigns?.weight ? `${v.vitalSigns.weight} kg` : '—'}</td>
-                            <td className="py-3 px-4">{v.vitalSigns?.oxygenSaturation ? `${v.vitalSigns.oxygenSaturation}%` : '—'}</td>
-                            <td className="py-3 px-4">{v.vitalSigns?.bmi || '—'}</td>
+                          <tr key={idx} className="hover:bg-muted/30">
+                            <td className="px-4 py-3 font-medium">{formatDate(v.date)}</td>
+                            <td className="px-4 py-3">{v.vitalSigns?.bloodPressure || '—'}</td>
+                            <td className="px-4 py-3">{v.vitalSigns?.temperature ? `${v.vitalSigns.temperature}°C` : '—'}</td>
+                            <td className="px-4 py-3">{v.vitalSigns?.heartRate ? `${v.vitalSigns.heartRate} bpm` : '—'}</td>
+                            <td className="px-4 py-3">{v.vitalSigns?.respiratoryRate || '—'}</td>
+                            <td className="px-4 py-3">{v.vitalSigns?.weight ? `${v.vitalSigns.weight} kg` : '—'}</td>
+                            <td className="px-4 py-3">{v.vitalSigns?.oxygenSaturation ? `${v.vitalSigns.oxygenSaturation}%` : '—'}</td>
+                            <td className="px-4 py-3">{v.vitalSigns?.bmi || '—'}</td>
                           </tr>
                         ))}
                       </tbody>
