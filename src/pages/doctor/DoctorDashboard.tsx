@@ -113,6 +113,12 @@ interface Medication {
   strength?: string;
   unitPrice?: number;
   stockQuantity?: number;
+  unit?: string;
+  category?: string;
+  isActive?: boolean;
+  __cafProduct?: boolean;
+  __cafBranchId?: string;
+  packSizes?: Array<{ name: string; unit: string; quantityPerPack: number; sellingPrice: number }>;
 }
 
 // Helper to get flag color
@@ -1933,16 +1939,30 @@ export default function DoctorDashboard() {
                     )}
                     onClick={() => (med.stockQuantity || 0) > 0 && addMedicationToPrescription(med)}
                   >
-                    <div>
-                      <p className="font-medium text-sm">{med.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {med.genericName} - {med.dosageForm} - Le {med.unitPrice?.toLocaleString()}
-                      </p>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{med.name}</p>
+                        {med.__cafProduct && <Badge variant="outline" className="text-[10px] flex-shrink-0">CAF</Badge>}
+                      </div>
+                      {med.genericName && (
+                        <p className="text-xs text-muted-foreground truncate">{med.genericName}</p>
+                      )}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                        {med.dosageForm && <span>{med.dosageForm}</span>}
+                        {med.unit && <span>| {med.unit}</span>}
+                        {med.category && <span>| {med.category}</span>}
+                        <span className="font-medium text-foreground">Le {(med.unitPrice || 0).toLocaleString()}</span>
+                      </div>
+                      {med.packSizes && med.packSizes.length > 0 && (
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
+                          Packs: {med.packSizes.map((ps) => `${ps.name} (${ps.quantityPerPack} ${ps.unit})`).join(', ')}
+                        </p>
+                      )}
                       <p className={cn("text-xs mt-0.5", (med.stockQuantity || 0) > 0 ? "text-emerald-600" : "text-red-600")}>
                         {(med.stockQuantity || 0) > 0 ? `${med.stockQuantity} in stock` : 'Out of stock'}
                       </p>
                     </div>
-                    {(med.stockQuantity || 0) > 0 ? <Plus className="w-4 h-4 text-muted-foreground" /> : <Badge variant="destructive">No stock</Badge>}
+                    {(med.stockQuantity || 0) > 0 ? <Plus className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <Badge variant="destructive" className="flex-shrink-0">No stock</Badge>}
                   </div>
                 ))}
               </ScrollArea>
