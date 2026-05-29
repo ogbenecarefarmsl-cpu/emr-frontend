@@ -352,14 +352,19 @@ export default function DoctorDashboard() {
     ).slice(0, 20);
   }, [lisOrderables, searchTest]);
 
-  // Filter medications based on search
+  // Search medications — hits backend /medications/search which includes CAF products
+  const { data: searchResults = [] } = useQuery({
+    queryKey: ['medications', 'search', searchMedication],
+    queryFn: () => medicationService.search(searchMedication),
+    enabled: searchMedication.length >= 2,
+    staleTime: 30 * 1000,
+  });
+
+  // Filter medications based on search — use live search results when typing, else show first 20
   const filteredMedications = useMemo(() => {
-    if (!searchMedication) return (medications || []).slice(0, 20);
-    return (medications || []).filter((m: Medication) =>
-      m.name?.toLowerCase().includes(searchMedication.toLowerCase()) ||
-      m.genericName?.toLowerCase().includes(searchMedication.toLowerCase())
-    ).slice(0, 20);
-  }, [medications, searchMedication]);
+    if (searchMedication.length >= 2) return searchResults;
+    return (medications || []).slice(0, 20);
+  }, [medications, searchMedication, searchResults]);
 
   // Reset forms when selected visit changes
   useEffect(() => {
@@ -1926,7 +1931,7 @@ export default function DoctorDashboard() {
               <Input
                 value={searchMedication}
                 onChange={(e) => setSearchMedication(e.target.value)}
-                placeholder="Search by medication name..."
+                placeholder="Type at least 2 characters to search CAF & local..."
                 className="mt-1"
               />
               <ScrollArea className="h-48 mt-2 border rounded-lg">
