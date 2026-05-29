@@ -360,10 +360,10 @@ export default function DoctorDashboard() {
     staleTime: 30 * 1000,
   });
 
-  // Filter medications based on search — use live search results when typing, else show first 20
+  // Filter medications based on search — use live search results when typing, else show all
   const filteredMedications = useMemo(() => {
     if (searchMedication.length >= 2) return searchResults;
-    return (medications || []).slice(0, 20);
+    return medications || [];
   }, [medications, searchMedication, searchResults]);
 
   // Reset forms when selected visit changes
@@ -1931,10 +1931,10 @@ export default function DoctorDashboard() {
               <Input
                 value={searchMedication}
                 onChange={(e) => setSearchMedication(e.target.value)}
-                placeholder="Type at least 2 characters to search CAF & local..."
+                placeholder="Search to filter medications..."
                 className="mt-1"
               />
-              <ScrollArea className="h-48 mt-2 border rounded-lg">
+              <ScrollArea className="h-80 mt-2 border rounded-lg">
                 {filteredMedications.map((med: Medication) => (
                   <div
                     key={med._id}
