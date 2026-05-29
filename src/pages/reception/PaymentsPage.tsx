@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useOrders, useAddPayment, usePaymentHistory, usePaymentStats, useDailyIncome } from '@/hooks/useOrders';
+import { paymentsAPI } from '@/services/api';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -32,6 +34,10 @@ export default function PaymentsPage() {
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
   const { data: orders, isLoading } = useOrders('all');
+  const { data: allPayments = [] } = useQuery({
+    queryKey: ['payments'],
+    queryFn: () => paymentsAPI.getAll(),
+  });
   const addPayment = useAddPayment();
   const { data: paymentHistory, isLoading: historyLoading } = usePaymentHistory(historyOrderId);
   
@@ -61,7 +67,34 @@ export default function PaymentsPage() {
   const { data: paymentStats } = usePaymentStats(start, end);
   const { data: dailyIncome } = useDailyIncome(start, end);
 
-  const filteredOrders = Array.isArray(orders) ? orders.filter(order => {
+  // Merge orders with prescription payments that have no orderId
+  const allItems = Array.isArray(orders) ? [...orders] : [];
+  if (Array.isArray(allPayments)) {
+    const orderIds = new Set(allItems.map((o: any) => o.id || o._id));
+    for (const p of allPayments) {
+      if (p.paymentType === 'prescription' && p.prescriptionId && !p.orderId) {
+        const rx = p.prescriptionId;
+        const medications = Array.isArray(rx?.medications) ? rx.medications : [];
+        const rxTotal = medications.reduce((sum: number, m: any) => sum + (m.totalPrice || m.price || 0), 0);
+        allItems.push({
+          _id: `rx-${p._id}`,
+          orderNumber: `RX-${(rx?.createdAt ? format(new Date(rx.createdAt), 'yyMM') : '0000')}-${String(p._id).slice(-4).toUpperCase()}`,
+          patientId: p.visitId?.patientId || {},
+          total: rxTotal || p.amount,
+          amountPaid: p.amount,
+          balance: Math.max(0, (rxTotal || p.amount) - p.amount),
+          paymentMethod: p.paymentMethod,
+          paymentStatus: p.amount >= (rxTotal || p.amount) ? 'paid' : 'partial',
+          createdAt: p.createdAt,
+          orderType: 'pharmacy',
+          _isPrescriptionPayment: true,
+          _paymentId: p._id,
+        });
+      }
+    }
+  }
+
+  const filteredOrders = Array.isArray(allItems) ? allItems.filter((order: any) => {
     // Filter by payment status
     const paymentStatus = order.paymentStatus || order.payment_status;
     if (paymentFilter !== 'all' && paymentStatus !== paymentFilter) return false;
@@ -80,19 +113,19 @@ export default function PaymentsPage() {
     );
   }) : [];
 
-  const pendingTotal = Array.isArray(orders) ? orders
-    .filter(o => ['pending', 'partial'].includes(o.paymentStatus || o.payment_status || ''))
-    .reduce((sum, o) => sum + Number(o.balance ?? (Number(o.total || o.totalAmount || 0) - Number(o.amountPaid || 0))), 0) : 0;
+  const pendingTotal = Array.isArray(allItems) ? allItems
+    .filter((o: any) => ['pending', 'partial'].includes(o.paymentStatus || o.payment_status || ''))
+    .reduce((sum: number, o: any) => sum + Number(o.balance ?? (Number(o.total || o.totalAmount || 0) - Number(o.amountPaid || 0))), 0) : 0;
 
-  const paidTodayTotal = Array.isArray(orders) ? orders
-    .filter(o => {
+  const paidTodayTotal = Array.isArray(allItems) ? allItems
+    .filter((o: any) => {
       const paymentStatus = o.paymentStatus || o.payment_status;
       if (paymentStatus !== 'paid') return false;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       return new Date(o.createdAt || o.created_at) >= today;
     })
-    .reduce((sum, o) => sum + Number(o.amountPaid || o.total || o.totalAmount || 0), 0) : 0;
+    .reduce((sum: number, o: any) => sum + Number(o.amountPaid || o.total || o.totalAmount || 0), 0) : 0;
 
   const handleProcessPayment = async () => {
     if (!selectedOrder || isProcessingPayment || addPayment.isPending) return;
@@ -335,6 +368,7 @@ export default function PaymentsPage() {
               <tr>
                 <th>Order #</th>
                 <th>Patient</th>
+                <th>Type</th>
                 <th>Total</th>
                 <th>Paid</th>
                 <th>Balance</th>
@@ -344,7 +378,7 @@ export default function PaymentsPage() {
               </tr>
             </thead>
             <tbody>
-              {filteredOrders?.map(order => {
+              {filteredOrders?.map((order: any) => {
                 const orderNum = order.orderNumber || order.order_number;
                 const firstName = order.patientId?.firstName || order.patients?.first_name;
                 const lastName = order.patientId?.lastName || order.patients?.last_name;
@@ -354,6 +388,7 @@ export default function PaymentsPage() {
                 const paymentStatus = order.paymentStatus || order.payment_status;
                 const amountPaid = Number(order.amountPaid || 0);
                 const balance = Number(order.balance ?? (Number(total) - amountPaid));
+                const orderType = order.orderType || order.order_type || '';
                 
                 return (
                   <tr key={order.id || order._id}>
@@ -365,6 +400,17 @@ export default function PaymentsPage() {
                           {format(new Date(createdAt), 'MMM dd, HH:mm')}
                         </p>
                       </div>
+                    </td>
+                    <td>
+                      <Badge variant="outline" className={cn(
+                        'text-[10px]',
+                        order._isPrescriptionPayment ? 'bg-purple-500/10 text-purple-600' :
+                        orderType === 'lab' ? 'bg-blue-500/10 text-blue-600' :
+                        orderType === 'pharmacy' ? 'bg-emerald-500/10 text-emerald-600' :
+                        'bg-muted'
+                      )}>
+                        {order._isPrescriptionPayment ? 'Prescription' : orderType === 'lab' ? 'Lab' : orderType === 'pharmacy' ? 'Pharmacy' : orderType || '—'}
+                      </Badge>
                     </td>
                     <td className="font-bold">Le {Number(total).toLocaleString()}</td>
                     <td className="text-status-normal font-medium">Le {amountPaid.toLocaleString()}</td>

@@ -381,6 +381,13 @@ export const ordersAPI = {
   },
 };
 
+export const paymentsAPI = {
+  getAll: async (params?: any) => {
+    const response = await api.get('/payments', { params });
+    return response.data;
+  },
+};
+
 export const doctorsAPI = {
   getAll: async (params?: { search?: string; activeOnly?: boolean }) => {
     const response = await api.get('/doctors', { params });
