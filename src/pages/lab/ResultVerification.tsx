@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { usePendingVerificationResults, useVerifyResult } from '@/hooks/useResults';
+import { visitsAPI } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,6 +32,28 @@ export default function ResultVerification() {
       await verifyResult.mutateAsync({
         id: selectedResult.id || selectedResult._id
       });
+
+      const orderId = selectedResult.orderId?._id || selectedResult.orders?._id;
+      const visitId = selectedResult.orderId?.visitId || selectedResult.orders?.visitId;
+
+      // Check if all results for this order are now verified
+      if (orderId) {
+        const remainingForOrder = (pendingResults || []).filter(
+          (r: any) => {
+                const rid = r.orderId?._id || r.orders?._id;
+                const rId = r.id || r._id;
+                return rid === orderId && rId !== (selectedResult.id || selectedResult._id);
+              }
+        );
+        if (remainingForOrder.length === 0 && visitId) {
+          const vid = typeof visitId === 'object' ? visitId?._id : visitId;
+          if (vid) {
+            try {
+              await visitsAPI.resultsReleased(vid);
+            } catch {}
+          }
+        }
+      }
 
       toast.success('Result verified successfully');
       setShowVerifyDialog(false);

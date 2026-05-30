@@ -314,6 +314,8 @@ export default function DoctorDashboard() {
     staleTime: 30 * 1000,
   });
 
+  const currentVisitId = selectedVisit?._id || selectedVisit?.id;
+
   // Current visit prescriptions (pending and unpaid)
   const currentVisitPrescriptions = (Array.isArray(patientPrescriptions) ? patientPrescriptions : [])
     .filter((rx: any) => {
@@ -327,7 +329,6 @@ export default function DoctorDashboard() {
     const visitId = selectedVisit?._id || selectedVisit?.id;
     return orderVisitId === visitId && (order.orderType || order.order_type) === 'lab';
   });
-  const currentVisitId = selectedVisit?._id || selectedVisit?.id;
   const currentVisitOrders = (Array.isArray(patientOrders) ? patientOrders : [])
     .filter((order: any) => {
       const orderVisitId = typeof order.visitId === 'object' ? order.visitId?._id : order.visitId;
