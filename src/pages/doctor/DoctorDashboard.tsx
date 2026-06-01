@@ -998,6 +998,13 @@ export default function DoctorDashboard() {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    {selectedVisit.room && (
+                      <Badge variant="secondary" className="gap-1">
+                        <BedDouble className="w-3 h-3" />
+                        {selectedVisit.room}
+                        {selectedVisit.roomType && <span className="text-[9px] opacity-70">({selectedVisit.roomType})</span>}
+                      </Badge>
+                    )}
                     <Badge variant="outline">{selectedVisit.visitNumber}</Badge>
                     <Badge className={visitStatusTone(selectedVisit.status)}>
                       {statusLabel(selectedVisit.status)}
@@ -1395,6 +1402,39 @@ export default function DoctorDashboard() {
                       </div>
                     )}
 
+                    {/* Doctor Vitals — editable during consultation */}
+                    <div className="rounded-lg border p-4 bg-background">
+                      <div className="flex items-center justify-between mb-3">
+                        <Label className="text-sm font-semibold flex items-center gap-2">
+                          <Heart className="w-4 h-4 text-red-500" />
+                          Vitals
+                        </Label>
+                        <span className="text-[10px] text-muted-foreground">Record or update during consultation</span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+                        {[
+                          { key: 'temperature', label: 'Temp (C)', placeholder: '36.5', type: 'number' },
+                          { key: 'bloodPressure', label: 'BP (mmHg)', placeholder: '120/80', type: 'text' },
+                          { key: 'heartRate', label: 'HR (bpm)', placeholder: '72', type: 'number' },
+                          { key: 'respiratoryRate', label: 'RR (/min)', placeholder: '16', type: 'number' },
+                          { key: 'weight', label: 'Weight (kg)', placeholder: '70', type: 'number' },
+                          { key: 'height', label: 'Height (cm)', placeholder: '170', type: 'number' },
+                          { key: 'oxygenSaturation', label: 'SpO2 (%)', placeholder: '98', type: 'number' },
+                        ].map((field) => (
+                          <div key={field.key}>
+                            <Label className="text-[11px] text-muted-foreground">{field.label}</Label>
+                            <Input
+                              type={field.type}
+                              value={(vitalsForm as any)[field.key]}
+                              onChange={(e) => setVitalsForm({ ...vitalsForm, [field.key]: e.target.value })}
+                              placeholder={field.placeholder}
+                              className="mt-1 h-8 text-sm"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
                     <div className="rounded-lg border p-4 bg-background">
                       <Label className="text-sm font-semibold">Diagnosis</Label>
                       <Input
@@ -1743,6 +1783,45 @@ export default function DoctorDashboard() {
                   </Tabs>
                 </TabsContent>
               </Tabs>
+
+              {/* Sticky Action Bar — always visible at bottom of workspace */}
+              <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-3">
+                {closureBlockers.length > 0 && (
+                  <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800">
+                    {closureBlockers.length === 1 ? closureBlockers[0] : `${closureBlockers.length} blocker(s) before closing`}
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="font-medium text-foreground">{statusLabel(selectedVisit.status)}</span>
+                    {selectedVisit.room && <span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">Room: {selectedVisit.room}</span>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setActiveTab('soap')}>
+                      <FileText className="w-3.5 h-3.5 mr-1.5" />
+                      Notes
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
+                      <ClipboardList className="w-3.5 h-3.5 mr-1.5" />
+                      Orders
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}>
+                      <FlaskConical className="w-3.5 h-3.5 mr-1.5" />
+                      Results
+                    </Button>
+                    <div className="w-px h-5 bg-border mx-1" />
+                    <Button
+                      size="sm"
+                      onClick={handleCompleteAndNext}
+                      disabled={completeVisit.isPending || !canCloseEncounter}
+                      title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}
+                    >
+                      {completeVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />}
+                      Complete & Next
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </div>
           ) : (
             <div className="bg-card border rounded-xl shadow-sm p-8">
