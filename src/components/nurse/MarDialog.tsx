@@ -14,7 +14,7 @@ interface MarDialogProps {
 export function MarDialog({ admission, medications, open, onOpenChange }: MarDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>MAR: {patientName(admission?.patientId)}</DialogTitle>
         </DialogHeader>
@@ -25,24 +25,29 @@ export function MarDialog({ admission, medications, open, onOpenChange }: MarDia
           {medications.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No active medication orders</p>
           ) : (
-            <div className="border rounded-lg divide-y">
+            <div className="overflow-hidden rounded-lg border">
+              <div className="grid grid-cols-[minmax(220px,1fr)_120px_120px_120px] bg-muted/30 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                <span>Medication</span>
+                <span>Route</span>
+                <span>Next due</span>
+                <span>Status</span>
+              </div>
               {medications.map((med, index) => {
                 const isDue = med.nextDue ? new Date(med.nextDue) <= new Date() : false;
                 const isGiven = med.status === 'given' || med.status === 'administered';
                 return (
-                  <div key={`${med.medicationName || med.name}-${index}`} className="p-3 flex items-center justify-between gap-3">
+                  <div key={`${med.medicationName || med.name}-${index}`} className="grid grid-cols-[minmax(220px,1fr)_120px_120px_120px] items-center gap-3 border-t p-3">
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">{med.medicationName || med.name}</p>
                       <p className="text-xs text-muted-foreground">
-                        {med.dosage} - {med.frequency} - {med.route || 'PO'}
+                        {med.dosage} - {med.frequency}
                       </p>
-                      {med.nextDue && (
-                        <p className={cn('text-xs mt-0.5 font-medium', isDue ? 'text-amber-600' : 'text-muted-foreground')}>
-                          Next due: {new Date(med.nextDue).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      )}
                     </div>
-                    <Badge variant={isGiven ? 'default' : isDue ? 'destructive' : 'outline'} className="flex-shrink-0">
+                    <span className="text-sm text-muted-foreground">{med.route || 'PO'}</span>
+                    <span className={cn('text-xs font-medium', isDue ? 'text-amber-600' : 'text-muted-foreground')}>
+                      {med.nextDue ? new Date(med.nextDue).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Not set'}
+                    </span>
+                    <Badge variant={isGiven ? 'default' : isDue ? 'destructive' : 'outline'} className="w-fit">
                       {isGiven ? 'Given' : isDue ? 'Due Now' : 'Scheduled'}
                     </Badge>
                   </div>

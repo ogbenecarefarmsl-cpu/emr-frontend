@@ -244,14 +244,14 @@ function ConsultSection({
               value={soapForm.subjective}
               onChange={(e) => setSoapForm({ ...soapForm, subjective: e.target.value })}
               placeholder="Patient reports…"
-              rows={3}
+              rows={4}
               className="w-full text-[13px] border-[#dfe3e8] focus:border-[#006194] focus:ring-1 focus:ring-[#006194] resize-none"
             />
           </div>
         </div>
 
         {/* Objective + Assessment Row */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
           {/* Objective */}
           <div className="bg-white border border-[#dfe3e8] rounded-xl overflow-hidden flex flex-col">
             <div className="bg-[#f1f4fa] px-4 py-2.5 border-b border-[#dfe3e8] flex justify-between items-center">
@@ -380,7 +380,7 @@ function ConsultSection({
               value={soapForm.plan}
               onChange={(e) => setSoapForm({ ...soapForm, plan: e.target.value })}
               placeholder="Treatment plan, follow-up, patient education…"
-              rows={3}
+              rows={4}
               className="w-full text-[13px] border-[#dfe3e8] focus:border-[#006194] focus:ring-1 focus:ring-[#006194] resize-none"
             />
             {currentVisitOrders.length > 0 && (
@@ -408,7 +408,7 @@ function ConsultSection({
       </div>
 
       {/* Right Panel - 1/3 */}
-      <div className="w-[300px] flex flex-col gap-4 shrink-0">
+      <div className="hidden xl:flex w-[340px] flex-col gap-4 shrink-0">
         {labResults.length > 0 && (
           <div className="bg-white border border-[#dfe3e8] rounded-xl overflow-hidden flex flex-col">
             <div className="bg-[#f1f4fa] px-4 py-2.5 border-b border-[#dfe3e8] flex justify-between items-center">
@@ -922,6 +922,7 @@ export default function DoctorDashboard() {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [activeSection, setActiveSection] = useState<'consult' | 'history' | 'labs' | 'rx'>('consult');
   const [historyTab, setHistoryTab] = useState('visits');
+  const [worklistMode, setWorklistMode] = useState<'queue' | 'active' | 'results' | null>(null);
 
   const [labOrderModalOpen, setLabOrderModalOpen] = useState(false);
   const [selectedTests, setSelectedTests] = useState<Test[]>([]);
@@ -1442,16 +1443,17 @@ export default function DoctorDashboard() {
 
           <nav className="flex-1 overflow-y-auto py-2 px-2 flex flex-col gap-1">
             {[
-              { id: 'queue', label: 'Queue', icon: Stethoscope, count: waitingQueue.length + activePatients.length, active: true },
-              { id: 'vitals', label: 'Vitals', icon: Activity, count: 0 },
-              { id: 'triage', label: 'Triage', icon: AlertTriangle, count: 0 },
-              { id: 'pharmacy', label: 'Pharmacy', icon: Pill, count: 0 },
+              { id: 'queue', label: 'Waiting Patients', icon: Clock, count: waitingQueue.length, mode: 'queue' as const },
+              { id: 'active', label: 'Patients I am Seeing', icon: Stethoscope, count: activePatients.length, mode: 'active' as const },
+              { id: 'results', label: 'Results Ready', icon: FlaskConical, count: resultsReady.length, mode: 'results' as const },
             ].map((item) => (
               <button
                 key={item.id}
+                type="button"
+                onClick={() => setWorklistMode(item.mode)}
                 className={cn(
                   "flex items-center gap-3 px-3 py-2 rounded-lg text-[11px] font-bold uppercase tracking-wider transition-colors",
-                  item.active
+                  item.count > 0
                     ? "border-l-2 border-[#006194] bg-[#cce5ff] text-[#004b73]"
                     : "text-[#3f4850] hover:bg-[#e5e8ee]"
                 )}
@@ -1461,7 +1463,7 @@ export default function DoctorDashboard() {
                 {item.count > 0 && (
                   <span className={cn(
                     "px-1.5 py-0.5 rounded-full text-[10px] font-bold",
-                    item.active ? "bg-[#004b73] text-white" : "bg-[#dfe3e8] text-[#3f4850]"
+                    item.count > 0 ? "bg-[#004b73] text-white" : "bg-[#dfe3e8] text-[#3f4850]"
                   )}>
                     {item.count}
                   </span>
@@ -1470,10 +1472,10 @@ export default function DoctorDashboard() {
             ))}
 
             <div className="mt-4 mb-1 px-3">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-[#707881]">Today's Roster</p>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-[#707881]">Pinned Worklist</p>
             </div>
             <div className="flex flex-col gap-1">
-              {sidebarQueue.slice(0, 5).map((visit: Visit) => {
+              {sidebarQueue.slice(0, 4).map((visit: Visit) => {
                 const isSelected = selectedVisit?._id === visit._id;
                 const name = patientDisplayName(visit);
                 const initials = patientInitials(visit);
@@ -1504,6 +1506,15 @@ export default function DoctorDashboard() {
               })}
               {sidebarQueue.length === 0 && (
                 <p className="text-[11px] text-[#707881] text-center py-3">No active patients</p>
+              )}
+              {sidebarQueue.length > 4 && (
+                <button
+                  type="button"
+                  onClick={() => setWorklistMode('active')}
+                  className="mt-1 rounded px-2 py-2 text-[11px] font-bold text-[#006194] hover:bg-white"
+                >
+                  View full worklist
+                </button>
               )}
             </div>
           </nav>
@@ -1580,7 +1591,7 @@ export default function DoctorDashboard() {
               </div>
 
               {/* Clinical Content */}
-              <div key={activeSection} className="flex-1 overflow-y-auto p-5 flex gap-5">
+              <div key={activeSection} className="flex-1 overflow-y-auto p-4 xl:p-5 flex gap-5">
                 {activeSection === 'consult' && (
                   <ConsultSection
                     selectedVisit={selectedVisit}
@@ -1710,6 +1721,54 @@ export default function DoctorDashboard() {
       </div>
 
       {/* Modals - all preserved from original */}
+      <Dialog open={!!worklistMode} onOpenChange={(open) => !open && setWorklistMode(null)}>
+        <DialogContent className="max-w-4xl max-h-[86vh] overflow-hidden">
+          <DialogHeader>
+            <DialogTitle>
+              {worklistMode === 'queue' && 'Waiting Patients'}
+              {worklistMode === 'active' && 'Patients I am Seeing'}
+              {worklistMode === 'results' && 'Results Ready for Review'}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[68vh] pr-3">
+            <div className="grid gap-2">
+              {(worklistMode === 'queue' ? waitingQueue : worklistMode === 'active' ? activePatients : resultsReady).length === 0 ? (
+                <div className="py-12 text-center text-sm text-[#707881]">No patients in this worklist</div>
+              ) : (
+                (worklistMode === 'queue' ? waitingQueue : worklistMode === 'active' ? activePatients : resultsReady).map((visit: Visit) => (
+                  <button
+                    key={visit._id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedVisit(visit);
+                      setWorklistMode(null);
+                      if (worklistMode === 'results') setActiveSection('labs');
+                    }}
+                    className={cn(
+                      "grid grid-cols-[1fr_auto] gap-3 rounded-lg border border-[#dfe3e8] bg-white p-3 text-left transition-colors hover:bg-[#f7f9ff] border-l-4",
+                      queueBorderColor(visit.status)
+                    )}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="truncate text-[14px] font-bold text-[#181c20]">{patientDisplayName(visit)}</span>
+                        <Badge variant="outline" className="capitalize text-[10px]">{statusLabel(visit.status)}</Badge>
+                      </div>
+                      <p className="mt-1 truncate text-[12px] text-[#3f4850]">
+                        {visit.visitNumber} - {visit.patientId?.patientId || visit.patientId?.mrn || 'No MRN'} - {visit.chiefComplaint || 'No complaint recorded'}
+                      </p>
+                    </div>
+                    <div className="text-right text-[11px] text-[#707881]">
+                      <p className="font-bold text-[#181c20]">{waitTimeLabel(visit.createdAt)}</p>
+                      <p>waiting</p>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
       <Dialog open={labOrderModalOpen} onOpenChange={(open) => { if (!open) cancelEdit(); setLabOrderModalOpen(open); }}>
         <DialogContent className="max-w-2xl max-h-[85vh]">
           <DialogHeader>
