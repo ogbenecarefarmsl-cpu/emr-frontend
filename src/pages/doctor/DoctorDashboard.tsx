@@ -26,7 +26,7 @@ import {
   Loader2, Clock, CheckCircle, User, Stethoscope, FlaskConical, Pill,
   AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
   Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
-  Pencil, ChevronRight, X, Check, AlertOctagon, Hourglass, PlusCircle, FileText, Hospital, FlaskRound, Stethoscope as StethoscopeIcon, BarChart3, Pill as PillIcon
+  Pencil, Bell, Settings, HelpCircle, LogOut, ChevronRight, X, Check, AlertOctagon, Hourglass, PlusCircle, FileText, Hospital, FlaskRound, Stethoscope as StethoscopeIcon, BarChart3, Pill as PillIcon
 } from 'lucide-react';
 
 interface Visit {
@@ -1533,6 +1533,12 @@ export default function DoctorDashboard() {
               className="w-full h-9 pl-9 pr-3 text-[13px] bg-[#f1f4fa] border border-[#dfe3e8] rounded-full text-[#181c20] focus:border-[#006194] focus:ring-1 focus:ring-[#006194] focus:bg-white outline-none"
             />
           </div>
+          <button className="w-9 h-9 rounded-full hover:bg-[#ebeef4] flex items-center justify-center text-[#3f4850]">
+            <Bell className="w-4 h-4" />
+          </button>
+          <button className="w-9 h-9 rounded-full hover:bg-[#ebeef4] flex items-center justify-center text-[#3f4850]">
+            <Settings className="w-4 h-4" />
+          </button>
           <div className="w-8 h-8 rounded-full overflow-hidden border border-[#dfe3e8] bg-[#dae2fd] flex items-center justify-center text-[#006194] text-[11px] font-bold">
             {profile?.fullName?.[0] || 'D'}
           </div>
@@ -1564,7 +1570,9 @@ export default function DoctorDashboard() {
           <nav className="flex-1 overflow-y-auto py-2 px-2 flex flex-col gap-1">
             {[
               { id: 'queue', label: 'Queue', icon: Stethoscope, count: waitingQueue.length + activePatients.length, active: true },
-              { id: 'results', label: 'Results Ready', icon: FlaskConical, count: resultsReady.length },
+              { id: 'vitals', label: 'Vitals', icon: Activity, count: 0 },
+              { id: 'triage', label: 'Triage', icon: AlertTriangle, count: 0 },
+              { id: 'pharmacy', label: 'Pharmacy', icon: Pill, count: 0 },
             ].map((item) => (
               <button
                 key={item.id}
@@ -1627,7 +1635,16 @@ export default function DoctorDashboard() {
             </div>
           </nav>
 
-
+          <div className="p-2 border-t border-[#dfe3e8] flex flex-col gap-1">
+            <button className="flex items-center gap-3 px-3 py-2 rounded text-[11px] font-bold uppercase tracking-wider text-[#3f4850] hover:bg-[#e5e8ee]">
+              <HelpCircle className="w-4 h-4" />
+              Support
+            </button>
+            <button className="flex items-center gap-3 px-3 py-2 rounded text-[11px] font-bold uppercase tracking-wider text-[#3f4850] hover:bg-[#e5e8ee]">
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
+          </div>
         </aside>
 
         {/* Main Workspace */}
