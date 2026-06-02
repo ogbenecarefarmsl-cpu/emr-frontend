@@ -340,41 +340,51 @@ function ConsultSection({
 
         {/* Plan */}
         <div className="bg-white border border-[#dfe3e8] rounded-xl overflow-hidden flex flex-col flex-1">
-          <div className="bg-[#f1f4fa] px-4 py-2.5 border-b border-[#dfe3e8] flex justify-between items-center">
-            <h3 className="text-[14px] font-bold text-[#181c20] flex items-center gap-2">
-              <CheckCircle className="w-4 h-4 text-[#006194]" />
-              Plan
+          <div className="bg-gradient-to-r from-[#006194] to-[#007bb9] px-4 py-3 border-b border-[#dfe3e8] flex justify-between items-center">
+            <h3 className="text-[14px] font-bold text-white flex items-center gap-2">
+              <ClipboardList className="w-4 h-4" />
+              Plan & Orders
             </h3>
+            <span className="text-[10px] text-white/80 font-medium uppercase tracking-wider">Clinical Actions</span>
           </div>
-          <div className="p-4 flex flex-col gap-3">
+          <div className="p-4 flex flex-col gap-4">
             <div className="grid grid-cols-3 gap-2">
-              <Button
-                variant="outline"
+              <button
+                type="button"
                 onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}
                 disabled={!canContinueClinicalWork}
-                className="h-11 border-[#dfe3e8] hover:bg-[#f1f4fa] text-[13px] font-medium text-[#181c20]"
+                className="group h-auto py-3 px-2 bg-[#894d00]/5 border border-[#894d00]/20 rounded-xl flex flex-col items-center gap-1.5 hover:bg-[#894d00]/10 hover:border-[#894d00]/40 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <FlaskConical className="w-4 h-4 mr-2 text-[#006194]" />
-                Order Labs
-              </Button>
-              <Button
-                variant="outline"
+                <div className="w-9 h-9 rounded-lg bg-[#894d00] flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <FlaskConical className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-[12px] font-semibold text-[#181c20]">Order Labs</span>
+                <span className="text-[10px] text-[#707881]">Diagnostic tests</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }}
                 disabled={!canContinueClinicalWork}
-                className="h-11 border-[#dfe3e8] hover:bg-[#f1f4fa] text-[13px] font-medium text-[#181c20]"
+                className="group h-auto py-3 px-2 bg-[#006194]/5 border border-[#006194]/20 rounded-xl flex flex-col items-center gap-1.5 hover:bg-[#006194]/10 hover:border-[#006194]/40 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <Pill className="w-4 h-4 mr-2 text-[#006194]" />
-                Prescribe
-              </Button>
-              <Button
-                variant="outline"
+                <div className="w-9 h-9 rounded-lg bg-[#006194] flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Pill className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-[12px] font-semibold text-[#181c20]">Prescribe</span>
+                <span className="text-[10px] text-[#707881]">Medications</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setReferralOpen(true)}
                 disabled={!canContinueClinicalWork}
-                className="h-11 border-[#dfe3e8] hover:bg-[#f1f4fa] text-[13px] font-medium text-[#181c20]"
+                className="group h-auto py-3 px-2 bg-[#0d9488]/5 border border-[#0d9488]/20 rounded-xl flex flex-col items-center gap-1.5 hover:bg-[#0d9488]/10 hover:border-[#0d9488]/40 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                <UserCheck className="w-4 h-4 mr-2 text-[#006194]" />
-                Refer
-              </Button>
+                <div className="w-9 h-9 rounded-lg bg-[#0d9488] flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <UserCheck className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-[12px] font-semibold text-[#181c20]">Refer</span>
+                <span className="text-[10px] text-[#707881]">Specialist / ward</span>
+              </button>
             </div>
             <Textarea
               value={soapForm.plan}
@@ -498,6 +508,19 @@ function HistorySection({ patientVisits, selectedVisit, patientChart, chartLoadi
     { id: 'admissions', label: 'Admissions' },
     { id: 'vitals', label: 'Vitals' },
   ];
+
+  const getCount = (id: string) => {
+    switch (id) {
+      case 'visits': return patientVisits.filter((v: Visit) => v._id !== selectedVisit._id).length;
+      case 'soap': return (patientChart?.soapNotes || []).length;
+      case 'labs': return (patientChart?.orders || []).filter((o: any) => (o.orderType || o.order_type) === 'lab').length;
+      case 'meds': return (patientChart?.prescriptions || []).length;
+      case 'admissions': return (patientChart?.admissions || []).length;
+      case 'vitals': return (patientChart?.vitalsHistory || []).length;
+      default: return 0;
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col min-w-0">
       <div className="bg-white border border-[#dfe3e8] rounded-t-xl px-5 py-3 flex items-center justify-between border-b">
@@ -508,36 +531,65 @@ function HistorySection({ patientVisits, selectedVisit, patientChart, chartLoadi
         {chartLoading && <Loader2 className="w-4 h-4 animate-spin text-[#707881]" />}
       </div>
       <div className="bg-white border-l border-r border-[#dfe3e8] px-5 flex gap-1 overflow-x-auto">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setHistoryTab(t.id)}
-            className={cn(
-              "px-3 py-2.5 text-[12px] font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap",
-              historyTab === t.id
-                ? "text-[#006194] border-[#006194]"
-                : "text-[#3f4850] border-transparent hover:text-[#181c20]"
-            )}
-          >
-            {t.label}
-          </button>
-        ))}
+        {tabs.map((t) => {
+          const count = getCount(t.id);
+          return (
+            <button
+              key={t.id}
+              onClick={() => setHistoryTab(t.id)}
+              className={cn(
+                "px-3 py-2.5 text-[12px] font-bold uppercase tracking-wider transition-colors border-b-2 whitespace-nowrap flex items-center gap-1.5",
+                historyTab === t.id
+                  ? "text-[#006194] border-[#006194]"
+                  : "text-[#3f4850] border-transparent hover:text-[#181c20]"
+              )}
+            >
+              {t.label}
+              {count > 0 && (
+                <span className={cn(
+                  "px-1.5 py-0.5 rounded-full text-[10px] font-bold min-w-[18px] text-center",
+                  historyTab === t.id ? "bg-[#006194] text-white" : "bg-[#ebeef4] text-[#3f4850]"
+                )}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
       <div className="flex-1 bg-white border border-t-0 border-[#dfe3e8] rounded-b-xl p-5 overflow-y-auto">
         {historyTab === 'visits' && (
           patientVisits.filter((v: Visit) => v._id !== selectedVisit._id).length === 0 ? (
-            <p className="text-center text-[#707881] py-10 text-[13px]">No previous visits</p>
+            <EmptyHistoryState label="No previous visits" sublabel="This is the patient's first visit to the clinic." />
           ) : (
-            <div className="space-y-2.5">
-              {patientVisits.filter((v: Visit) => v._id !== selectedVisit._id).map((visit: Visit) => (
-                <div key={visit._id} className="border border-[#dfe3e8] rounded-lg p-4 bg-white hover:bg-[#f7f9ff]">
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-[13px] font-semibold">{visit.visitNumber}</p>
-                    <Badge variant="outline" className="text-[10px] capitalize">{statusLabel(visit.status)}</Badge>
+            <div className="relative pl-6">
+              <div className="absolute left-2 top-2 bottom-2 w-px bg-[#dfe3e8]" />
+              {patientVisits.filter((v: Visit) => v._id !== selectedVisit._id).map((visit: Visit, idx: number) => (
+                <div key={visit._id} className="relative pb-5 last:pb-0">
+                  <div className="absolute -left-[18px] top-1 w-4 h-4 rounded-full bg-white border-2 border-[#006194] flex items-center justify-center">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#006194]" />
                   </div>
-                  <p className="text-[11px] text-[#707881] mb-1">{new Date(visit.createdAt).toLocaleDateString()} • {visit.visitType}</p>
-                  {visit.chiefComplaint && <p className="text-[12px] mt-1"><span className="font-semibold">Complaint:</span> {visit.chiefComplaint}</p>}
-                  {visit.diagnosis && <p className="text-[12px] mt-1"><span className="font-semibold">Diagnosis:</span> {visit.diagnosis}</p>}
+                  <div className="bg-gradient-to-br from-white to-[#f7f9ff] border border-[#dfe3e8] rounded-xl p-4 hover:shadow-sm transition-shadow">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="text-[13px] font-bold text-[#181c20]">{visit.visitNumber}</p>
+                        <p className="text-[11px] text-[#707881] mt-0.5">
+                          {new Date(visit.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })} • {visit.visitType?.replace(/_/g, ' ')}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] capitalize">{statusLabel(visit.status)}</Badge>
+                    </div>
+                    {visit.chiefComplaint && (
+                      <div className="mt-2 text-[12px] bg-white border-l-2 border-[#006194] pl-3 py-1">
+                        <span className="font-semibold text-[#006194]">CC:</span> {visit.chiefComplaint}
+                      </div>
+                    )}
+                    {visit.diagnosis && (
+                      <div className="mt-1.5 text-[12px] bg-white border-l-2 border-[#565e74] pl-3 py-1">
+                        <span className="font-semibold text-[#565e74]">Dx:</span> {visit.diagnosis}
+                      </div>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -545,23 +597,29 @@ function HistorySection({ patientVisits, selectedVisit, patientChart, chartLoadi
         )}
         {historyTab === 'soap' && (
           (patientChart?.soapNotes || []).length === 0 ? (
-            <p className="text-center text-[#707881] py-10 text-[13px]">No SOAP notes</p>
+            <EmptyHistoryState label="No SOAP notes" sublabel="Clinical notes will appear here once signed." />
           ) : (
-            <div className="space-y-2.5">
+            <div className="relative pl-6">
+              <div className="absolute left-2 top-2 bottom-2 w-px bg-[#dfe3e8]" />
               {patientChart.soapNotes.map((note: any) => (
-                <div key={note._id} className="border border-[#dfe3e8] rounded-lg p-4 bg-white">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <p className="text-[13px] font-semibold capitalize">{note.noteType?.replace(/_/g, ' ') || 'Clinical note'}</p>
-                      <p className="text-[11px] text-[#707881]">{note.doctorId?.fullName || note.nurseId?.fullName || 'Clinical staff'} • {new Date(note.createdAt).toLocaleDateString()}</p>
-                    </div>
-                    {note.isSigned && <Badge>Signed</Badge>}
+                <div key={note._id} className="relative pb-5 last:pb-0">
+                  <div className="absolute -left-[18px] top-1 w-4 h-4 rounded-full bg-white border-2 border-[#0d9488] flex items-center justify-center">
+                    <FileText className="w-2 h-2 text-[#0d9488]" />
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-[12px]">
-                    {note.chiefComplaint && <div><span className="font-semibold text-[#006194]">S:</span> {note.chiefComplaint}</div>}
-                    {note.physicalExamination && <div><span className="font-semibold text-[#894d00]">O:</span> {note.physicalExamination}</div>}
-                    {note.diagnosis && <div><span className="font-semibold text-[#565e74]">A:</span> {note.diagnosis}</div>}
-                    {note.treatmentPlan && <div><span className="font-semibold text-[#0d9488]">P:</span> {note.treatmentPlan}</div>}
+                  <div className="bg-gradient-to-br from-white to-[#f7f9ff] border border-[#dfe3e8] rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <p className="text-[13px] font-bold text-[#181c20] capitalize">{note.noteType?.replace(/_/g, ' ') || 'Clinical note'}</p>
+                        <p className="text-[11px] text-[#707881] mt-0.5">{note.doctorId?.fullName || note.nurseId?.fullName || 'Clinical staff'} • {new Date(note.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                      </div>
+                      {note.isSigned ? <Badge className="text-[10px] bg-[#0d9488]">Signed</Badge> : <Badge variant="outline" className="text-[10px]">Draft</Badge>}
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[12px]">
+                      {note.chiefComplaint && <SoapField color="#006194" label="S" value={note.chiefComplaint} />}
+                      {note.physicalExamination && <SoapField color="#894d00" label="O" value={note.physicalExamination} />}
+                      {note.diagnosis && <SoapField color="#565e74" label="A" value={note.diagnosis} />}
+                      {note.treatmentPlan && <SoapField color="#0d9488" label="P" value={note.treatmentPlan} />}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -570,26 +628,34 @@ function HistorySection({ patientVisits, selectedVisit, patientChart, chartLoadi
         )}
         {historyTab === 'labs' && (
           (patientChart?.orders || []).filter((o: any) => (o.orderType || o.order_type) === 'lab').length === 0 ? (
-            <p className="text-center text-[#707881] py-10 text-[13px]">No lab history</p>
+            <EmptyHistoryState label="No lab history" sublabel="Ordered lab tests will appear here once processed." />
           ) : (
-            <div className="space-y-2.5">
+            <div className="relative pl-6">
+              <div className="absolute left-2 top-2 bottom-2 w-px bg-[#dfe3e8]" />
               {patientChart.orders.filter((o: any) => (o.orderType || o.order_type) === 'lab').map((order: any) => (
-                <div key={order._id} className="border border-[#dfe3e8] rounded-lg p-4 bg-white">
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-[13px] font-semibold">{order.orderNumber}</p>
-                    <Badge variant="outline" className="text-[10px] capitalize">{statusLabel(order.status)}</Badge>
+                <div key={order._id} className="relative pb-5 last:pb-0">
+                  <div className="absolute -left-[18px] top-1 w-4 h-4 rounded-full bg-white border-2 border-[#894d00] flex items-center justify-center">
+                    <FlaskConical className="w-2 h-2 text-[#894d00]" />
                   </div>
-                  <p className="text-[11px] text-[#707881] mb-2">{new Date(order.createdAt).toLocaleDateString()}</p>
-                  <div className="space-y-1">
-                    {(order.orderTests || []).map((test: any, idx: number) => {
-                      const result = order.results?.find((r: any) => r.orderTestId?.toString() === test._id?.toString());
-                      return (
-                        <div key={idx} className="flex items-center justify-between text-[12px] border-l-2 border-[#dfe3e8] pl-3">
-                          <span>{test.testName || test.testCode}</span>
-                          {result ? <span className="font-medium">{result.value} {result.unit || ''}</span> : <span className="text-[#707881]">Pending</span>}
-                        </div>
-                      );
-                    })}
+                  <div className="bg-gradient-to-br from-white to-[#f7f9ff] border border-[#dfe3e8] rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="text-[13px] font-bold text-[#181c20]">{order.orderNumber}</p>
+                        <p className="text-[11px] text-[#707881] mt-0.5">{new Date(order.createdAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] capitalize">{statusLabel(order.status)}</Badge>
+                    </div>
+                    <div className="space-y-1.5">
+                      {(order.orderTests || []).map((test: any, idx: number) => {
+                        const result = order.results?.find((r: any) => r.orderTestId?.toString() === test._id?.toString());
+                        return (
+                          <div key={idx} className="flex items-center justify-between text-[12px] bg-white border border-[#dfe3e8] rounded-lg px-3 py-2">
+                            <span className="font-medium">{test.testName || test.testCode}</span>
+                            {result ? <span className="font-mono text-[#006194] font-semibold">{result.value} {result.unit || ''}</span> : <span className="text-[#707881] italic">Pending</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -598,23 +664,31 @@ function HistorySection({ patientVisits, selectedVisit, patientChart, chartLoadi
         )}
         {historyTab === 'meds' && (
           (patientChart?.prescriptions || []).length === 0 ? (
-            <p className="text-center text-[#707881] py-10 text-[13px]">No medication history</p>
+            <EmptyHistoryState label="No medication history" sublabel="Prescriptions issued to this patient will appear here." />
           ) : (
-            <div className="space-y-2.5">
+            <div className="relative pl-6">
+              <div className="absolute left-2 top-2 bottom-2 w-px bg-[#dfe3e8]" />
               {patientChart.prescriptions.map((rx: any) => (
-                <div key={rx._id} className="border border-[#dfe3e8] rounded-lg p-4 bg-white">
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-[13px] font-semibold">{rx.prescriptionNumber}</p>
-                    <Badge variant={rx.isPaid ? 'default' : 'secondary'} className="text-[10px]">{rx.isPaid ? 'Paid' : 'Pending'}</Badge>
+                <div key={rx._id} className="relative pb-5 last:pb-0">
+                  <div className="absolute -left-[18px] top-1 w-4 h-4 rounded-full bg-white border-2 border-[#006194] flex items-center justify-center">
+                    <Pill className="w-2 h-2 text-[#006194]" />
                   </div>
-                  <p className="text-[11px] text-[#707881] mb-2">{new Date(rx.createdAt).toLocaleDateString()}</p>
-                  <div className="space-y-1">
-                    {(rx.items || []).map((item: any, idx: number) => (
-                      <div key={idx} className="text-[12px] border-l-2 border-[#dfe3e8] pl-3">
-                        <span className="font-medium">{item.medicationName}</span>
-                        <span className="text-[#707881]"> - {item.dosage}, {item.frequency}, {item.duration}</span>
+                  <div className="bg-gradient-to-br from-white to-[#f7f9ff] border border-[#dfe3e8] rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="text-[13px] font-bold text-[#181c20]">{rx.prescriptionNumber}</p>
+                        <p className="text-[11px] text-[#707881] mt-0.5">{new Date(rx.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                       </div>
-                    ))}
+                      <Badge variant={rx.isPaid ? 'default' : 'secondary'} className="text-[10px]">{rx.isPaid ? 'Paid' : 'Pending'}</Badge>
+                    </div>
+                    <div className="space-y-1.5">
+                      {(rx.items || []).map((item: any, idx: number) => (
+                        <div key={idx} className="text-[12px] bg-white border border-[#dfe3e8] rounded-lg px-3 py-2">
+                          <span className="font-semibold text-[#181c20]">{item.medicationName}</span>
+                          <span className="text-[#707881]"> • {item.dosage}, {item.frequency}, {item.duration}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -623,19 +697,33 @@ function HistorySection({ patientVisits, selectedVisit, patientChart, chartLoadi
         )}
         {historyTab === 'admissions' && (
           (patientChart?.admissions || []).length === 0 ? (
-            <p className="text-center text-[#707881] py-10 text-[13px]">No admissions</p>
+            <EmptyHistoryState label="No admissions" sublabel="Inpatient admissions will appear here when the patient is admitted." />
           ) : (
-            <div className="space-y-2.5">
+            <div className="relative pl-6">
+              <div className="absolute left-2 top-2 bottom-2 w-px bg-[#dfe3e8]" />
               {patientChart.admissions.map((adm: any) => (
-                <div key={adm._id} className="border border-[#dfe3e8] rounded-lg p-4 bg-white">
-                  <div className="flex items-start justify-between mb-2">
-                    <p className="text-[13px] font-semibold">{adm.admissionNumber}</p>
-                    <Badge className="text-[10px] capitalize">{adm.status}</Badge>
+                <div key={adm._id} className="relative pb-5 last:pb-0">
+                  <div className="absolute -left-[18px] top-1 w-4 h-4 rounded-full bg-white border-2 border-[#0d9488] flex items-center justify-center">
+                    <BedDouble className="w-2 h-2 text-[#0d9488]" />
                   </div>
-                  <p className="text-[11px] text-[#707881] mb-2">{adm.wardType}{adm.bedNumber ? ` - ${adm.bedNumber}` : ''} • {new Date(adm.createdAt).toLocaleDateString()}</p>
-                  <div className="grid grid-cols-2 gap-2 text-[12px]">
-                    <div><span className="font-medium">Reason:</span> {adm.admissionReason || 'N/A'}</div>
-                    <div><span className="font-medium">Diagnosis:</span> {adm.diagnosis || adm.dischargeDiagnosis || 'N/A'}</div>
+                  <div className="bg-gradient-to-br from-white to-[#f7f9ff] border border-[#dfe3e8] rounded-xl p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <p className="text-[13px] font-bold text-[#181c20]">{adm.admissionNumber}</p>
+                        <p className="text-[11px] text-[#707881] mt-0.5">{adm.wardType}{adm.bedNumber ? ` • Bed ${adm.bedNumber}` : ''} • {new Date(adm.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                      </div>
+                      <Badge className="text-[10px] capitalize">{adm.status}</Badge>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-[12px]">
+                      <div className="bg-white border border-[#dfe3e8] rounded-lg px-3 py-2">
+                        <p className="text-[10px] text-[#707881] uppercase font-semibold">Reason</p>
+                        <p className="mt-0.5">{adm.admissionReason || 'N/A'}</p>
+                      </div>
+                      <div className="bg-white border border-[#dfe3e8] rounded-lg px-3 py-2">
+                        <p className="text-[10px] text-[#707881] uppercase font-semibold">Diagnosis</p>
+                        <p className="mt-0.5">{adm.diagnosis || adm.dischargeDiagnosis || 'N/A'}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -644,22 +732,28 @@ function HistorySection({ patientVisits, selectedVisit, patientChart, chartLoadi
         )}
         {historyTab === 'vitals' && (
           (patientChart?.vitalsHistory || []).length === 0 ? (
-            <p className="text-center text-[#707881] py-10 text-[13px]">No vitals history</p>
+            <EmptyHistoryState label="No vitals history" sublabel="Recorded vitals from previous visits will appear here." />
           ) : (
-            <div className="space-y-2.5">
+            <div className="relative pl-6">
+              <div className="absolute left-2 top-2 bottom-2 w-px bg-[#dfe3e8]" />
               {patientChart.vitalsHistory.map((v: any, idx: number) => (
-                <div key={idx} className="border border-[#dfe3e8] rounded-lg p-4 bg-white">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-[13px] font-semibold">{new Date(v.date).toLocaleDateString()}</p>
-                    <p className="text-[11px] text-[#707881]">{v.recordedBy?.fullName || 'Clinical staff'}</p>
+                <div key={idx} className="relative pb-5 last:pb-0">
+                  <div className="absolute -left-[18px] top-1 w-4 h-4 rounded-full bg-white border-2 border-[#ba1a1a] flex items-center justify-center">
+                    <Heart className="w-2 h-2 text-[#ba1a1a]" />
                   </div>
-                  <div className="grid grid-cols-3 gap-2 text-[12px]">
-                    {v.vitalSigns?.bloodPressure && <div>BP: <span className="font-medium">{v.vitalSigns.bloodPressure}</span></div>}
-                    {v.vitalSigns?.temperature && <div>Temp: <span className="font-medium">{v.vitalSigns.temperature}</span></div>}
-                    {v.vitalSigns?.heartRate && <div>HR: <span className="font-medium">{v.vitalSigns.heartRate}</span></div>}
-                    {v.vitalSigns?.respiratoryRate && <div>RR: <span className="font-medium">{v.vitalSigns.respiratoryRate}</span></div>}
-                    {v.vitalSigns?.weight && <div>Weight: <span className="font-medium">{v.vitalSigns.weight}</span></div>}
-                    {v.vitalSigns?.height && <div>Height: <span className="font-medium">{v.vitalSigns.height}</span></div>}
+                  <div className="bg-gradient-to-br from-white to-[#f7f9ff] border border-[#dfe3e8] rounded-xl p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-[13px] font-bold text-[#181c20]">{new Date(v.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })}</p>
+                      <p className="text-[11px] text-[#707881]">{v.recordedBy?.fullName || 'Clinical staff'}</p>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-[12px]">
+                      {v.vitalSigns?.bloodPressure && <VitalChip label="BP" value={v.vitalSigns.bloodPressure} unit="mmHg" color="#006194" />}
+                      {v.vitalSigns?.temperature && <VitalChip label="Temp" value={v.vitalSigns.temperature} unit="°C" color="#894d00" />}
+                      {v.vitalSigns?.heartRate && <VitalChip label="HR" value={v.vitalSigns.heartRate} unit="bpm" color="#ba1a1a" />}
+                      {v.vitalSigns?.respiratoryRate && <VitalChip label="RR" value={v.vitalSigns.respiratoryRate} unit="/min" color="#0d9488" />}
+                      {v.vitalSigns?.weight && <VitalChip label="Weight" value={v.vitalSigns.weight} unit="kg" color="#565e74" />}
+                      {v.vitalSigns?.height && <VitalChip label="Height" value={v.vitalSigns.height} unit="cm" color="#565e74" />}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -667,6 +761,36 @@ function HistorySection({ patientVisits, selectedVisit, patientChart, chartLoadi
           )
         )}
       </div>
+    </div>
+  );
+}
+
+function EmptyHistoryState({ label, sublabel }: { label: string; sublabel: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div className="w-16 h-16 rounded-full bg-[#ebeef4] flex items-center justify-center mb-3">
+        <Clock className="w-7 h-7 text-[#707881]" />
+      </div>
+      <p className="text-[14px] font-semibold text-[#181c20]">{label}</p>
+      <p className="text-[12px] text-[#707881] mt-1 max-w-xs">{sublabel}</p>
+    </div>
+  );
+}
+
+function SoapField({ color, label, value }: { color: string; label: string; value: string }) {
+  return (
+    <div className="bg-white border border-[#dfe3e8] rounded-lg p-2.5">
+      <span className="font-bold text-[12px]" style={{ color }}>{label}:</span>
+      <p className="text-[12px] text-[#181c20] mt-0.5">{value}</p>
+    </div>
+  );
+}
+
+function VitalChip({ label, value, unit, color }: { label: string; value: any; unit: string; color: string }) {
+  return (
+    <div className="bg-white border border-[#dfe3e8] rounded-lg p-2">
+      <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{label}</p>
+      <p className="text-[13px] font-semibold font-mono text-[#181c20] mt-0.5">{value} <span className="text-[10px] text-[#707881] font-sans">{unit}</span></p>
     </div>
   );
 }
@@ -1434,7 +1558,10 @@ export default function DoctorDashboard() {
             </div>
           </div>
           <div className="p-3">
-            <button className="w-full h-11 bg-[#006194] text-white text-[11px] font-bold uppercase tracking-wider rounded-full flex items-center justify-center gap-2 hover:bg-[#004b73] transition-colors shadow-sm">
+            <button
+              onClick={() => navigate('/reception/register')}
+              className="w-full h-11 bg-[#006194] text-white text-[11px] font-bold uppercase tracking-wider rounded-full flex items-center justify-center gap-2 hover:bg-[#004b73] transition-colors shadow-sm"
+            >
               <Plus className="w-4 h-4" />
               New Registration
             </button>
