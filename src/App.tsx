@@ -168,7 +168,7 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['receptionist', 'admin']}><ReceptionDashboard /></RoleGuard>
       } />
       <Route path="/reception/register" element={
-        <RoleGuard allowedRoles={['receptionist', 'admin', 'doctor']}><RegisterPatient /></RoleGuard>
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><RegisterPatient /></RoleGuard>
       } />
       <Route path="/reception/patients" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PatientsPage /></RoleGuard>

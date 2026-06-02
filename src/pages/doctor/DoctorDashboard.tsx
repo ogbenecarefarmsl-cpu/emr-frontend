@@ -1557,15 +1557,6 @@ export default function DoctorDashboard() {
               <p className="text-[12px] text-[#3f4850] truncate">{hospitalInfo.type}</p>
             </div>
           </div>
-          <div className="p-3">
-            <button
-              onClick={() => navigate('/reception/register')}
-              className="w-full h-11 bg-[#006194] text-white text-[11px] font-bold uppercase tracking-wider rounded-full flex items-center justify-center gap-2 hover:bg-[#004b73] transition-colors shadow-sm"
-            >
-              <Plus className="w-4 h-4" />
-              New Registration
-            </button>
-          </div>
 
           <nav className="flex-1 overflow-y-auto py-2 px-2 flex flex-col gap-1">
             {[
