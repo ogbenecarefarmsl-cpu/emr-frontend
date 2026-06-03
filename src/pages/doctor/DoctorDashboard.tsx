@@ -26,8 +26,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Dashboard components
-import { RoleLayout } from '@/components/layout/RoleLayout';
-import { PatientSearch } from '@/components/doctor/PatientSearch';
 import { AllergyManager } from '@/components/doctor/AllergyManager';
 import { ProblemList } from '@/components/doctor/ProblemList';
 import { VitalsTrends } from '@/components/doctor/VitalsTrends';
@@ -35,9 +33,9 @@ import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
 
 // Icons
 import {
-  Loader2, Clock, CheckCircle, User, Stethoscope, FileText, FlaskConical, Pill,
-  ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
-  Send, Heart, Users, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
+  Loader2, CheckCircle, User, FileText, FlaskConical, Pill,
+  ChevronDown, AlertTriangle, Search, Plus, Trash2, Save,
+  Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
   Pencil
 } from 'lucide-react';
 
@@ -752,10 +750,10 @@ export default function DoctorDashboard() {
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-border z-50 flex items-center justify-between px-4">
-        <div className="flex items-center gap-6">
-          <span className="font-bold text-primary text-lg">SierraEMR</span>
-          <nav className="flex items-center gap-1">
+      <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-border z-50 flex items-center justify-between gap-3 px-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <span className="font-bold text-primary text-lg shrink-0">SierraEMR</span>
+          <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
             {[
               { label: 'Consult', value: 'soap' },
               { label: 'History', value: 'history' },
@@ -775,7 +773,7 @@ export default function DoctorDashboard() {
             ))}
           </nav>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="relative hidden md:block">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input type="text" placeholder="Search patients…" className="h-8 w-48 pl-8 pr-3 rounded-full border border-border bg-muted/30 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
@@ -791,14 +789,14 @@ export default function DoctorDashboard() {
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
               <span className="text-xs font-bold text-primary">{profile?.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
             </div>
-            <span className="text-sm font-medium hidden lg:block">{profile?.fullName}</span>
+            <span className="text-sm font-medium hidden lg:block truncate max-w-40">{profile?.fullName}</span>
           </div>
         </div>
       </header>
 
       <div className="flex flex-1 pt-14 h-full">
         {/* Sidebar */}
-        <nav className="fixed left-0 top-14 bottom-0 w-64 z-40 bg-[#fafbfc] border-r border-border flex flex-col">
+        <nav className="fixed left-0 top-14 bottom-0 w-64 z-40 bg-[#fafbfc] border-r border-border hidden md:flex flex-col">
           <div className="p-4 border-b border-border">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -850,15 +848,15 @@ export default function DoctorDashboard() {
         </nav>
 
         {/* Main Workspace */}
-        <main className="ml-64 flex-1 h-[calc(100vh-56px)] flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto flex gap-6 p-6">
+        <main className="md:ml-64 flex-1 h-[calc(100vh-56px)] flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto flex flex-col xl:flex-row gap-6 p-4 md:p-6">
             {/* Left Editor Area */}
             <div className="flex-1 flex flex-col gap-5 min-w-0">
               {selectedVisit ? (
                 <>
                   {/* Patient Context Strip */}
-                  <div className="bg-white border border-border rounded-xl p-4 flex items-center justify-between shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                    <div className="flex items-center gap-4">
+                  <div className="bg-white border border-border rounded-xl p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
+                    <div className="flex flex-wrap items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                         <span className="text-sm font-bold text-primary">
                           {selectedVisit.patientId?.firstName?.[0]}{selectedVisit.patientId?.lastName?.[0]}
@@ -868,16 +866,16 @@ export default function DoctorDashboard() {
                         <h2 className="text-sm font-semibold">{patientDisplayName(selectedVisit)}</h2>
                         <p className="text-[11px] text-muted-foreground font-mono">{selectedVisit.patientId?.patientId || 'N/A'}</p>
                       </div>
-                      <div className="h-8 w-px bg-border mx-1" />
+                      <div className="hidden sm:block h-8 w-px bg-border mx-1" />
                       <span className="text-xs text-muted-foreground">{patientAgeLabel(selectedVisit.patientId)} · {selectedVisit.patientId?.gender || 'N/A'}</span>
-                      <div className="h-8 w-px bg-border mx-1" />
+                      <div className="hidden sm:block h-8 w-px bg-border mx-1" />
                       <div className="flex items-center gap-1.5">
                         {selectedVisit.triagePriority && (
                           <span className={cn("w-2 h-2 rounded-full", selectedVisit.triagePriority.includes('emergency') || selectedVisit.triagePriority.includes('urgent') ? "bg-red-500" : "bg-amber-500")} />
                         )}
                         <span className="text-[11px] text-muted-foreground">{selectedVisit.triagePriority ? statusLabel(selectedVisit.triagePriority) : 'Triage'}</span>
                       </div>
-                      <span className="text-[11px] text-muted-foreground truncate max-w-[120px]">{selectedVisit.chiefComplaint || 'No complaint'}</span>
+                      <span className="text-[11px] text-muted-foreground truncate max-w-full md:max-w-[180px]">{selectedVisit.chiefComplaint || 'No complaint'}</span>
                       <div className="flex items-center gap-1">
                         {selectedVisit.patientId?.allergies?.length > 0 ? (
                           <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-medium border border-red-200">
@@ -888,7 +886,7 @@ export default function DoctorDashboard() {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <span className="text-xs font-mono text-muted-foreground">NGN {selectedWalletBalance.toLocaleString()}</span>
                       <Badge variant="outline" className="text-[10px]">{selectedVisit.visitNumber}</Badge>
                       <Badge className={cn("text-[10px]", visitStatusTone(selectedVisit.status))}>{statusLabel(selectedVisit.status)}</Badge>
@@ -897,7 +895,7 @@ export default function DoctorDashboard() {
 
                   {/* Tabs */}
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1">
-                    <div className="border-b border-border bg-white rounded-t-xl">
+                    <div className="border-b border-border bg-white rounded-t-xl overflow-x-auto">
                       <TabsList className="bg-transparent h-auto p-0 min-w-max px-4">
                         <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-sm">Consult</TabsTrigger>
                         <TabsTrigger value="orders" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-sm">Orders</TabsTrigger>
@@ -947,33 +945,6 @@ export default function DoctorDashboard() {
                           </div>
                         )}
 
-                        {/* Doctor Vitals — editable during consultation */}
-                        <div className="bg-white border border-border rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                          <div className="flex items-center justify-between mb-3">
-                            <Label className="text-sm font-semibold flex items-center gap-2">
-                              <Heart className="w-4 h-4 text-red-500" />
-                              Vitals
-                            </Label>
-                            <span className="text-[10px] text-muted-foreground">Record or update during consultation</span>
-                          </div>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
-                            {[
-                              { key: 'temperature', label: 'Temp (C)', placeholder: '36.5', type: 'number' },
-                              { key: 'bloodPressure', label: 'BP (mmHg)', placeholder: '120/80', type: 'text' },
-                              { key: 'heartRate', label: 'HR (bpm)', placeholder: '72', type: 'number' },
-                              { key: 'respiratoryRate', label: 'RR (/min)', placeholder: '16', type: 'number' },
-                              { key: 'weight', label: 'Weight (kg)', placeholder: '70', type: 'number' },
-                              { key: 'height', label: 'Height (cm)', placeholder: '170', type: 'number' },
-                              { key: 'oxygenSaturation', label: 'SpO2 (%)', placeholder: '98', type: 'number' },
-                            ].map((field) => (
-                              <div key={field.key}>
-                                <Label className="text-[11px] text-muted-foreground">{field.label}</Label>
-                                <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(e) => setVitalsForm({ ...vitalsForm, [field.key]: e.target.value })} placeholder={field.placeholder} className="mt-1 h-8 text-sm" />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-
                         {/* Subjective Card */}
                         <div className="bg-white border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
                           <div className="bg-muted/30 px-4 py-2.5 border-b border-border flex justify-between items-center">
@@ -984,7 +955,9 @@ export default function DoctorDashboard() {
                           </div>
                           <div className="p-4">
                             <Label className="text-[11px] text-muted-foreground font-semibold">Chief Complaint</Label>
-                            <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})} placeholder="Primary diagnosis" className="mt-1 h-8 text-sm" />
+                            <div className="mt-1 min-h-8 rounded border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+                              {selectedVisit.chiefComplaint || 'No chief complaint recorded'}
+                            </div>
                             <Label className="text-[11px] text-muted-foreground font-semibold mt-3 block">Patient History</Label>
                             <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})} placeholder="Patient's description of symptoms, history of present illness..." rows={4} className="mt-1 resize-y text-sm" />
                           </div>
@@ -1008,6 +981,7 @@ export default function DoctorDashboard() {
                                   { key: 'heartRate', label: 'HR (bpm)', placeholder: '72', type: 'number' },
                                   { key: 'respiratoryRate', label: 'RR (/min)', placeholder: '16', type: 'number' },
                                   { key: 'weight', label: 'Weight (kg)', placeholder: '70', type: 'number' },
+                                  { key: 'height', label: 'Height (cm)', placeholder: '170', type: 'number' },
                                   { key: 'oxygenSaturation', label: 'SpO2 (%)', placeholder: '98', type: 'number' },
                                 ].map((field) => (
                                   <div key={field.key}>
@@ -1049,14 +1023,14 @@ export default function DoctorDashboard() {
                           </div>
                           <div className="p-4 flex flex-col gap-4">
                             {/* Action Buttons Row */}
-                            <div className="flex gap-3">
-                              <Button variant="outline" className="flex-1 h-11 justify-center gap-2" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!canContinueClinicalWork}>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                              <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!canContinueClinicalWork}>
                                 <span className="material-symbols-outlined text-primary text-[18px]">science</span> Order Labs
                               </Button>
-                              <Button variant="outline" className="flex-1 h-11 justify-center gap-2" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }} disabled={!canContinueClinicalWork}>
+                              <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }} disabled={!canContinueClinicalWork}>
                                 <span className="material-symbols-outlined text-primary text-[18px]">prescriptions</span> Prescribe
                               </Button>
-                              <Button variant="outline" className="flex-1 h-11 justify-center gap-2" onClick={() => setReferralOpen(true)} disabled={!canContinueClinicalWork}>
+                              <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => setReferralOpen(true)} disabled={!canContinueClinicalWork}>
                                 <span className="material-symbols-outlined text-primary text-[18px]">forward</span> Refer
                               </Button>
                             </div>
@@ -1065,21 +1039,21 @@ export default function DoctorDashboard() {
                               <div className="border border-border border-dashed rounded-lg p-3 bg-muted/20">
                                 <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Pending Orders for Visit</p>
                                 {currentVisitOrders.map((order: any) => (
-                                  <div key={order._id || order.id} className="flex items-center justify-between p-2 bg-white border border-border rounded mb-1.5 last:mb-0">
-                                    <div className="flex items-center gap-2">
+                                  <div key={order._id || order.id} className="flex items-center justify-between gap-3 p-2 bg-white border border-border rounded mb-1.5 last:mb-0 min-w-0">
+                                    <div className="flex items-center gap-2 min-w-0">
                                       <span className="material-symbols-outlined text-primary text-[16px]">science</span>
-                                      <span className="text-xs font-medium">{(order.order_tests || order.tests || []).map((t: any) => t.testName || t.testCode).join(', ')}</span>
+                                      <span className="text-xs font-medium truncate">{(order.order_tests || order.tests || []).map((t: any) => t.testName || t.testCode).join(', ')}</span>
                                     </div>
-                                    <Badge variant={(order.paymentStatus || order.payment_status) === 'paid' ? 'default' : 'outline'} className="text-[9px]">{(order.paymentStatus || order.payment_status || 'pending')}</Badge>
+                                    <Badge variant={(order.paymentStatus || order.payment_status) === 'paid' ? 'default' : 'outline'} className="text-[9px] shrink-0">{(order.paymentStatus || order.payment_status || 'pending')}</Badge>
                                   </div>
                                 ))}
                                 {currentVisitPrescriptions.map((rx: any) => (
-                                  <div key={rx._id} className="flex items-center justify-between p-2 bg-white border border-border rounded mb-1.5 last:mb-0">
-                                    <div className="flex items-center gap-2">
+                                  <div key={rx._id} className="flex items-center justify-between gap-3 p-2 bg-white border border-border rounded mb-1.5 last:mb-0 min-w-0">
+                                    <div className="flex items-center gap-2 min-w-0">
                                       <span className="material-symbols-outlined text-primary text-[16px]">medication</span>
-                                      <span className="text-xs font-medium">{(rx.items || []).map((i: any) => `${i.medicationName} ${i.dosage}`).join(', ')}</span>
+                                      <span className="text-xs font-medium truncate">{(rx.items || []).map((i: any) => `${i.medicationName} ${i.dosage}`).join(', ')}</span>
                                     </div>
-                                    <Badge variant={rx.isPaid ? 'default' : 'secondary'} className="text-[9px]">{rx.isPaid ? 'Paid' : 'Pending'}</Badge>
+                                    <Badge variant={rx.isPaid ? 'default' : 'secondary'} className="text-[9px] shrink-0">{rx.isPaid ? 'Paid' : 'Pending'}</Badge>
                                   </div>
                                 ))}
                               </div>
@@ -1243,8 +1217,8 @@ export default function DoctorDashboard() {
                               <ExternalLink className="w-3 h-3" /> View Full Report
                             </Button>
                           </div>
-                          <div className="clinical-panel overflow-hidden">
-                            <table className="w-full text-sm">
+                          <div className="clinical-panel overflow-x-auto">
+                            <table className="w-full min-w-[640px] text-sm">
                               <thead className="bg-muted/50">
                                 <tr>
                                   <th className="text-left p-3 font-medium">Test</th>
@@ -1498,18 +1472,18 @@ export default function DoctorDashboard() {
                   </Tabs>
 
                   {/* Sticky Action Bar */}
-                  <div className="sticky bottom-0 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 px-6 py-3 rounded-b-xl shadow-[0_-2px_10px_rgba(0,0,0,0.03)]">
+                  <div className="sticky bottom-0 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 px-4 md:px-6 py-3 rounded-b-xl shadow-[0_-2px_10px_rgba(0,0,0,0.03)]">
                     {closureBlockers.length > 0 && (
                       <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800">
                         {closureBlockers.length === 1 ? closureBlockers[0] : `${closureBlockers.length} blocker(s) before closing`}
                       </div>
                     )}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="font-medium text-foreground">{statusLabel(selectedVisit.status)}</span>
                         {selectedVisit.room && <span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">Room: {selectedVisit.room}</span>}
                       </div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Button variant="outline" size="sm" className="rounded-full" onClick={() => setActiveTab('soap')}>
                           <FileText className="w-3.5 h-3.5 mr-1.5" /> Notes
                         </Button>
@@ -1519,7 +1493,7 @@ export default function DoctorDashboard() {
                         <Button variant="outline" size="sm" className="rounded-full" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}>
                           <FlaskConical className="w-3.5 h-3.5 mr-1.5" /> Results
                         </Button>
-                        <div className="w-px h-5 bg-border mx-1" />
+                        <div className="hidden sm:block w-px h-5 bg-border mx-1" />
                         <Button size="sm" className="rounded-full bg-[#0d9488] hover:bg-[#0f766e] text-white" onClick={handleCompleteAndNext} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
                           {completeVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />}
                           Complete & Next
