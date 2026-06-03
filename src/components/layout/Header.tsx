@@ -12,14 +12,14 @@ interface HeaderProps {
 
 export function Header({ title, subtitle, sidebarCollapsed, onToggleSidebar }: HeaderProps) {
   return (
-    <header className="bg-card/80 backdrop-blur-sm border-b px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+    <header className="bg-card border-b px-4 h-14 flex items-center justify-between sticky top-0 z-30">
       <div className="min-w-0 flex items-center gap-3">
         {onToggleSidebar && (
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="hidden lg:inline-flex h-9 w-9"
+            className="hidden lg:inline-flex h-9 w-9 rounded-full"
             onClick={onToggleSidebar}
             title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
@@ -27,9 +27,9 @@ export function Header({ title, subtitle, sidebarCollapsed, onToggleSidebar }: H
           </Button>
         )}
         <div className="min-w-0">
-          <h1 className="text-xl font-bold text-foreground truncate">{title}</h1>
+          <h1 className="text-xl font-semibold tracking-normal text-foreground truncate">{title}</h1>
           {subtitle && (
-            <p className="text-sm text-muted-foreground mt-0.5 truncate">{subtitle}</p>
+            <p className="clinical-label mt-0.5 truncate">{subtitle}</p>
           )}
         </div>
       </div>
@@ -45,7 +45,7 @@ export function Header({ title, subtitle, sidebarCollapsed, onToggleSidebar }: H
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
             placeholder="Search patients, orders..." 
-            className="pl-10 w-64 h-9 bg-muted/50 border-transparent focus:border-border focus:bg-card transition-colors"
+            className="pl-10 w-64 h-9 rounded-full bg-muted/50 border-border focus:bg-card transition-colors"
           />
         </div>
 

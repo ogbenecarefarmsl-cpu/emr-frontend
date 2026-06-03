@@ -14,7 +14,7 @@ interface MarDialogProps {
 export function MarDialog({ admission, medications, open, onOpenChange }: MarDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>MAR: {patientName(admission?.patientId)}</DialogTitle>
         </DialogHeader>
@@ -25,15 +25,16 @@ export function MarDialog({ admission, medications, open, onOpenChange }: MarDia
           {medications.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">No active medication orders</p>
           ) : (
-            <div className="border rounded-lg divide-y">
+            <div className="clinical-panel overflow-hidden">
               {medications.map((med, index) => {
                 const isDue = med.nextDue ? new Date(med.nextDue) <= new Date() : false;
                 const isGiven = med.status === 'given' || med.status === 'administered';
                 return (
-                  <div key={`${med.medicationName || med.name}-${index}`} className="p-3 flex items-center justify-between gap-3">
+                  <div key={`${med.medicationName || med.name}-${index}`} className="clinical-list-row relative p-3 pl-5 flex items-center justify-between gap-3">
+                    <div className={`clinical-status-strip ${isGiven ? 'bg-primary' : isDue ? 'bg-amber-500' : 'bg-border'}`} />
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium">{med.medicationName || med.name}</p>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="clinical-label">
                         {med.dosage} - {med.frequency} - {med.route || 'PO'}
                       </p>
                       {med.nextDue && (

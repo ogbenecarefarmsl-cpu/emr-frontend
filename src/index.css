@@ -4,36 +4,36 @@
 
 @layer base {
   :root {
-    /* Clinical blue theme */
-    --background: 210 20% 98%;
-    --foreground: 215 25% 15%;
+    /* Stitch-inspired clinical blue theme */
+    --background: 220 47% 98%;
+    --foreground: 210 14% 11%;
 
     --card: 0 0% 100%;
-    --card-foreground: 215 25% 15%;
+    --card-foreground: 210 14% 11%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 215 25% 15%;
 
-    --primary: 210 75% 42%;
+    --primary: 201 100% 29%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 20% 94%;
-    --secondary-foreground: 215 25% 25%;
+    --secondary: 223 58% 93%;
+    --secondary-foreground: 222 29% 23%;
 
-    --muted: 210 15% 92%;
-    --muted-foreground: 215 15% 45%;
+    --muted: 220 24% 93%;
+    --muted-foreground: 209 11% 28%;
 
-    --accent: 210 25% 90%;
-    --accent-foreground: 210 75% 35%;
+    --accent: 208 29% 91%;
+    --accent-foreground: 201 100% 29%;
 
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 20% 88%;
-    --input: 210 20% 88%;
-    --ring: 210 75% 42%;
+    --border: 213 19% 76%;
+    --input: 213 19% 76%;
+    --ring: 201 100% 29%;
 
-    --radius: 0.5rem;
+    --radius: 0.25rem;
 
     /* LIS-specific semantic colors */
     --status-normal: 142 71% 45%;
@@ -51,14 +51,14 @@
     --machine-error: 0 84% 60%;
     --machine-processing: 210 75% 50%;
 
-    --sidebar-background: 215 28% 17%;
-    --sidebar-foreground: 210 20% 92%;
-    --sidebar-primary: 210 75% 55%;
+    --sidebar-background: 220 24% 93%;
+    --sidebar-foreground: 210 14% 11%;
+    --sidebar-primary: 201 100% 29%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 215 25% 25%;
-    --sidebar-accent-foreground: 210 20% 92%;
-    --sidebar-border: 215 25% 25%;
-    --sidebar-ring: 210 75% 55%;
+    --sidebar-accent: 213 19% 88%;
+    --sidebar-accent-foreground: 210 14% 11%;
+    --sidebar-border: 213 19% 76%;
+    --sidebar-ring: 201 100% 29%;
   }
 
   .dark {
@@ -116,6 +116,24 @@
     font-feature-settings: "cv11", "ss01";
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border));
+    border-radius: 4px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.6);
   }
 
   /* Hide elements when printing */
@@ -196,6 +214,34 @@
 
   .metric-label {
     @apply text-sm text-muted-foreground mt-1;
+  }
+
+  .clinical-shell {
+    @apply bg-background;
+  }
+
+  .clinical-panel {
+    @apply bg-card border border-border rounded-lg shadow-sm;
+  }
+
+  .clinical-panel-header {
+    @apply px-4 py-3 border-b bg-muted/40 flex items-center justify-between gap-3;
+  }
+
+  .clinical-label {
+    @apply text-[11px] leading-4 font-bold uppercase tracking-[0.05em] text-muted-foreground;
+  }
+
+  .clinical-data {
+    @apply font-mono text-[13px] leading-[18px] font-medium;
+  }
+
+  .clinical-list-row {
+    @apply border-b last:border-b-0 hover:bg-muted/40 transition-colors;
+  }
+
+  .clinical-status-strip {
+    @apply absolute inset-y-0 left-0 w-1.5 bg-border;
   }
 }
 

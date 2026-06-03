@@ -18,8 +18,8 @@ export function TriageQueuePanel({
   maxHeightClassName = 'max-h-[calc(100vh-340px)]',
 }: TriageQueuePanelProps) {
   return (
-    <div className="bg-card border rounded-xl shadow-sm">
-      <div className="px-4 py-3 border-b flex items-center justify-between">
+    <div className="clinical-panel overflow-hidden">
+      <div className="clinical-panel-header">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <Clock className="w-4 h-4 text-amber-500" />
           Awaiting Triage
@@ -38,11 +38,12 @@ export function TriageQueuePanel({
         ) : (
           <div className="divide-y">
             {visits.map((visit) => (
-              <div key={visit._id} className="p-3 hover:bg-muted/30 transition-colors">
+              <div key={visit._id} className="clinical-list-row relative p-3 pl-5">
+                <div className="clinical-status-strip bg-amber-500" />
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm truncate">{patientName(visit.patientId)}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="clinical-label">
                       {visit.visitNumber} - {visit.patientId?.patientId}
                     </p>
                     {visit.chiefComplaint && (
@@ -59,7 +60,7 @@ export function TriageQueuePanel({
                       </div>
                     )}
                   </div>
-                  <Button size="sm" className="flex-shrink-0" onClick={() => onOpenTriage(visit)}>
+                  <Button size="sm" className="flex-shrink-0 rounded-full" onClick={() => onOpenTriage(visit)}>
                     Triage
                   </Button>
                 </div>

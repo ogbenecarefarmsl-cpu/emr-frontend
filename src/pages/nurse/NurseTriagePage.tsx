@@ -23,7 +23,7 @@ export default function NurseTriagePage() {
       role="nurse"
       userName={profile?.fullName}
     >
-      <div className="max-w-4xl">
+      <div className="max-w-6xl">
         <TriageQueuePanel
           visits={triageQueue}
           isLoading={isLoading}

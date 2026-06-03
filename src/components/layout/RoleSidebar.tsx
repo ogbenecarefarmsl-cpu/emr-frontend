@@ -145,7 +145,7 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
 
   return (
     <aside className={cn(
-      "bg-sidebar text-sidebar-foreground flex flex-col h-screen transition-[width] duration-200 overflow-hidden",
+      "bg-sidebar text-sidebar-foreground flex flex-col h-screen transition-[width] duration-200 overflow-hidden border-r border-sidebar-border",
       collapsed ? "lg:w-20 w-64" : "w-64"
     )}>
       {/* Logo */}
@@ -172,8 +172,8 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
 
       {/* User Info */}
       {userName && !collapsed && (
-        <div className="px-6 py-3 border-b border-sidebar-border bg-sidebar-accent/30">
-          <p className="text-xs text-sidebar-foreground/60">Logged in as</p>
+        <div className="px-5 py-3 border-b border-sidebar-border bg-sidebar-accent/40">
+          <p className="clinical-label text-sidebar-foreground/60">Logged in as</p>
           <p className="font-medium text-sm">{userName}</p>
         </div>
       )}
@@ -189,22 +189,22 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
               onClick={onClose}
               title={collapsed ? label : undefined}
               className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150',
+                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 border-l-2 border-transparent',
                 collapsed && 'lg:justify-center lg:px-2',
                 isActive 
-                  ? 'bg-sidebar-primary text-sidebar-primary-foreground shadow-sm shadow-sidebar-primary/25 font-semibold' 
+                  ? 'border-sidebar-primary bg-sidebar-primary/15 text-sidebar-foreground font-semibold'
                   : 'hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium'
               )}
             >
               <Icon className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span className={cn(collapsed && "lg:hidden")}>{label}</span>
+              <span className={cn("clinical-label text-current", collapsed && "lg:hidden")}>{label}</span>
             </NavLink>
           );
         })}
         {(role === 'doctor' || role === 'specialist') && (
           <div className={cn("pt-3 mt-3 border-t border-sidebar-border/70 space-y-0.5", collapsed && "lg:pt-2 lg:mt-2")}>
             {!collapsed && (
-              <p className="px-3 pb-1 text-[11px] uppercase tracking-wide text-sidebar-foreground/50">Worklist</p>
+              <p className="px-3 pb-1 clinical-label text-sidebar-foreground/50">Worklist</p>
             )}
             <button
               type="button"
@@ -216,7 +216,7 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
               )}
             >
               <Clock className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span className={cn(collapsed && "lg:hidden")}>Waiting Patients</span>
+              <span className={cn("clinical-label text-current", collapsed && "lg:hidden")}>Waiting Patients</span>
             </button>
             <button
               type="button"
@@ -228,7 +228,7 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
               )}
             >
               <Stethoscope className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span className={cn(collapsed && "lg:hidden")}>Patients I'm Seeing</span>
+              <span className={cn("clinical-label text-current", collapsed && "lg:hidden")}>Patients I'm Seeing</span>
             </button>
             <button
               type="button"
@@ -240,7 +240,7 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
               )}
             >
               <FlaskConical className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span className={cn(collapsed && "lg:hidden")}>Results Ready</span>
+              <span className={cn("clinical-label text-current", collapsed && "lg:hidden")}>Results Ready</span>
             </button>
           </div>
         )}

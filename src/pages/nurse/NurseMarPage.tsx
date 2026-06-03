@@ -20,7 +20,7 @@ export default function NurseMarPage() {
       role="nurse"
       userName={profile?.fullName}
     >
-      <div className="max-w-4xl">
+      <div className="max-w-6xl">
         <MedicationWorklist
           admissions={activeAdmissions}
           maxHeightClassName="max-h-[calc(100vh-230px)]"

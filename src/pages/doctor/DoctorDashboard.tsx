@@ -749,10 +749,10 @@ export default function DoctorDashboard() {
 
   return (
     <RoleLayout title="Doctor Workbench" subtitle="Today's patients, clinical notes, results and orders" role="doctor" userName={profile?.fullName}>
-      <div className="flex gap-0 -mt-2 -mx-2" style={{ height: 'calc(100vh - 64px)' }}>
+      <div className="flex gap-4 -mt-2" style={{ height: 'calc(100vh - 64px)' }}>
         {/* Sidebar Queue — always visible */}
-        <div className="w-[300px] xl:w-[340px] shrink-0 border-r bg-card overflow-y-auto flex flex-col">
-          <div className="px-4 py-3 border-b sticky top-0 bg-card z-10">
+        <div className="clinical-panel w-[300px] xl:w-[340px] shrink-0 overflow-y-auto flex flex-col">
+          <div className="clinical-panel-header sticky top-0 z-10">
             <h2 className="font-semibold text-sm">Patient Queue</h2>
             <div className="grid grid-cols-3 gap-1.5 mt-2">
               {[
@@ -760,8 +760,8 @@ export default function DoctorDashboard() {
                 { label: 'Active', value: activePatients.length, color: 'text-blue-600 bg-blue-50' },
                 { label: 'Results', value: resultsReady.length, color: 'text-emerald-600 bg-emerald-50' },
               ].map((item) => (
-                <div key={item.label} className={cn("rounded-md px-2 py-1 text-center", item.color)}>
-                  <p className="text-[10px] font-medium uppercase">{item.label}</p>
+                <div key={item.label} className={cn("rounded px-2 py-1 text-center border border-current/10", item.color)}>
+                  <p className="clinical-label text-current/80">{item.label}</p>
                   <p className="text-base font-bold">{item.value}</p>
                 </div>
               ))}
@@ -795,20 +795,21 @@ export default function DoctorDashboard() {
                       <div
                         key={visit._id || visit.id}
                         className={cn(
-                          "px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-muted/60",
+                          "clinical-list-row relative px-3 py-2 pl-5 cursor-pointer",
                           selectedVisit?._id === visit._id && "bg-primary/10 ring-1 ring-primary/30"
                         )}
                         onClick={() => setSelectedVisit(visit)}
                       >
+                        <div className="clinical-status-strip bg-amber-500" />
                         <div className="flex items-center justify-between">
                           <div className="min-w-0">
                             <p className="font-medium text-xs truncate">{patientDisplayName(visit)}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber} · {visit.patientId?.patientId}</p>
+                            <p className="clinical-label truncate">{visit.visitNumber} · {visit.patientId?.patientId}</p>
                           </div>
                           <Button
                             size="sm"
                             variant="default"
-                            className="h-6 text-[10px] px-2 ml-2 shrink-0"
+                            className="h-6 rounded-full text-[10px] px-2 ml-2 shrink-0"
                             onClick={(e) => { e.stopPropagation(); handleAcceptPatient(visit); }}
                             disabled={acceptPatient.isPending}
                           >
@@ -850,7 +851,7 @@ export default function DoctorDashboard() {
                       <div
                         key={visit._id || visit.id}
                         className={cn(
-                          "px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-muted/60",
+                          "clinical-list-row relative px-3 py-2 pl-5 cursor-pointer",
                           selectedVisit?._id === visit._id && "bg-primary/10 ring-1 ring-primary/30"
                         )}
                         onClick={() => {
@@ -858,10 +859,11 @@ export default function DoctorDashboard() {
                           if (visit.status === 'results_ready') setActiveTab('lab-results');
                         }}
                       >
+                        <div className="clinical-status-strip bg-blue-500" />
                         <div className="flex items-center justify-between">
                           <div className="min-w-0">
                             <p className="font-medium text-xs truncate">{patientDisplayName(visit)}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
+                            <p className="clinical-label truncate">{visit.visitNumber}</p>
                           </div>
                           <Badge variant="outline" className="capitalize text-[9px] px-1.5 py-0 shrink-0 ml-2">
                             {statusLabel(visit.status)}
@@ -902,7 +904,7 @@ export default function DoctorDashboard() {
                       <div
                         key={visit._id || visit.id}
                         className={cn(
-                          "px-3 py-2 rounded-md cursor-pointer transition-colors hover:bg-muted/60",
+                          "clinical-list-row relative px-3 py-2 pl-5 cursor-pointer",
                           selectedVisit?._id === visit._id && "bg-primary/10 ring-1 ring-primary/30"
                         )}
                         onClick={() => {
@@ -910,10 +912,11 @@ export default function DoctorDashboard() {
                           setActiveTab('lab-results');
                         }}
                       >
+                        <div className="clinical-status-strip bg-emerald-500" />
                         <div className="flex items-center justify-between">
                           <div className="min-w-0">
                             <p className="font-medium text-xs truncate">{patientDisplayName(visit)}</p>
-                            <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
+                            <p className="clinical-label truncate">{visit.visitNumber}</p>
                           </div>
                           <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[9px] px-1.5 py-0 shrink-0 ml-2">
                             Review
@@ -964,11 +967,11 @@ export default function DoctorDashboard() {
           <div className="mt-auto px-4 py-3 border-t bg-muted/20">
             <div className="grid grid-cols-2 gap-2 text-center">
               <div>
-                <p className="text-[10px] text-muted-foreground">Waiting</p>
+                <p className="clinical-label">Waiting</p>
                 <p className="text-lg font-bold text-amber-600">{stats.waiting}</p>
               </div>
               <div>
-                <p className="text-[10px] text-muted-foreground">Closed</p>
+                <p className="clinical-label">Closed</p>
                 <p className="text-lg font-bold text-emerald-600">{stats.completed}</p>
               </div>
             </div>
@@ -978,9 +981,9 @@ export default function DoctorDashboard() {
         {/* Main Content — Patient Workspace */}
         <div className="flex-1 min-w-0 overflow-y-auto">
           {selectedVisit ? (
-            <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
+            <div className="clinical-panel overflow-hidden">
               {/* Patient Header */}
-              <div className="px-6 py-5 border-b bg-gradient-to-r from-primary/5 via-primary/3 to-transparent">
+              <div className="px-6 py-5 border-b bg-muted/30">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0">
                     <h2 className="text-2xl font-semibold tracking-normal">{patientDisplayName(selectedVisit)}</h2>
@@ -1018,9 +1021,9 @@ export default function DoctorDashboard() {
                     { label: 'Wallet', value: `NGN ${selectedWalletBalance.toLocaleString()}` },
                     { label: 'Triage', value: selectedVisit.triagePriority ? statusLabel(selectedVisit.triagePriority) : 'Not recorded' },
                   ].map((item) => (
-                    <div key={item.label} className="rounded-lg border bg-background/80 px-3 py-2 min-w-0">
-                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">{item.label}</p>
-                      <p className="text-sm font-medium leading-snug break-words">{item.value}</p>
+                    <div key={item.label} className="rounded border bg-background px-3 py-2 min-w-0">
+                      <p className="clinical-label">{item.label}</p>
+                      <p className="clinical-data break-words">{item.value}</p>
                     </div>
                   ))}
                 </div>
@@ -1028,7 +1031,7 @@ export default function DoctorDashboard() {
 
               {/* Tabs */}
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-                <div className="px-6 pt-3 border-b overflow-x-auto">
+                <div className="px-6 pt-3 border-b bg-card overflow-x-auto">
                   <TabsList className="bg-transparent h-auto p-0 min-w-max">
                     <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Consult</TabsTrigger>
                     <TabsTrigger value="orders" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Orders</TabsTrigger>
@@ -1047,7 +1050,7 @@ export default function DoctorDashboard() {
                 <TabsContent value="overview" className="p-5 mt-0">
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                     {/* Vitals Card */}
-                    <div className="border rounded-lg p-4">
+                    <div className="clinical-panel p-4">
                       <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                         <Heart className="w-4 h-4 text-red-500" />
                         Vitals
@@ -1062,8 +1065,8 @@ export default function DoctorDashboard() {
                           { label: 'SpO2 (%)', value: vitalsForm.oxygenSaturation },
                         ].map((vital) => (
                           <div key={vital.label} className="p-2 rounded-lg bg-muted/50 border min-w-0">
-                            <div className="text-xs text-muted-foreground">{vital.label}</div>
-                            <div className="text-sm font-medium mt-0.5 break-words">{vital.value || '-'}</div>
+                            <div className="clinical-label">{vital.label}</div>
+                            <div className="clinical-data mt-0.5 break-words">{vital.value || '-'}</div>
                           </div>
                         ))}
                       </div>
@@ -1071,7 +1074,7 @@ export default function DoctorDashboard() {
                     </div>
 
                     {/* Chief Complaint Card */}
-                    <div className="border rounded-lg p-4">
+                    <div className="clinical-panel p-4">
                       <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                         <ClipboardList className="w-4 h-4 text-blue-500" />
                         Chief Complaint
@@ -1108,7 +1111,7 @@ export default function DoctorDashboard() {
                   </div>
 
                   {/* Quick Actions */}
-                  <div className="mt-6 rounded-xl border bg-muted/20 p-4">
+                  <div className="clinical-panel mt-6 p-4">
                     {closureBlockers.length > 0 && (
                       <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
                         <p className="text-xs font-semibold text-amber-800">Cannot close encounter yet</p>
@@ -1125,19 +1128,20 @@ export default function DoctorDashboard() {
                         <p className="text-xs text-muted-foreground mt-1 capitalize">{statusLabel(selectedVisit.status)}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" onClick={() => setActiveTab('soap')}>
+                        <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('soap')}>
                           <FileText className="w-4 h-4 mr-2" />
                           Consult
                         </Button>
-                        <Button variant="outline" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
+                        <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
                           <ClipboardList className="w-4 h-4 mr-2" />
                           Orders
                         </Button>
-                        <Button variant="outline" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}>
+                        <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}>
                           <FlaskConical className="w-4 h-4 mr-2" />
                           Results
                         </Button>
                         <Button
+                          className="rounded-full"
                           onClick={handleCompleteAndNext}
                           disabled={completeVisit.isPending || !canCloseEncounter}
                           title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}
@@ -1174,7 +1178,7 @@ export default function DoctorDashboard() {
                           const canEdit = (order.paymentStatus || order.payment_status) === 'pending' &&
                             (order.status === 'awaiting_payment');
                           return (
-                            <div key={order._id || order.id} className="border rounded-lg p-4 bg-card">
+                            <div key={order._id || order.id} className="clinical-panel p-4">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
@@ -1210,6 +1214,7 @@ export default function DoctorDashboard() {
                                   <Button
                                     variant="outline"
                                     size="sm"
+                                    className="rounded-full"
                                     onClick={() => startEditOrder(order)}
                                     disabled={!canContinueClinicalWork}
                                   >
@@ -1233,7 +1238,7 @@ export default function DoctorDashboard() {
                         {currentVisitPrescriptions.map((rx: any) => {
                           const canEdit = !rx.isPaid && rx.status === 'pending';
                           return (
-                            <div key={rx._id} className="border rounded-lg p-4 bg-card">
+                            <div key={rx._id} className="clinical-panel p-4">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-2 flex-wrap">
@@ -1259,6 +1264,7 @@ export default function DoctorDashboard() {
                                   <Button
                                     variant="outline"
                                     size="sm"
+                                    className="rounded-full"
                                     onClick={() => startEditPrescription(rx)}
                                     disabled={!canContinueClinicalWork}
                                   >
@@ -1277,7 +1283,7 @@ export default function DoctorDashboard() {
                   <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                     <Button
                       variant="outline"
-                      className="h-auto justify-start p-4"
+                      className="h-auto justify-start rounded-lg p-4"
                       onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}
                       disabled={!canContinueClinicalWork}
                     >
@@ -1289,7 +1295,7 @@ export default function DoctorDashboard() {
                     </Button>
                     <Button
                       variant="outline"
-                      className="h-auto justify-start p-4"
+                      className="h-auto justify-start rounded-lg p-4"
                       onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }}
                       disabled={!canContinueClinicalWork}
                     >
@@ -1301,7 +1307,7 @@ export default function DoctorDashboard() {
                     </Button>
                     <Button
                       variant="outline"
-                      className="h-auto justify-start p-4"
+                      className="h-auto justify-start rounded-lg p-4"
                       onClick={() => setReferralOpen(true)}
                       disabled={!canContinueClinicalWork}
                     >
@@ -1313,7 +1319,7 @@ export default function DoctorDashboard() {
                     </Button>
                     <Button
                       variant="outline"
-                      className="h-auto justify-start p-4"
+                      className="h-auto justify-start rounded-lg p-4"
                       onClick={() => setAdmitOpen(true)}
                       disabled={!canContinueClinicalWork}
                     >
@@ -1331,8 +1337,8 @@ export default function DoctorDashboard() {
                       { label: 'Awaiting results', value: awaitingResults.length },
                       { label: 'Pharmacy workflow', value: awaitingPharmacy.length + awaitingDispensing.length },
                     ].map((item) => (
-                      <div key={item.label} className="rounded-lg border p-4">
-                        <p className="text-xs text-muted-foreground">{item.label}</p>
+                      <div key={item.label} className="clinical-panel p-4">
+                        <p className="clinical-label">{item.label}</p>
                         <p className="text-2xl font-semibold mt-1">{item.value}</p>
                       </div>
                     ))}
@@ -1340,6 +1346,7 @@ export default function DoctorDashboard() {
 
                   <div className="mt-6 flex justify-end">
                     <Button
+                      className="rounded-full"
                       onClick={handleCompleteAndNext}
                       disabled={completeVisit.isPending || !canCloseEncounter}
                       title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}
@@ -1353,17 +1360,17 @@ export default function DoctorDashboard() {
                 {/* Consultation Tab */}
                 <TabsContent value="soap" className="p-6 mt-0">
                   <div className="space-y-5">
-                    <div className="flex flex-col gap-3 border rounded-lg p-4 bg-muted/20 md:flex-row md:items-center md:justify-between">
+                    <div className="clinical-panel flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                       <div>
                         <h3 className="font-semibold text-sm">Consultation Note</h3>
                         <p className="text-xs text-muted-foreground mt-1">{selectedVisit.chiefComplaint || 'No chief complaint recorded'}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" onClick={handleAddSoapNote}>
+                        <Button variant="outline" size="sm" className="rounded-full" onClick={handleAddSoapNote}>
                           <Plus className="w-3.5 h-3.5 mr-1.5" />
                           New Note
                         </Button>
-                        <Button size="sm" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
+                        <Button size="sm" className="rounded-full" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
                           <Save className="w-3.5 h-3.5 mr-1.5" />
                           Save
                         </Button>
@@ -1403,7 +1410,7 @@ export default function DoctorDashboard() {
                     )}
 
                     {/* Doctor Vitals — editable during consultation */}
-                    <div className="rounded-lg border p-4 bg-background">
+                    <div className="clinical-panel p-4">
                       <div className="flex items-center justify-between mb-3">
                         <Label className="text-sm font-semibold flex items-center gap-2">
                           <Heart className="w-4 h-4 text-red-500" />
@@ -1435,7 +1442,7 @@ export default function DoctorDashboard() {
                       </div>
                     </div>
 
-                    <div className="rounded-lg border p-4 bg-background">
+                    <div className="clinical-panel p-4">
                       <Label className="text-sm font-semibold">Diagnosis</Label>
                       <Input
                         value={soapForm.diagnosis}
@@ -1446,7 +1453,7 @@ export default function DoctorDashboard() {
                     </div>
 
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                      <div className="rounded-lg border p-4 bg-background">
+                      <div className="clinical-panel p-4">
                         <Label className="text-sm font-semibold text-blue-600">S - Subjective</Label>
                         <Textarea
                           value={soapForm.subjective}
@@ -1456,7 +1463,7 @@ export default function DoctorDashboard() {
                           className="mt-2 resize-y"
                         />
                       </div>
-                      <div className="rounded-lg border p-4 bg-background">
+                      <div className="clinical-panel p-4">
                         <Label className="text-sm font-semibold text-green-600">O - Objective</Label>
                         <Textarea
                           value={soapForm.objective}
@@ -1466,7 +1473,7 @@ export default function DoctorDashboard() {
                           className="mt-2 resize-y"
                         />
                       </div>
-                      <div className="rounded-lg border p-4 bg-background">
+                      <div className="clinical-panel p-4">
                         <Label className="text-sm font-semibold text-purple-600">A - Assessment</Label>
                         <Textarea
                           value={soapForm.assessment}
@@ -1476,7 +1483,7 @@ export default function DoctorDashboard() {
                           className="mt-2 resize-y"
                         />
                       </div>
-                      <div className="rounded-lg border p-4 bg-background">
+                      <div className="clinical-panel p-4">
                         <Label className="text-sm font-semibold text-orange-600">P - Plan</Label>
                         <Textarea
                           value={soapForm.plan}
@@ -1541,7 +1548,7 @@ export default function DoctorDashboard() {
                           View Full Report
                         </Button>
                       </div>
-                      <div className="border rounded-lg overflow-hidden">
+                      <div className="clinical-panel overflow-hidden">
                         <table className="w-full text-sm">
                           <thead className="bg-muted/50">
                             <tr>
@@ -1614,7 +1621,7 @@ export default function DoctorDashboard() {
                               {patientVisits
                                 .filter((v: Visit) => v._id !== selectedVisit._id)
                                 .map((visit: Visit) => (
-                                  <div key={visit._id} className="border rounded-lg p-4 bg-card">
+                                  <div key={visit._id} className="clinical-panel p-4">
                                     <div className="flex items-start justify-between gap-4">
                                       <div>
                                         <p className="text-sm font-semibold">{visit.visitNumber}</p>
@@ -1638,7 +1645,7 @@ export default function DoctorDashboard() {
                           ) : (
                             <div className="space-y-3">
                               {patientChart.soapNotes.map((note: any) => (
-                                <div key={note._id} className="border rounded-lg p-4 bg-card">
+                                <div key={note._id} className="clinical-panel p-4">
                                   <div className="flex items-start justify-between gap-3 mb-3">
                                     <div>
                                       <p className="text-sm font-semibold capitalize">{note.noteType?.replace(/_/g, ' ') || 'Clinical note'}</p>
@@ -1666,7 +1673,7 @@ export default function DoctorDashboard() {
                           ) : (
                             <div className="space-y-3">
                               {patientChart.orders.map((order: any) => (
-                                <div key={order._id} className="border rounded-lg p-4 bg-card">
+                                <div key={order._id} className="clinical-panel p-4">
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
                                       <p className="text-sm font-semibold">{order.orderNumber}</p>
@@ -1701,7 +1708,7 @@ export default function DoctorDashboard() {
                           ) : (
                             <div className="space-y-3">
                               {patientChart.prescriptions.map((prescription: any) => (
-                                <div key={prescription._id} className="border rounded-lg p-4 bg-card">
+                                <div key={prescription._id} className="clinical-panel p-4">
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
                                       <p className="text-sm font-semibold">{prescription.prescriptionNumber}</p>
@@ -1729,7 +1736,7 @@ export default function DoctorDashboard() {
                           ) : (
                             <div className="space-y-3">
                               {patientChart.admissions.map((admission: any) => (
-                                <div key={admission._id} className="border rounded-lg p-4 bg-card">
+                                <div key={admission._id} className="clinical-panel p-4">
                                   <div className="flex items-start justify-between gap-3">
                                     <div>
                                       <p className="text-sm font-semibold">{admission.admissionNumber}</p>
@@ -1760,7 +1767,7 @@ export default function DoctorDashboard() {
                           ) : (
                             <div className="space-y-3">
                               {patientChart.vitalsHistory.map((vital: any, index: number) => (
-                                <div key={index} className="border rounded-lg p-4 bg-card">
+                                <div key={index} className="clinical-panel p-4">
                                   <div className="flex items-center justify-between mb-3">
                                     <p className="text-sm font-semibold">{new Date(vital.date).toLocaleDateString()}</p>
                                     <p className="text-xs text-muted-foreground">{vital.recordedBy?.fullName || vital.recordedBy?.fullName || 'Clinical staff'}</p>
@@ -1785,7 +1792,7 @@ export default function DoctorDashboard() {
               </Tabs>
 
               {/* Sticky Action Bar — always visible at bottom of workspace */}
-              <div className="sticky bottom-0 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-3">
+              <div className="sticky bottom-0 border-t bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 px-6 py-3">
                 {closureBlockers.length > 0 && (
                   <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800">
                     {closureBlockers.length === 1 ? closureBlockers[0] : `${closureBlockers.length} blocker(s) before closing`}
@@ -1797,21 +1804,22 @@ export default function DoctorDashboard() {
                     {selectedVisit.room && <span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">Room: {selectedVisit.room}</span>}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setActiveTab('soap')}>
+                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => setActiveTab('soap')}>
                       <FileText className="w-3.5 h-3.5 mr-1.5" />
                       Notes
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
+                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
                       <ClipboardList className="w-3.5 h-3.5 mr-1.5" />
                       Orders
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}>
+                    <Button variant="outline" size="sm" className="rounded-full" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}>
                       <FlaskConical className="w-3.5 h-3.5 mr-1.5" />
                       Results
                     </Button>
                     <div className="w-px h-5 bg-border mx-1" />
                     <Button
                       size="sm"
+                      className="rounded-full"
                       onClick={handleCompleteAndNext}
                       disabled={completeVisit.isPending || !canCloseEncounter}
                       title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}
@@ -1824,7 +1832,7 @@ export default function DoctorDashboard() {
               </div>
             </div>
           ) : (
-            <div className="bg-card border rounded-xl shadow-sm p-8">
+            <div className="clinical-panel p-8">
               <div className="max-w-2xl mx-auto text-center">
                 <User className="w-14 h-14 mx-auto mb-4 text-muted-foreground/40" />
                 <h2 className="text-2xl font-semibold">No patient open</h2>
@@ -1832,19 +1840,19 @@ export default function DoctorDashboard() {
                   Open a waiting patient, continue an active encounter, or review returned results.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
-                  <Button variant="outline" className="h-auto py-4" onClick={() => {
+                  <Button variant="outline" className="h-auto rounded-lg py-4" onClick={() => {
                     setQueueSectionsOpen((current) => ({ ...current, waiting: true }));
                   }}>
                     <Clock className="w-4 h-4 mr-2" />
                     Waiting Patients
                   </Button>
-                  <Button variant="outline" className="h-auto py-4" onClick={() => {
+                  <Button variant="outline" className="h-auto rounded-lg py-4" onClick={() => {
                     setQueueSectionsOpen((current) => ({ ...current, active: true }));
                   }}>
                     <Stethoscope className="w-4 h-4 mr-2" />
                     Patients I'm Seeing
                   </Button>
-                  <Button variant="outline" className="h-auto py-4" onClick={() => {
+                  <Button variant="outline" className="h-auto rounded-lg py-4" onClick={() => {
                     setQueueSectionsOpen((current) => ({ ...current, results: true }));
                   }}>
                     <FlaskConical className="w-4 h-4 mr-2" />

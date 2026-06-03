@@ -19,7 +19,7 @@ export function RoleLayout({ children, title, subtitle, role, userName }: RoleLa
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen clinical-shell">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -50,7 +50,7 @@ export function RoleLayout({ children, title, subtitle, role, userName }: RoleLa
       `}>
         {/* Mobile header bar */}
         <div className="lg:hidden sticky top-0 z-30 bg-card border-b px-4 py-3 flex items-center gap-3">
-          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="h-9 w-9">
+          <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)} className="h-9 w-9 rounded-full">
             <Menu className="w-5 h-5" />
           </Button>
           <div className="min-w-0 flex-1">
