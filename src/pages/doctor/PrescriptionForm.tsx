@@ -56,11 +56,32 @@ const PrescriptionForm = () => {
     enabled: !!consultationId,
   });
 
+  const { data: allMedications = [] } = useQuery({
+    queryKey: ['medications'],
+    queryFn: () => medicationService.findAll(),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const { data: searchResults = [] } = useQuery({
     queryKey: ['medications', 'search', searchTerm],
     queryFn: () => medicationService.search(searchTerm),
-    enabled: searchTerm.length > 2,
+    enabled: searchTerm.length >= 2,
+    staleTime: 30 * 1000,
   });
+
+  const displayMedications = (() => {
+    const allMeds = allMedications || [];
+    if (searchTerm.length < 2) return allMeds;
+    const lower = searchTerm.toLowerCase();
+    const localMatches = allMeds.filter((m: any) =>
+      m.name?.toLowerCase().includes(lower) ||
+      m.genericName?.toLowerCase().includes(lower) ||
+      m.medicationCode?.toLowerCase().includes(lower)
+    );
+    const searchIds = new Set((searchResults || []).map((r: any) => r._id || r.medicationCode));
+    const extraLocal = localMatches.filter((m: any) => !searchIds.has(m._id) && !searchIds.has(m.medicationCode));
+    return [...(searchResults || []), ...extraLocal];
+  })();
 
   const createPrescriptionMutation = useMutation({
     mutationFn: (data: any) => prescriptionService.create(data),
@@ -189,16 +210,16 @@ const PrescriptionForm = () => {
                 />
               </div>
 
-              {searchResults.length > 0 && (
+              {displayMedications.length > 0 && (
                 <div className="border rounded-lg max-h-48 overflow-y-auto">
-                  {searchResults.map((med: any) => (
+                  {displayMedications.map((med: any) => (
                     <div
                       key={med._id}
                       className="p-3 hover:bg-gray-100 cursor-pointer border-b flex justify-between items-center"
                       onClick={() => addMedication(med)}
                     >
                       <div>
-                        <p className="font-medium">{med.name}</p>
+                        <p className="font-medium">{med.name} {med.__cafProduct && <Badge variant="outline" className="text-[10px] ml-1">CAF</Badge>}</p>
                         <p className="text-sm text-gray-500">
                           {med.genericName} · {med.medicationCode}
                           {med.strength ? ` · ${med.strength}` : ''}

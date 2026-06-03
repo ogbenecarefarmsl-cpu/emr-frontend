@@ -358,8 +358,17 @@ export default function DoctorDashboard() {
 
   // Filter medications based on search â€” use live search results when typing, else show all
   const filteredMedications = useMemo(() => {
-    if (searchMedication.length >= 2) return searchResults;
-    return medications || [];
+    const allMeds = medications || [];
+    if (searchMedication.length < 2) return allMeds;
+    const searchLower = searchMedication.toLowerCase();
+    const localMatches = allMeds.filter((m: Medication) =>
+      m.name?.toLowerCase().includes(searchLower) ||
+      m.genericName?.toLowerCase().includes(searchLower) ||
+      m.medicationCode?.toLowerCase().includes(searchLower)
+    );
+    const searchIds = new Set((searchResults || []).map((r: any) => r._id || r.medicationCode));
+    const extraLocal = localMatches.filter((m: Medication) => !searchIds.has(m._id) && !searchIds.has(m.medicationCode));
+    return [...(searchResults || []), ...extraLocal];
   }, [medications, searchMedication, searchResults]);
 
   // Reset forms when selected visit changes
