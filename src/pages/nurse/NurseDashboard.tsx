@@ -41,6 +41,13 @@ const workspaces = [
     accent: 'text-cyan-700 bg-cyan-500/10',
   },
   {
+    title: 'Prescriptions',
+    description: 'Write medication orders and route payment to reception.',
+    to: '/nurse/prescriptions',
+    icon: Pill,
+    accent: 'text-violet-600 bg-violet-500/10',
+  },
+  {
     title: 'MAR',
     description: 'Medication administration worklist for admitted patients.',
     to: '/nurse/mar',

@@ -72,6 +72,7 @@ import NurseDashboard from "./pages/nurse/NurseDashboard";
 import NurseAdmissionsPage from "./pages/nurse/NurseAdmissionsPage";
 import NurseMarPage from "./pages/nurse/NurseMarPage";
 import NurseLabRequestsPage from "./pages/nurse/NurseLabRequestsPage";
+import NursePrescriptionPage from "./pages/nurse/NursePrescriptionPage";
 import NurseObservationPage from "./pages/nurse/NurseObservationPage";
 import NurseProceduresPage from "./pages/nurse/NurseProceduresPage";
 import NurseTriagePage from "./pages/nurse/NurseTriagePage";
@@ -371,6 +372,9 @@ function AppRoutes() {
       } />
       <Route path="/nurse/lab-requests" element={
         <RoleGuard allowedRoles={['nurse', 'admin']}><NurseLabRequestsPage /></RoleGuard>
+      } />
+      <Route path="/nurse/prescriptions" element={
+        <RoleGuard allowedRoles={['nurse', 'admin']}><NursePrescriptionPage /></RoleGuard>
       } />
       <Route path="/nurse/observation" element={
         <RoleGuard allowedRoles={['nurse', 'admin']}><NurseObservationPage /></RoleGuard>

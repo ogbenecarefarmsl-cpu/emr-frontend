@@ -15,6 +15,15 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Loader2, Search, UserPlus, Stethoscope, ArrowLeft, Thermometer } from 'lucide-react';
 
+const BILLABLE_SERVICES = [
+  { id: 'normal_consultation', label: 'Normal Consultation', fee: 150, visitType: 'new' },
+  { id: 'specialist_consultation', label: 'Specialist Consultation', fee: 250, visitType: 'new' },
+  { id: 'observation_4h', label: 'Observation Fee (per 4 hours)', fee: 100, visitType: 'new' },
+  { id: 'procedure', label: 'Procedure', fee: 50, visitType: 'new' },
+  { id: 'rapid_malaria', label: 'Rapid Test - Malaria', fee: 50, visitType: 'new' },
+  { id: 'rapid_typhoid', label: 'Rapid Test - Typhoid', fee: 50, visitType: 'new' },
+];
+
 export default function VisitRegistration() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -23,8 +32,9 @@ export default function VisitRegistration() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
+  const [selectedServiceId, setSelectedServiceId] = useState('normal_consultation');
   const [visitType, setVisitType] = useState<string>('new');
-  const [consultationFee, setConsultationFee] = useState<string>('5000');
+  const [consultationFee, setConsultationFee] = useState<string>('150');
   const [chiefComplaint, setChiefComplaint] = useState('');
   const [notes, setNotes] = useState('');
   const [temperature, setTemperature] = useState('');
@@ -33,6 +43,7 @@ export default function VisitRegistration() {
   const { data: allPatients = [] } = useSearchPatients('');
   const createVisit = useCreateVisit();
   const markConsultationPaid = useMarkConsultationPaid();
+  const selectedService = BILLABLE_SERVICES.find((service) => service.id === selectedServiceId) || BILLABLE_SERVICES[0];
 
   const recentPatients = useMemo(() => {
     if (!Array.isArray(allPatients)) return [];
@@ -79,7 +90,10 @@ export default function VisitRegistration() {
         visitType: visitType as any,
         consultationFee: parseFloat(consultationFee),
         chiefComplaint,
-        notes,
+        notes: [
+          `Service: ${selectedService.label}`,
+          notes.trim() || undefined,
+        ].filter(Boolean).join('\n'),
         temperature: temperature ? parseFloat(temperature) : undefined,
       });
 
@@ -222,6 +236,32 @@ export default function VisitRegistration() {
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  <Label htmlFor="service">Service</Label>
+                  <Select
+                    value={selectedServiceId}
+                    onValueChange={(value) => {
+                      const service = BILLABLE_SERVICES.find((item) => item.id === value);
+                      setSelectedServiceId(value);
+                      if (service) {
+                        setConsultationFee(String(service.fee));
+                        setVisitType(service.visitType);
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select service" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {BILLABLE_SERVICES.map((service) => (
+                        <SelectItem key={service.id} value={service.id}>
+                          {service.label} - Le {service.fee}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="visitType">Visit Type</Label>
                   <Select value={visitType} onValueChange={setVisitType}>
                     <SelectTrigger>
@@ -236,7 +276,7 @@ export default function VisitRegistration() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="consultationFee">Consultation Fee (Le)</Label>
+                  <Label htmlFor="consultationFee">Service Fee (Le)</Label>
                   <Input
                     id="consultationFee"
                     type="number"
