@@ -167,7 +167,7 @@ const visitStatusTone = (status?: string) => cn(
 );
 
 export default function DoctorDashboard() {
-  const { profile } = useAuth();
+  const { profile, signOut } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -728,6 +728,11 @@ export default function DoctorDashboard() {
     setQueueSectionsOpen((current) => ({ ...current, [section]: !current[section] }));
   };
 
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
   // Auto-select the active patient if available
   useEffect(() => {
     if (currentActiveVisit && !selectedVisit) {
@@ -933,7 +938,7 @@ export default function DoctorDashboard() {
             <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted/50 transition-colors">
               <span className="material-symbols-outlined text-[18px]">help</span>Support
             </button>
-            <button onClick={() => { localStorage.removeItem('authToken'); window.location.href = '/login'; }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors">
+            <button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors">
               <span className="material-symbols-outlined text-[18px]">logout</span>Logout
             </button>
           </div>
