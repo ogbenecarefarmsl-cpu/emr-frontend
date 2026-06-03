@@ -18,11 +18,11 @@ export function TriageQueuePanel({
   maxHeightClassName = 'max-h-[calc(100vh-340px)]',
 }: TriageQueuePanelProps) {
   return (
-    <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
-      <div className="px-4 py-3 border-b flex items-center justify-between bg-muted/20">
+    <div className="bg-card border rounded-xl shadow-sm">
+      <div className="px-4 py-3 border-b flex items-center justify-between">
         <h3 className="font-semibold text-sm flex items-center gap-2">
           <Clock className="w-4 h-4 text-amber-500" />
-          Triage Queue
+          Awaiting Triage
         </h3>
         <Badge variant={visits.length > 0 ? 'default' : 'secondary'}>{visits.length}</Badge>
       </div>
@@ -38,36 +38,31 @@ export function TriageQueuePanel({
         ) : (
           <div className="divide-y">
             {visits.map((visit) => (
-              <div key={visit._id} className="grid gap-3 border-l-4 border-l-amber-500 p-4 hover:bg-muted/30 transition-colors md:grid-cols-[minmax(0,1fr)_160px_auto] md:items-center">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-semibold text-sm truncate">{patientName(visit.patientId)}</p>
-                    <Badge variant="outline" className="text-[10px]">{visit.visitType || 'OPD'}</Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {visit.visitNumber} - {visit.patientId?.patientId || visit.patientId?.mrn || 'No MRN'}
-                  </p>
-                  {visit.chiefComplaint && (
-                    <p className="text-xs text-muted-foreground italic mt-1 line-clamp-2">
-                      "{visit.chiefComplaint}"
+              <div key={visit._id} className="p-3 hover:bg-muted/30 transition-colors">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate">{patientName(visit.patientId)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {visit.visitNumber} - {visit.patientId?.patientId}
                     </p>
-                  )}
-                  {visit.patientId?.allergies?.length > 0 && (
-                    <div className="flex items-center gap-1 mt-1">
-                      <AlertTriangle className="w-3 h-3 text-red-500" />
-                      <span className="text-xs text-red-600 font-medium truncate">
-                        {visit.patientId.allergies.join(', ')}
-                      </span>
-                    </div>
-                  )}
+                    {visit.chiefComplaint && (
+                      <p className="text-xs text-muted-foreground italic mt-0.5 line-clamp-2">
+                        "{visit.chiefComplaint}"
+                      </p>
+                    )}
+                    {visit.patientId?.allergies?.length > 0 && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <AlertTriangle className="w-3 h-3 text-red-500" />
+                        <span className="text-xs text-red-600 font-medium truncate">
+                          {visit.patientId.allergies.join(', ')}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <Button size="sm" className="flex-shrink-0" onClick={() => onOpenTriage(visit)}>
+                    Triage
+                  </Button>
                 </div>
-                <div className="rounded-lg border bg-background px-3 py-2 text-xs text-muted-foreground">
-                  <p className="font-semibold text-foreground">Payment cleared</p>
-                  <p>Awaiting vitals</p>
-                </div>
-                <Button size="sm" className="md:w-28" onClick={() => onOpenTriage(visit)}>
-                  Open Triage
-                </Button>
               </div>
             ))}
           </div>
