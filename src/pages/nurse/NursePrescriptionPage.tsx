@@ -53,6 +53,7 @@ export default function NursePrescriptionPage() {
   const queryClient = useQueryClient();
   const [visitId, setVisitId] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [isMedicationPickerOpen, setIsMedicationPickerOpen] = useState(false);
   const [selectedMeds, setSelectedMeds] = useState<SelectedMed[]>([]);
   const [notes, setNotes] = useState('');
 
@@ -68,6 +69,12 @@ export default function NursePrescriptionPage() {
     enabled: searchTerm.trim().length > 2,
   });
 
+  const { data: allMedicationOptions = [], isLoading: medicationsLoading } = useQuery({
+    queryKey: ['medications', 'nurse-all-options'],
+    queryFn: () => medicationService.findAll(),
+    staleTime: 60 * 1000,
+  });
+
   const activeVisits = useMemo(() => {
     const list = Array.isArray(visits) ? visits : visits?.data || [];
     return list
@@ -79,6 +86,44 @@ export default function NursePrescriptionPage() {
   const selectedPatientId = patientId(selectedVisit);
 
   const totalAmount = selectedMeds.reduce((sum, med) => sum + med.unitPrice * med.quantity, 0);
+
+  const medicationOptions = useMemo(() => {
+    const term = searchTerm.trim().toLowerCase();
+    const byId = new Map<string, any>();
+
+    [...searchResults, ...allMedicationOptions].forEach((med: any) => {
+      if (med?._id) byId.set(med._id, med);
+    });
+
+    const list = Array.from(byId.values());
+    const filtered = term
+      ? list.filter((med: any) => {
+          const packText = Array.isArray(med.packSizes)
+            ? med.packSizes.map((pack: any) => `${pack.name || ''} ${pack.unit || ''} ${pack.barcode || ''}`).join(' ')
+            : '';
+          const searchable = [
+            med.name,
+            med.genericName,
+            med.medicationCode,
+            med.category,
+            med.strength,
+            med.dosageForm,
+            med.unit,
+            packText,
+          ].join(' ').toLowerCase();
+          return searchable.includes(term);
+        })
+      : list;
+
+    return filtered
+      .sort((a: any, b: any) => {
+        const aStock = Number(a.stockQuantity || 0) > 0 ? 0 : 1;
+        const bStock = Number(b.stockQuantity || 0) > 0 ? 0 : 1;
+        if (aStock !== bStock) return aStock - bStock;
+        return String(a.name || '').localeCompare(String(b.name || ''));
+      })
+      .slice(0, 80);
+  }, [allMedicationOptions, searchResults, searchTerm]);
 
   const createPrescription = useMutation({
     mutationFn: async () => {
@@ -138,6 +183,7 @@ export default function NursePrescriptionPage() {
       },
     ]);
     setSearchTerm('');
+    setIsMedicationPickerOpen(false);
   };
 
   const updateMedication = (index: number, field: keyof SelectedMed, value: any) => {
@@ -199,15 +245,23 @@ export default function NursePrescriptionPage() {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
                   value={searchTerm}
-                  onChange={(event) => setSearchTerm(event.target.value)}
-                  placeholder="Search medications or CAF products"
+                  onChange={(event) => {
+                    setSearchTerm(event.target.value);
+                    setIsMedicationPickerOpen(true);
+                  }}
+                  onFocus={() => setIsMedicationPickerOpen(true)}
+                  placeholder="Search by drug name, generic, brand, SKU, strength..."
                   className="pl-9"
                 />
-              </div>
-              {searchLoading && <p className="text-sm text-muted-foreground">Searching...</p>}
-              {searchResults.length > 0 && (
-                <div className="max-h-72 overflow-y-auto rounded-lg border">
-                  {searchResults.map((med: any) => (
+                {isMedicationPickerOpen && (
+                  <div className="absolute z-30 mt-2 max-h-80 w-full overflow-y-auto rounded-lg border bg-background shadow-xl">
+                    {(searchLoading || medicationsLoading) && (
+                      <p className="p-3 text-sm text-muted-foreground">Loading products...</p>
+                    )}
+                    {!searchLoading && !medicationsLoading && medicationOptions.length === 0 && (
+                      <p className="p-3 text-sm text-muted-foreground">No medications or CAF products found</p>
+                    )}
+                    {medicationOptions.map((med: any) => (
                     <button
                       key={med._id}
                       type="button"
@@ -215,9 +269,15 @@ export default function NursePrescriptionPage() {
                       className="flex w-full items-center justify-between gap-3 border-b p-3 text-left last:border-b-0 hover:bg-muted/50"
                     >
                       <div className="min-w-0">
-                        <p className="font-medium">{med.name}</p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="font-medium">{med.name}</p>
+                          {med.__cafProduct && <Badge variant="secondary">CAF</Badge>}
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {med.genericName || med.medicationCode || 'Medication'} {med.strength ? `- ${med.strength}` : ''}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          {med.medicationCode || 'No code'} {med.unit ? `- ${med.unit}` : ''} {med.category ? `- ${med.category}` : ''}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">
@@ -227,9 +287,10 @@ export default function NursePrescriptionPage() {
                         <Plus className="h-4 w-4" />
                       </div>
                     </button>
-                  ))}
-                </div>
-              )}
+                    ))}
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
 
