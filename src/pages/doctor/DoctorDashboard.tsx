@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,12 +27,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 // Dashboard components
 import { RoleLayout } from '@/components/layout/RoleLayout';
+import { PatientSearch } from '@/components/doctor/PatientSearch';
+import { AllergyManager } from '@/components/doctor/AllergyManager';
+import { ProblemList } from '@/components/doctor/ProblemList';
+import { VitalsTrends } from '@/components/doctor/VitalsTrends';
+import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
 
 // Icons
 import {
   Loader2, Clock, CheckCircle, User, Stethoscope, FileText, FlaskConical, Pill,
   ChevronDown, AlertTriangle, ArrowUp, ArrowDown, Search, Plus, Trash2, Save,
-  Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
+  Send, Heart, Users, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
   Pencil
 } from 'lucide-react';
 
@@ -1035,9 +1041,118 @@ export default function DoctorDashboard() {
                         <Badge className="ml-1.5 h-4 min-w-4 text-[10px]">{labResults.length}</Badge>
                       )}
                     </TabsTrigger>
+                    <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Summary</TabsTrigger>
                     <TabsTrigger value="history" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">History</TabsTrigger>
                   </TabsList>
                 </div>
+
+                {/* Overview Tab */}
+                <TabsContent value="overview" className="p-5 mt-0">
+                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                    {/* Vitals Card */}
+                    <div className="clinical-panel p-4">
+                      <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                        <Heart className="w-4 h-4 text-red-500" />
+                        Vitals
+                      </h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {[
+                          { label: 'Temperature (C)', value: vitalsForm.temperature },
+                          { label: 'Blood Pressure', value: vitalsForm.bloodPressure },
+                          { label: 'Heart Rate (bpm)', value: vitalsForm.heartRate },
+                          { label: 'Resp. Rate (/min)', value: vitalsForm.respiratoryRate },
+                          { label: 'Weight (kg)', value: vitalsForm.weight },
+                          { label: 'SpO2 (%)', value: vitalsForm.oxygenSaturation },
+                        ].map((vital) => (
+                          <div key={vital.label} className="p-2 rounded-lg bg-muted/50 border min-w-0">
+                            <div className="clinical-label">{vital.label}</div>
+                            <div className="clinical-data mt-0.5 break-words">{vital.value || '-'}</div>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">Latest nursing triage vitals.</p>
+                    </div>
+
+                    {/* Chief Complaint Card */}
+                    <div className="clinical-panel p-4">
+                      <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                        <ClipboardList className="w-4 h-4 text-blue-500" />
+                        Chief Complaint
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedVisit.chiefComplaint || 'Not specified'}
+                      </p>
+                      {selectedVisit.notes && (
+                        <>
+                          <Separator className="my-3" />
+                          <p className="text-sm text-muted-foreground">{selectedVisit.notes}</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Clinical Components */}
+                  <div className="mt-6 space-y-4">
+                    <AllergyManager
+                      patientId={selectedVisit.patientId?._id || selectedVisit.patientId}
+                      allergies={selectedVisit.patientId?.allergies || []}
+                      allergyDetails={selectedVisit.patientId?.allergyDetails || []}
+                    />
+                    <ProblemList
+                      visitId={selectedVisit._id || selectedVisit.id}
+                      problems={selectedVisit.problemList || []}
+                    />
+                    <VitalsTrends vitalsHistory={patientChart?.vitalsHistory || []} />
+                    <FollowUpScheduler
+                      visitId={selectedVisit._id || selectedVisit.id}
+                      followUpDate={selectedVisit.followUpDate}
+                      followUpNotes={selectedVisit.followUpNotes}
+                    />
+                  </div>
+
+                  {/* Quick Actions */}
+                  <div className="clinical-panel mt-6 p-4">
+                    {closureBlockers.length > 0 && (
+                      <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
+                        <p className="text-xs font-semibold text-amber-800">Cannot close encounter yet</p>
+                        <ul className="mt-1 text-xs text-amber-700 space-y-1">
+                          {closureBlockers.map((blocker) => (
+                            <li key={blocker}>- {blocker}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <h3 className="font-semibold text-sm">Clinical actions</h3>
+                        <p className="text-xs text-muted-foreground mt-1 capitalize">{statusLabel(selectedVisit.status)}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('soap')}>
+                          <FileText className="w-4 h-4 mr-2" />
+                          Consult
+                        </Button>
+                        <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
+                          <ClipboardList className="w-4 h-4 mr-2" />
+                          Orders
+                        </Button>
+                        <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}>
+                          <FlaskConical className="w-4 h-4 mr-2" />
+                          Results
+                        </Button>
+                        <Button
+                          className="rounded-full"
+                          onClick={handleCompleteAndNext}
+                          disabled={completeVisit.isPending || !canCloseEncounter}
+                          title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-2" />
+                          Close Visit
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </TabsContent>
 
                 {/* Orders Tab */}
                 <TabsContent value="orders" className="p-5 md:p-6 mt-0">
@@ -1244,8 +1359,7 @@ export default function DoctorDashboard() {
 
                 {/* Consultation Tab */}
                 <TabsContent value="soap" className="p-6 mt-0">
-                  <div className="flex flex-col xl:flex-row gap-6">
-                    <div className="flex-1 space-y-4">
+                  <div className="space-y-5">
                     <div className="clinical-panel flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
                       <div>
                         <h3 className="font-semibold text-sm">Consultation Note</h3>
@@ -1328,102 +1442,56 @@ export default function DoctorDashboard() {
                       </div>
                     </div>
 
-                    <div className="clinical-panel overflow-hidden">
-                      <div className="clinical-panel-header">
-                        <Label className="font-semibold text-sm text-blue-600">S - Subjective</Label>
-                      </div>
-                      <div className="p-4">
+                    <div className="clinical-panel p-4">
+                      <Label className="text-sm font-semibold">Diagnosis</Label>
+                      <Input
+                        value={soapForm.diagnosis}
+                        onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})}
+                        placeholder="Primary diagnosis"
+                        className="mt-2"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                      <div className="clinical-panel p-4">
+                        <Label className="text-sm font-semibold text-blue-600">S - Subjective</Label>
                         <Textarea
                           value={soapForm.subjective}
                           onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})}
                           placeholder="Patient's description of symptoms, history of present illness..."
-                          rows={5}
+                          rows={7}
                           className="mt-2 resize-y"
                         />
                       </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                      <div className="clinical-panel overflow-hidden">
-                        <div className="clinical-panel-header">
-                          <Label className="font-semibold text-sm text-green-600">O - Objective</Label>
-                        </div>
-                        <div className="p-4">
+                      <div className="clinical-panel p-4">
+                        <Label className="text-sm font-semibold text-green-600">O - Objective</Label>
                         <Textarea
                           value={soapForm.objective}
                           onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})}
                           placeholder="Physical exam findings, vitals, observations..."
-                          rows={6}
+                          rows={7}
                           className="mt-2 resize-y"
                         />
-                        </div>
                       </div>
-                      <div className="clinical-panel overflow-hidden">
-                        <div className="clinical-panel-header">
-                          <Label className="font-semibold text-sm text-purple-600">A - Assessment</Label>
-                        </div>
-                        <div className="p-4 space-y-3">
-                        <Input
-                          value={soapForm.diagnosis}
-                          onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})}
-                          placeholder="Primary diagnosis"
-                        />
+                      <div className="clinical-panel p-4">
+                        <Label className="text-sm font-semibold text-purple-600">A - Assessment</Label>
                         <Textarea
                           value={soapForm.assessment}
                           onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})}
                           placeholder="Clinical impression, differential diagnosis..."
-                          rows={4}
-                          className="resize-y"
+                          rows={6}
+                          className="mt-2 resize-y"
                         />
-                        </div>
                       </div>
-                    </div>
-
-                    <div className="clinical-panel overflow-hidden">
-                      <div className="clinical-panel-header">
-                        <Label className="font-semibold text-sm text-orange-600">P - Plan</Label>
-                      </div>
-                      <div className="p-4 space-y-4">
+                      <div className="clinical-panel p-4">
+                        <Label className="text-sm font-semibold text-orange-600">P - Plan</Label>
                         <Textarea
                           value={soapForm.plan}
                           onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})}
                           placeholder="Treatment plan, medications, follow-up..."
-                          rows={4}
-                          className="resize-y"
+                          rows={6}
+                          className="mt-2 resize-y"
                         />
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                          <Button variant="outline" className="h-11 rounded-lg" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!canContinueClinicalWork}>
-                            <FlaskConical className="w-4 h-4 mr-2" />
-                            Order Lab Tests
-                          </Button>
-                          <Button variant="outline" className="h-11 rounded-lg" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }} disabled={!canContinueClinicalWork}>
-                            <Pill className="w-4 h-4 mr-2" />
-                            Prescribe Medication
-                          </Button>
-                          <Button variant="outline" className="h-11 rounded-lg" onClick={() => setReferralOpen(true)} disabled={!canContinueClinicalWork}>
-                            <UserCheck className="w-4 h-4 mr-2" />
-                            Refer Patient
-                          </Button>
-                        </div>
-                        {(currentVisitOrders.length > 0 || currentVisitPrescriptions.length > 0) && (
-                          <div className="rounded-lg border border-dashed bg-background p-3">
-                            <p className="clinical-label mb-2">Pending Orders for Visit</p>
-                            <div className="space-y-2">
-                              {currentVisitOrders.slice(0, 3).map((order: any) => (
-                                <div key={order._id || order.id} className="flex items-center justify-between gap-3 rounded border bg-card px-3 py-2 text-xs">
-                                  <span className="truncate">{order.orderNumber || 'Clinical order'}</span>
-                                  <Badge variant="outline" className="text-[10px]">{(order.status || 'pending').replace(/_/g, ' ')}</Badge>
-                                </div>
-                              ))}
-                              {currentVisitPrescriptions.slice(0, 3).map((rx: any) => (
-                                <div key={rx._id} className="flex items-center justify-between gap-3 rounded border bg-card px-3 py-2 text-xs">
-                                  <span className="truncate">{rx.prescriptionNumber || 'Prescription'}</span>
-                                  <Badge variant={rx.isPaid ? 'default' : 'secondary'} className="text-[10px]">{rx.isPaid ? 'Paid' : 'Awaiting payment'}</Badge>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </div>
 
@@ -1438,54 +1506,14 @@ export default function DoctorDashboard() {
                     )}
 
                     <div className="flex flex-wrap justify-end gap-3">
+                      <Button variant="outline" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
+                        <ClipboardList className="w-4 h-4 mr-2" />
+                        Orders
+                      </Button>
                       <Button onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
                         <Save className="w-4 h-4 mr-2" />
                         Save Note
                       </Button>
-                    </div>
-                    </div>
-
-                    <div className="w-full xl:w-[300px] space-y-4">
-                      <div className="clinical-panel overflow-hidden">
-                        <div className="clinical-panel-header">
-                          <h4 className="clinical-label">Chief Complaint</h4>
-                        </div>
-                        <div className="p-4 text-sm text-muted-foreground">
-                          {selectedVisit.chiefComplaint || 'Not specified'}
-                          {selectedVisit.notes && (
-                            <p className="mt-3 border-t pt-3">{selectedVisit.notes}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="clinical-panel overflow-hidden">
-                        <div className="clinical-panel-header">
-                          <h4 className="clinical-label">Recent Encounters</h4>
-                        </div>
-                        <div className="max-h-[320px] overflow-y-auto">
-                          {patientVisits.filter((visit: Visit) => visit._id !== selectedVisit._id).slice(0, 5).length === 0 ? (
-                            <div className="p-4 text-sm text-muted-foreground">No previous visits found</div>
-                          ) : (
-                            patientVisits
-                              .filter((visit: Visit) => visit._id !== selectedVisit._id)
-                              .slice(0, 5)
-                              .map((visit: Visit) => (
-                                <button
-                                  key={visit._id}
-                                  type="button"
-                                  className="clinical-list-row block w-full p-3 text-left"
-                                  onClick={() => setActiveTab('history')}
-                                >
-                                  <div className="flex items-center justify-between gap-2">
-                                    <span className="text-sm font-semibold truncate">{new Date(visit.createdAt).toLocaleDateString()}</span>
-                                    <span className="clinical-label shrink-0">{visit.visitNumber}</span>
-                                  </div>
-                                  <p className="text-xs text-muted-foreground truncate">{visit.diagnosis || visit.chiefComplaint || visit.visitType}</p>
-                                </button>
-                              ))
-                          )}
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </TabsContent>
@@ -1811,6 +1839,26 @@ export default function DoctorDashboard() {
                 <p className="text-sm text-muted-foreground mt-2">
                   Open a waiting patient, continue an active encounter, or review returned results.
                 </p>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
+                  <Button variant="outline" className="h-auto rounded-lg py-4" onClick={() => {
+                    setQueueSectionsOpen((current) => ({ ...current, waiting: true }));
+                  }}>
+                    <Clock className="w-4 h-4 mr-2" />
+                    Waiting Patients
+                  </Button>
+                  <Button variant="outline" className="h-auto rounded-lg py-4" onClick={() => {
+                    setQueueSectionsOpen((current) => ({ ...current, active: true }));
+                  }}>
+                    <Stethoscope className="w-4 h-4 mr-2" />
+                    Patients I'm Seeing
+                  </Button>
+                  <Button variant="outline" className="h-auto rounded-lg py-4" onClick={() => {
+                    setQueueSectionsOpen((current) => ({ ...current, results: true }));
+                  }}>
+                    <FlaskConical className="w-4 h-4 mr-2" />
+                    Results Ready
+                  </Button>
+                </div>
               </div>
             </div>
           )}
