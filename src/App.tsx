@@ -71,6 +71,7 @@ import PrescriptionForm from "./pages/doctor/PrescriptionForm";
 import NurseDashboard from "./pages/nurse/NurseDashboard";
 import NurseAdmissionsPage from "./pages/nurse/NurseAdmissionsPage";
 import NurseMarPage from "./pages/nurse/NurseMarPage";
+import NurseLabRequestsPage from "./pages/nurse/NurseLabRequestsPage";
 import NurseObservationPage from "./pages/nurse/NurseObservationPage";
 import NurseProceduresPage from "./pages/nurse/NurseProceduresPage";
 import NurseTriagePage from "./pages/nurse/NurseTriagePage";
@@ -269,7 +270,7 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['lab_tech', 'admin']}><EditableResultReport /></RoleGuard>
       } />
       <Route path="/lab/reports/:orderId" element={
-        <RoleGuard allowedRoles={['lab_tech', 'admin', 'doctor']}><LabReportPage /></RoleGuard>
+        <RoleGuard allowedRoles={['lab_tech', 'admin', 'doctor', 'specialist', 'nurse']}><LabReportPage /></RoleGuard>
       } />
       <Route path="/public/lab/reports/:orderId" element={<PublicLabReportPage />} />
 
@@ -368,11 +369,17 @@ function AppRoutes() {
       <Route path="/nurse/mar" element={
         <RoleGuard allowedRoles={['nurse', 'admin']}><NurseMarPage /></RoleGuard>
       } />
+      <Route path="/nurse/lab-requests" element={
+        <RoleGuard allowedRoles={['nurse', 'admin']}><NurseLabRequestsPage /></RoleGuard>
+      } />
       <Route path="/nurse/observation" element={
         <RoleGuard allowedRoles={['nurse', 'admin']}><NurseObservationPage /></RoleGuard>
       } />
       <Route path="/nurse/procedures" element={
         <RoleGuard allowedRoles={['nurse', 'admin']}><NurseProceduresPage /></RoleGuard>
+      } />
+      <Route path="/nurse/reports/:orderId" element={
+        <RoleGuard allowedRoles={['nurse', 'admin']}><LabReportPage /></RoleGuard>
       } />
 
       {/* Pharmacy Routes */}

@@ -12,6 +12,7 @@ import {
   BedDouble,
   ClipboardCheck,
   ClipboardList,
+  FlaskConical,
   HeartPulse,
   Pill,
   Stethoscope,
@@ -31,6 +32,13 @@ const workspaces = [
     to: '/nurse/admissions',
     icon: BedDouble,
     accent: 'text-blue-600 bg-blue-500/10',
+  },
+  {
+    title: 'Lab Requests',
+    description: 'Order LIS-backed tests and route payment to reception.',
+    to: '/nurse/lab-requests',
+    icon: FlaskConical,
+    accent: 'text-cyan-700 bg-cyan-500/10',
   },
   {
     title: 'MAR',

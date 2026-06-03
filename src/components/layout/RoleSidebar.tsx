@@ -102,6 +102,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { to: '/nurse', icon: LayoutDashboard, label: 'Nurse Station' },
     { to: '/nurse/triage', icon: ClipboardCheck, label: 'Triage' },
     { to: '/nurse/admissions', icon: BedDouble, label: 'Admissions' },
+    { to: '/nurse/lab-requests', icon: FlaskConical, label: 'Lab Requests' },
     { to: '/nurse/mar', icon: Pill, label: 'MAR' },
     { to: '/nurse/observation', icon: HeartPulse, label: 'Observation' },
     { to: '/nurse/procedures', icon: ClipboardList, label: 'Procedures' },

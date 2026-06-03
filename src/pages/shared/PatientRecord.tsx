@@ -370,7 +370,11 @@ const PatientRecord = () => {
                           {order.status === 'completed' && (
                             <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
                               onClick={() => {
-                                const reportPath = primaryRole === 'receptionist' ? `/reception/reports/${order._id}` : `/lab/reports/${order._id}`;
+                                const reportPath = primaryRole === 'receptionist'
+                                  ? `/reception/reports/${order._id}`
+                                  : primaryRole === 'nurse'
+                                    ? `/nurse/reports/${order._id}`
+                                    : `/lab/reports/${order._id}`;
                                 navigate(reportPath);
                               }}
                             >
