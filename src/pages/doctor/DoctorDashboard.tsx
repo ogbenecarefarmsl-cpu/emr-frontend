@@ -752,7 +752,10 @@ export default function DoctorDashboard() {
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-border z-50 flex items-center justify-between gap-3 px-4">
         <div className="flex items-center gap-4 min-w-0">
-          <span className="font-bold text-primary text-lg shrink-0">SierraEMR</span>
+          <div className="flex items-center gap-2 shrink-0">
+            <img src="/harbour-emr-logo.svg" alt="Harbour EMR Logo" className="h-8 w-auto object-contain" />
+            <span className="font-bold text-primary text-lg">Harbour EMR</span>
+          </div>
           <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
             {[
               { label: 'Consult', value: 'soap' },
@@ -799,41 +802,130 @@ export default function DoctorDashboard() {
         <nav className="fixed left-0 top-14 bottom-0 w-64 z-40 bg-[#fafbfc] border-r border-border hidden md:flex flex-col">
           <div className="p-4 border-b border-border">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-primary/10 flex items-center justify-center">
-                <span className="material-symbols-outlined text-primary text-[20px]">local_hospital</span>
-              </div>
+              <img src="/harbour-emr-logo.svg" alt="Harbour EMR Logo" className="h-10 w-auto object-contain" />
               <div>
-                <p className="text-sm font-semibold leading-tight">Freetown Central</p>
-                <p className="text-[10px] text-muted-foreground">General Outpatient</p>
+                <p className="text-sm font-semibold leading-tight">Harbour EMR</p>
+                <p className="text-[10px] text-muted-foreground">Doctor Workbench</p>
               </div>
             </div>
           </div>
           <div className="flex-1 overflow-y-auto">
-            <div className="p-2">
-              {[
-                { label: 'Queue', icon: 'queue', active: true },
-                { label: 'Vitals', icon: 'monitor_heart', active: false },
-                { label: 'Triage', icon: 'emergency', active: false },
-                { label: 'Pharmacy', icon: 'medication', active: false },
-              ].map((item) => (
-                <button key={item.label} className={cn("w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors", item.active ? "bg-primary/10 text-primary font-semibold border-l-2 border-primary" : "text-muted-foreground hover:bg-muted/50")}>
-                  <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                  {item.label}
-                </button>
-              ))}
-            </div>
-            <div className="px-4 pt-4 pb-2">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Today's Roster</p>
-              <div className="space-y-1">
-                {[...waitingQueue.slice(0, 5), ...activePatients.slice(0, 5)].slice(0, 5).map((visit: Visit) => (
-                  <div key={visit._id} onClick={() => setSelectedVisit(visit)} className={cn("p-2.5 rounded-lg cursor-pointer transition-colors border-l-2", selectedVisit?._id === visit._id ? "bg-primary/10 border-primary" : "hover:bg-muted/50", visit.status === 'in_consultation' ? "border-l-primary" : visit.roomType === 'emergency' ? "border-l-red-500" : "border-l-muted")}>
-                    <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
-                    <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
-                  </div>
-                ))}
-                {[...waitingQueue.slice(0, 5), ...activePatients.slice(0, 5)].length === 0 && (
-                  <p className="text-[11px] text-muted-foreground text-center py-3">No patients in roster</p>
-                )}
+            <div className="px-3 py-4">
+              <p className="px-1 text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Today's Roster</p>
+              <div className="space-y-2">
+                <div className="rounded-lg border bg-white overflow-hidden">
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2.5 flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+                    onClick={() => toggleQueueSection('waiting')}
+                  >
+                    <span className="text-xs font-semibold flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[17px] text-amber-500">schedule</span>
+                      Waiting
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Badge variant="secondary" className="h-5 text-[10px]">{waitingQueue.length}</Badge>
+                      <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", !queueSectionsOpen.waiting && "-rotate-90")} />
+                    </span>
+                  </button>
+                  {queueSectionsOpen.waiting && (
+                    <div className="border-t">
+                      {waitingQueue.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground text-center py-3">No waiting patients</p>
+                      ) : (
+                        waitingQueue.map((visit: Visit) => (
+                          <div key={visit._id} onClick={() => setSelectedVisit(visit)} className={cn("p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0", selectedVisit?._id === visit._id ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-amber-500")}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
+                              </div>
+                              <Button
+                                size="sm"
+                                className="h-6 rounded-full text-[10px] px-2 shrink-0"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleAcceptPatient(visit);
+                                }}
+                                disabled={acceptPatient.isPending}
+                              >
+                                See
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border bg-white overflow-hidden">
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2.5 flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+                    onClick={() => toggleQueueSection('active')}
+                  >
+                    <span className="text-xs font-semibold flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[17px] text-primary">stethoscope</span>
+                      Patients I'm Seeing
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Badge variant="secondary" className="h-5 text-[10px]">{activePatients.length}</Badge>
+                      <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", !queueSectionsOpen.active && "-rotate-90")} />
+                    </span>
+                  </button>
+                  {queueSectionsOpen.active && (
+                    <div className="border-t">
+                      {activePatients.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground text-center py-3">No active encounters</p>
+                      ) : (
+                        activePatients.map((visit: Visit) => (
+                          <div key={visit._id} onClick={() => { setSelectedVisit(visit); if (visit.status === 'results_ready') setActiveTab('lab-results'); }} className={cn("p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0", selectedVisit?._id === visit._id ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-primary")}>
+                            <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
+                            <div className="mt-0.5 flex items-center justify-between gap-2">
+                              <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
+                              <Badge variant="outline" className="text-[9px] capitalize shrink-0">{statusLabel(visit.status)}</Badge>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-lg border bg-white overflow-hidden">
+                  <button
+                    type="button"
+                    className="w-full px-3 py-2.5 flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
+                    onClick={() => toggleQueueSection('results')}
+                  >
+                    <span className="text-xs font-semibold flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[17px] text-emerald-600">science</span>
+                      Results Ready
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <Badge variant="secondary" className="h-5 text-[10px]">{resultsReady.length}</Badge>
+                      <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", !queueSectionsOpen.results && "-rotate-90")} />
+                    </span>
+                  </button>
+                  {queueSectionsOpen.results && (
+                    <div className="border-t">
+                      {resultsReady.length === 0 ? (
+                        <p className="text-[11px] text-muted-foreground text-center py-3">No results pending</p>
+                      ) : (
+                        resultsReady.map((visit: Visit) => (
+                          <div key={visit._id} onClick={() => { setSelectedVisit(visit); setActiveTab('lab-results'); }} className={cn("p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0", selectedVisit?._id === visit._id ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-emerald-500")}>
+                            <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
+                            <div className="mt-0.5 flex items-center justify-between gap-2">
+                              <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
+                              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[9px] shrink-0">Review</Badge>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
