@@ -22,7 +22,6 @@ import {
   Printer,
   FileBarChart,
   Stethoscope,
-  Clock,
   Tag,
   UserRoundCog,
   Pill,
@@ -136,13 +135,6 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
     navigate('/login');
   };
 
-  const openDoctorWorklist = (section: 'waiting' | 'active' | 'results') => {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('doctor-worklist:open', { detail: { section } }));
-    }
-    onClose?.();
-  };
-
   return (
     <aside className={cn(
       "bg-sidebar text-sidebar-foreground flex flex-col h-screen transition-[width] duration-200 overflow-hidden border-r border-sidebar-border",
@@ -201,49 +193,6 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
             </NavLink>
           );
         })}
-        {(role === 'doctor' || role === 'specialist') && (
-          <div className={cn("pt-3 mt-3 border-t border-sidebar-border/70 space-y-0.5", collapsed && "lg:pt-2 lg:mt-2")}>
-            {!collapsed && (
-              <p className="px-3 pb-1 clinical-label text-sidebar-foreground/50">Worklist</p>
-            )}
-            <button
-              type="button"
-              onClick={() => openDoctorWorklist('waiting')}
-              title={collapsed ? 'Waiting Patients' : undefined}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium',
-                collapsed && 'lg:justify-center lg:px-2'
-              )}
-            >
-              <Clock className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span className={cn("clinical-label text-current", collapsed && "lg:hidden")}>Waiting Patients</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openDoctorWorklist('active')}
-              title={collapsed ? "Patients I'm Seeing" : undefined}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium',
-                collapsed && 'lg:justify-center lg:px-2'
-              )}
-            >
-              <Stethoscope className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span className={cn("clinical-label text-current", collapsed && "lg:hidden")}>Patients I'm Seeing</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openDoctorWorklist('results')}
-              title={collapsed ? 'Results Ready' : undefined}
-              className={cn(
-                'w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium',
-                collapsed && 'lg:justify-center lg:px-2'
-              )}
-            >
-              <FlaskConical className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span className={cn("clinical-label text-current", collapsed && "lg:hidden")}>Results Ready</span>
-            </button>
-          </div>
-        )}
       </nav>
 
       {/* Logout Button */}
