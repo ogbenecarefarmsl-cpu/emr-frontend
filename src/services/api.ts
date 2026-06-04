@@ -335,6 +335,11 @@ export const ordersAPI = {
     return response.data;
   },
 
+  retryFailedLisSync: async () => {
+    const response = await api.post('/orders/retry-failed-lis-sync');
+    return response.data;
+  },
+
   getLisCatalog: async () => {
     const response = await api.get('/orders/lis-catalog');
     const payload = response.data;

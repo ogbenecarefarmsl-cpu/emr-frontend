@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { ordersAPI, visitsAPI } from '@/services/api';
 import { cn } from '@/lib/utils';
-import { Check, FlaskConical, Loader2, Search, Send, X } from 'lucide-react';
+import { Check, FlaskConical, Loader2, RefreshCw, Search, Send, X } from 'lucide-react';
 
 interface LisOrderable {
   _id?: string;
@@ -74,6 +74,14 @@ export default function NurseLabRequestsPage() {
   const selectedVisit = activeVisits.find((visit: any) => (visit._id || visit.id) === visitId);
   const selectedPatientId = patientId(selectedVisit);
 
+  // Fetch existing orders for the selected visit
+  const { data: existingOrders = [] } = useQuery({
+    queryKey: ['orders', 'visit', visitId],
+    queryFn: () => ordersAPI.getAll({ visitId, limit: 50 }),
+    enabled: !!visitId,
+    staleTime: 10 * 1000,
+  });
+
   const filteredCatalog = useMemo(() => {
     const list = Array.isArray(lisCatalog) ? lisCatalog : [];
     const query = search.trim().toLowerCase();
@@ -124,6 +132,17 @@ export default function NurseLabRequestsPage() {
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || error?.message || 'Failed to create lab request');
+    },
+  });
+
+  const retryLisSync = useMutation({
+    mutationFn: (orderId: string) => ordersAPI.syncToLis(orderId),
+    onSuccess: () => {
+      toast.success('LIS sync retry triggered');
+      queryClient.invalidateQueries({ queryKey: ['orders', 'visit', visitId], exact: false });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || error?.message || 'LIS retry failed');
     },
   });
 
@@ -197,6 +216,66 @@ export default function NurseLabRequestsPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Existing orders for this visit */}
+          {visitId && (
+            <Card>
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <FlaskConical className="h-5 w-5 text-primary" />
+                  Existing Orders
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {existingOrders.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No orders yet for this visit</p>
+                ) : (
+                  <div className="space-y-2">
+                    {existingOrders.map((order: any) => (
+                      <div key={order._id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">{order.orderNumber}</span>
+                            <Badge variant="outline" className="text-xs">{order.orderType}</Badge>
+                            <Badge
+                              variant={
+                                order.status === 'completed' ? 'default'
+                                : order.status === 'awaiting_payment' ? 'destructive'
+                                : 'secondary'
+                              }
+                              className="text-xs capitalize"
+                            >
+                              {order.status?.replace(/_/g, ' ')}
+                            </Badge>
+                          </div>
+                          {order.order_tests?.length > 0 && (
+                            <p className="mt-1 text-xs text-muted-foreground truncate max-w-[280px]">
+                              {order.order_tests.map((t: any) => t.testName).join(', ')}
+                            </p>
+                          )}
+                        </div>
+                        {order.priority && order.priority !== 'routine' && (
+                          <Badge variant="secondary" className="text-xs uppercase">{order.priority}</Badge>
+                        )}
+                        {order.lisSyncStatus === 'failed' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 text-xs text-destructive hover:text-destructive"
+                            onClick={() => retryLisSync.mutate(order._id)}
+                            disabled={retryLisSync.isPending}
+                          >
+                            <RefreshCw className={cn('h-3 w-3 mr-1', retryLisSync.isPending && 'animate-spin')} />
+                            Retry LIS
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader className="pb-4">
