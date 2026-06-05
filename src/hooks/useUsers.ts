@@ -95,3 +95,36 @@ export function useDeleteUserRole() {
     },
   });
 }
+
+export function useUpdateUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: { fullName?: string; email?: string; department?: string; isActive?: boolean } }) => {
+      return await usersAPI.update(id, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}
+
+export function useResetPassword() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, newPassword }: { id: string; newPassword: string }) => {
+      return await usersAPI.resetPassword(id, newPassword);
+    },
+  });
+}
+
+export function useDeleteUser() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return await usersAPI.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+  });
+}

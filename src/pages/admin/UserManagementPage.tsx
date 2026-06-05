@@ -1,15 +1,16 @@
 import { useState } from 'react';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
-import { useUsers, useAssignRole, useRemoveRole } from '@/hooks/useUsers';
+import { useUsers, useAssignRole, useRemoveRole, useUpdateUser, useResetPassword, useDeleteUser } from '@/hooks/useUsers';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { UserPlus, Shield, Trash2, Loader2, Mail } from 'lucide-react';
+import { UserPlus, Shield, Trash2, Loader2, Mail, Pencil, KeyRound, Power } from 'lucide-react';
 import { usersAPI } from '@/services/api';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -20,18 +21,33 @@ export default function UserManagementPage() {
   const { data: users, isLoading } = useUsers();
   const assignRole = useAssignRole();
   const removeRole = useRemoveRole();
+  const updateUser = useUpdateUser();
+  const resetPassword = useResetPassword();
+  const deleteUser = useDeleteUser();
 
   const [selectedUser, setSelectedUser] = useState<any>(null);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
   const [selectedRole, setSelectedRole] = useState<AppRole>('receptionist');
   const [isCreating, setIsCreating] = useState(false);
-  
+
   // Create user form state
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState<AppRole>('receptionist');
+
+  // Edit user form state
+  const [editFullName, setEditFullName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editDepartment, setEditDepartment] = useState('');
+  const [editIsActive, setEditIsActive] = useState(true);
+
+  // Reset password form state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   const roleColors: Record<AppRole, string> = {
     admin: 'bg-status-critical/10 text-status-critical border-status-critical/20',
@@ -76,6 +92,10 @@ export default function UserManagementPage() {
   };
 
   const handleRemoveRole = async (userId: string, role: AppRole, userName: string) => {
+    if (userId === profile?.id) {
+      toast.error('You cannot remove a role from yourself');
+      return;
+    }
     if (!confirm(`Remove ${roleLabels[role]} role from ${userName}?`)) return;
 
     try {
@@ -99,25 +119,22 @@ export default function UserManagementPage() {
 
     setIsCreating(true);
     try {
-      // Step 1: Create user using backend API
       const newUser = await usersAPI.create({
         email: newUserEmail,
         password: newUserPassword,
         fullName: newUserName
       });
 
-      // Step 2: Assign role to the newly created user
       await usersAPI.assignRole(newUser.id, newUserRole);
 
       toast.success(`User ${newUserName} created successfully with ${roleLabels[newUserRole]} role`);
-      
-      // Reset form
+
       setNewUserEmail('');
       setNewUserPassword('');
       setNewUserName('');
       setNewUserRole('receptionist');
       setShowCreateDialog(false);
-      
+
     } catch (error: unknown) {
       console.error('Error creating user:', error);
       const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
@@ -131,14 +148,84 @@ export default function UserManagementPage() {
     }
   };
 
+  const openEditDialog = (user: any) => {
+    setSelectedUser(user);
+    setEditFullName(user.full_name);
+    setEditEmail(user.email);
+    setEditDepartment(user.department || '');
+    setEditIsActive(true);
+    setShowEditDialog(true);
+  };
+
+  const openPasswordDialog = (user: any) => {
+    setSelectedUser(user);
+    setNewPassword('');
+    setConfirmPassword('');
+    setShowPasswordDialog(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedUser) return;
+    if (!editFullName.trim() || !editEmail.trim()) {
+      toast.error('Name and email are required');
+      return;
+    }
+    try {
+      await updateUser.mutateAsync({
+        id: selectedUser.id,
+        data: {
+          fullName: editFullName.trim(),
+          email: editEmail.trim(),
+          department: editDepartment.trim() || undefined,
+        },
+      });
+      toast.success(`User ${editFullName} updated`);
+      setShowEditDialog(false);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to update user');
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!selectedUser) return;
+    if (newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    try {
+      await resetPassword.mutateAsync({ id: selectedUser.id, newPassword });
+      toast.success(`Password reset for ${selectedUser.full_name}`);
+      setShowPasswordDialog(false);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to reset password');
+    }
+  };
+
+  const handleDelete = async (user: any) => {
+    if (user.id === profile?.id) {
+      toast.error('You cannot delete your own account');
+      return;
+    }
+    if (!confirm(`Deactivate ${user.full_name}? They will no longer be able to sign in.`)) return;
+    try {
+      await deleteUser.mutateAsync(user.id);
+      toast.success(`${user.full_name} deactivated`);
+    } catch (error: any) {
+      toast.error(error?.response?.data?.message || 'Failed to deactivate user');
+    }
+  };
+
   return (
-    <RoleLayout 
-      title="Staff & Roles" 
+    <RoleLayout
+      title="Staff & Roles"
       subtitle="Manage staff accounts and role-based access"
       role="admin"
       userName={profile?.fullName}
     >
-      {/* Header with Create Button */}
       <div className="flex justify-between items-center mb-6">
         <div></div>
         <Button onClick={() => setShowCreateDialog(true)}>
@@ -188,7 +275,7 @@ export default function UserManagementPage() {
                 <th>Department</th>
                 <th>Roles</th>
                 <th>Joined</th>
-                <th>Actions</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -226,12 +313,14 @@ export default function UserManagementPage() {
                             className={roleColors[roleItem.role]}
                           >
                             {roleLabels[roleItem.role]}
-                            <button
-                              onClick={() => handleRemoveRole(user.id, roleItem.role, user.full_name)}
-                              className="ml-1 hover:text-destructive"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </button>
+                            {user.id !== profile?.id && (
+                              <button
+                                onClick={() => handleRemoveRole(user.id, roleItem.role, user.full_name)}
+                                className="ml-1 hover:text-destructive"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            )}
                           </Badge>
                         ))
                       ) : (
@@ -243,17 +332,46 @@ export default function UserManagementPage() {
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
                   <td>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setSelectedUser(user);
-                        setShowRoleDialog(true);
-                      }}
-                    >
-                      <Shield className="w-4 h-4 mr-1" />
-                      Assign Role
-                    </Button>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditDialog(user)}
+                        title="Edit user details"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openPasswordDialog(user)}
+                        title="Reset password"
+                      >
+                        <KeyRound className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowRoleDialog(true);
+                        }}
+                        title="Assign role"
+                      >
+                        <Shield className="w-4 h-4" />
+                      </Button>
+                      {user.id !== profile?.id && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDelete(user)}
+                          title="Deactivate user"
+                          className="text-destructive hover:text-destructive"
+                        >
+                          <Power className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -268,6 +386,115 @@ export default function UserManagementPage() {
           </table>
         )}
       </div>
+
+      {/* Edit User Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit user details</DialogTitle>
+            <DialogDescription>Update the user&apos;s name, email, or department.</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-name">Full name</Label>
+              <Input
+                id="edit-name"
+                value={editFullName}
+                onChange={(e) => setEditFullName(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editEmail}
+                onChange={(e) => setEditEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-department">Department</Label>
+              <Input
+                id="edit-department"
+                placeholder="e.g. Laboratory, Pharmacy, Front Desk"
+                value={editDepartment}
+                onChange={(e) => setEditDepartment(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <div>
+                <p className="text-sm font-medium">Account status</p>
+                <p className="text-xs text-muted-foreground">Inactive users cannot sign in.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">{editIsActive ? 'Active' : 'Inactive'}</span>
+                <Switch checked={editIsActive} onCheckedChange={setEditIsActive} />
+              </div>
+            </div>
+            {editIsActive !== true && (
+              <p className="text-xs text-amber-600">
+                Note: Account status changes are not yet wired through the edit dialog — use the deactivation button in the table to mark inactive.
+              </p>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSaveEdit} disabled={updateUser.isPending}>
+              {updateUser.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Save changes
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Reset password</DialogTitle>
+            <DialogDescription>
+              Set a new password for <span className="font-medium">{selectedUser?.full_name}</span>.
+              The user can change it after signing in.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-password">New password</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="At least 8 characters"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirm-password">Confirm password</Label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleResetPassword} disabled={resetPassword.isPending}>
+              {resetPassword.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Reset password
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Role Assignment Dialog */}
       <Dialog open={showRoleDialog} onOpenChange={setShowRoleDialog}>
@@ -353,36 +580,6 @@ export default function UserManagementPage() {
                   </SelectItem>
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="mt-4 p-3 bg-muted rounded-lg">
-              <p className="text-sm font-medium mb-1">Role Permissions:</p>
-              <ul className="text-xs text-muted-foreground space-y-1">
-                {selectedRole === 'admin' && (
-                  <>
-                    <li>• Full system access</li>
-                    <li>• User management</li>
-                    <li>• Test catalog configuration</li>
-                    <li>• Reports and analytics</li>
-                  </>
-                )}
-                {selectedRole === 'receptionist' && (
-                  <>
-                    <li>• Patient registration</li>
-                    <li>• Order creation</li>
-                    <li>• Payment processing</li>
-                    <li>• View results</li>
-                  </>
-                )}
-                {selectedRole === 'lab_tech' && (
-                  <>
-                    <li>• Sample collection</li>
-                    <li>• Result entry</li>
-                    <li>• Result verification</li>
-                    <li>• Machine management</li>
-                  </>
-                )}
-              </ul>
             </div>
           </div>
 
@@ -503,13 +700,6 @@ export default function UserManagementPage() {
                 </SelectContent>
               </Select>
             </div>
-
-            <div className="p-3 bg-muted rounded-lg">
-              <p className="text-sm font-medium mb-1">Note:</p>
-              <p className="text-xs text-muted-foreground">
-                The user will receive an email confirmation and can log in immediately with the provided credentials.
-              </p>
-            </div>
           </div>
 
           <DialogFooter>
@@ -530,4 +720,3 @@ export default function UserManagementPage() {
     </RoleLayout>
   );
 }
-

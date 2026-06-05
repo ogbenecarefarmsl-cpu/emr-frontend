@@ -608,6 +608,11 @@ export const usersAPI = {
     return response.data;
   },
 
+  resetPassword: async (id: string, newPassword: string) => {
+    const response = await api.patch(`/users/${id}/password`, { newPassword });
+    return response.data;
+  },
+
   delete: async (id: string) => {
     await api.delete(`/users/${id}`);
   },
@@ -619,6 +624,17 @@ export const usersAPI = {
 
   removeRole: async (id: string, role: string) => {
     await api.delete(`/users/${id}/roles/${role}`);
+  },
+};
+
+export const adminAPI = {
+  clearTestDataPreview: async () => {
+    const response = await api.get('/admin/clear-test-data/preview');
+    return response.data as Record<string, number>;
+  },
+  clearTestData: async (confirmation: string) => {
+    const response = await api.post('/admin/clear-test-data', { confirmation });
+    return response.data;
   },
 };
 

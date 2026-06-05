@@ -1,18 +1,23 @@
+import { useState } from 'react';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useRealtimeOrders } from '@/hooks/useRealtimeOrders';
 import { useRealtimeResults } from '@/hooks/useRealtimeResults';
 import { useRealtimePatients } from '@/hooks/useRealtimePatients';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api, { adminAPI } from '@/services/api';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 import {
   Users, ClipboardList, DollarSign, AlertTriangle, Stethoscope, Pill,
   FlaskConical, BedDouble, TrendingUp, Package, Shield, BarChart3,
   Cpu, Printer, Settings, ArrowRight, Loader2, Activity, UserCog,
-  Calendar, FileText, FileSearch, Clock,
+  Calendar, FileText, FileSearch, Clock, Skull, Database, Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -426,6 +431,8 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+
+      <DangerZone />
     </RoleLayout>
   );
 }
@@ -531,6 +538,181 @@ function AdminTool({
         highlight ? 'text-primary group-hover:text-white' : 'text-foreground',
       )}>{label}</span>
     </button>
+  );
+}
+
+function DangerZone() {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [result, setResult] = useState<{ deleted: Record<string, number>; preserved: string[]; timestamp: string } | null>(null);
+
+  const { data: preview, isLoading: previewLoading } = useQuery({
+    queryKey: ['admin', 'clear-test-data', 'preview'],
+    queryFn: () => adminAPI.clearTestDataPreview(),
+    enabled: open,
+    staleTime: 30_000,
+  });
+
+  const clearMutation = useMutation({
+    mutationFn: () => adminAPI.clearTestData(confirmText),
+    onSuccess: (data) => {
+      setResult(data);
+      setConfirmText('');
+      toast.success(`Cleared ${Object.values(data.deleted).reduce((s, n) => s + n, 0)} records`);
+      queryClient.invalidateQueries();
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to clear test data');
+    },
+  });
+
+  const totalToDelete = preview ? Object.values(preview).reduce((s, n) => s + (n as number), 0) : 0;
+  const canSubmit = confirmText === 'DELETE ALL TEST DATA' && !clearMutation.isPending;
+
+  const reset = () => {
+    setOpen(false);
+    setConfirmText('');
+    setResult(null);
+  };
+
+  return (
+    <div className="bg-card border-2 border-destructive/30 rounded-xl shadow-sm mt-6">
+      <div className="px-5 py-4 border-b border-destructive/20 bg-destructive/5 rounded-t-xl">
+        <h3 className="font-semibold text-sm flex items-center gap-2 text-destructive">
+          <Skull className="w-4 h-4" />
+          Danger Zone
+        </h3>
+        <p className="text-xs text-muted-foreground mt-1">
+          Destructive operations. Use with care.
+        </p>
+      </div>
+      <div className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="flex-1">
+          <p className="text-sm font-medium flex items-center gap-2">
+            <Database className="w-4 h-4 text-muted-foreground" />
+            Clear all test data
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Permanently deletes every patient, visit, order, prescription, payment, lab result, admission, appointment, and audit log.
+            Reference data (users, branches, medications, rooms, LIS catalog) is preserved.
+          </p>
+        </div>
+        <Button variant="destructive" onClick={() => setOpen(true)}>
+          <Trash2 className="w-4 h-4 mr-2" />
+          Clear test data
+        </Button>
+      </div>
+
+      <Dialog open={open} onOpenChange={(v) => { if (!v) reset(); else setOpen(true); }}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Skull className="w-5 h-5" />
+              Clear all test data
+            </DialogTitle>
+            <DialogDescription>
+              This permanently deletes transactional records. The action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          {result ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-status-normal/30 bg-status-normal/10 p-4">
+                <p className="font-semibold text-status-normal">Cleared successfully at {new Date(result.timestamp).toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {Object.values(result.deleted).reduce((s, n) => s + n, 0)} records removed across {Object.keys(result.deleted).length} collections.
+                </p>
+              </div>
+              <div className="rounded-lg border p-3 max-h-72 overflow-y-auto">
+                <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Deleted counts</p>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                  {Object.entries(result.deleted).map(([k, v]) => (
+                    <div key={k} className="flex justify-between border-b border-dashed py-1">
+                      <span className="capitalize text-muted-foreground">{k.replace(/([A-Z])/g, ' $1')}</span>
+                      <span className="font-mono font-semibold">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-lg border p-3">
+                <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">Preserved reference data</p>
+                <ul className="text-xs text-muted-foreground grid grid-cols-2 gap-1">
+                  {result.preserved.map((p) => (<li key={p}>• {p}</li>))}
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="rounded-lg border p-3 max-h-72 overflow-y-auto">
+                <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
+                  {previewLoading ? 'Counting records...' : `${totalToDelete.toLocaleString()} records will be deleted`}
+                </p>
+                {preview && (
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+                    {Object.entries(preview)
+                      .filter(([, v]) => (v as number) > 0)
+                      .sort(([, a], [, b]) => (b as number) - (a as number))
+                      .map(([k, v]) => (
+                        <div key={k} className="flex justify-between border-b border-dashed py-1">
+                          <span className="capitalize text-muted-foreground">{k.replace(/([A-Z])/g, ' $1')}</span>
+                          <span className="font-mono font-semibold">{(v as number).toLocaleString()}</span>
+                        </div>
+                      ))}
+                    {totalToDelete === 0 && (
+                      <p className="text-xs text-muted-foreground col-span-2 py-2">No transactional data found.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                <p className="text-xs text-muted-foreground mb-1">Preserved:</p>
+                <p className="text-xs">
+                  users, branches, medications, rooms, doctor profiles, LIS catalog, machines, suppliers, report templates.
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="confirm-phrase">
+                  Type <span className="font-mono font-bold text-destructive">DELETE ALL TEST DATA</span> to confirm
+                </Label>
+                <Input
+                  id="confirm-phrase"
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  placeholder="DELETE ALL TEST DATA"
+                  className="font-mono"
+                  autoComplete="off"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            {result ? (
+              <Button onClick={reset}>Close</Button>
+            ) : (
+              <>
+                <Button variant="outline" onClick={reset}>Cancel</Button>
+                <Button
+                  variant="destructive"
+                  disabled={!canSubmit}
+                  onClick={() => clearMutation.mutate()}
+                >
+                  {clearMutation.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-2" />
+                  )}
+                  Clear {totalToDelete.toLocaleString()} records
+                </Button>
+              </>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 
