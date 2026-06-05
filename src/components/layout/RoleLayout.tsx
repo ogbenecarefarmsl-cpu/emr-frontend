@@ -65,6 +65,7 @@ export function RoleLayout({ children, title, subtitle, role, userName }: RoleLa
             subtitle={subtitle}
             sidebarCollapsed={sidebarCollapsed}
             onToggleSidebar={() => setSidebarCollapsed((value) => !value)}
+            role={role}
           />
         </div>
 

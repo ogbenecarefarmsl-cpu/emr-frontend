@@ -1,16 +1,18 @@
-import { Search, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Search, PanelLeftClose, PanelLeftOpen, Stethoscope } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { OfflineIndicator } from '@/components/offline/OfflineIndicator';
+import { UserRole } from '@/types/lis';
 
 interface HeaderProps {
   title: string;
   subtitle?: string;
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
+  role?: UserRole;
 }
 
-export function Header({ title, subtitle, sidebarCollapsed, onToggleSidebar }: HeaderProps) {
+export function Header({ title, subtitle, sidebarCollapsed, onToggleSidebar, role }: HeaderProps) {
   return (
     <header className="bg-card border-b px-4 h-14 flex items-center justify-between sticky top-0 z-30">
       <div className="min-w-0 flex items-center gap-3">
@@ -32,6 +34,12 @@ export function Header({ title, subtitle, sidebarCollapsed, onToggleSidebar }: H
             <p className="clinical-label mt-0.5 truncate">{subtitle}</p>
           )}
         </div>
+        {role === 'nurse' && (
+          <span className="hidden md:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold uppercase tracking-wide">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            On duty
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-3 flex-shrink-0">
@@ -43,8 +51,8 @@ export function Header({ title, subtitle, sidebarCollapsed, onToggleSidebar }: H
         {/* Search */}
         <div className="relative hidden lg:block">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search patients, orders..." 
+          <Input
+            placeholder="Search patients, orders..."
             className="pl-10 w-64 h-9 rounded-full bg-muted/50 border-border focus:bg-card transition-colors"
           />
         </div>
