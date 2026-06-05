@@ -627,17 +627,6 @@ export const usersAPI = {
   },
 };
 
-export const adminAPI = {
-  clearTestDataPreview: async () => {
-    const response = await api.get('/admin/clear-test-data/preview');
-    return response.data as Record<string, number>;
-  },
-  clearTestData: async (confirmation: string) => {
-    const response = await api.post('/admin/clear-test-data', { confirmation });
-    return response.data;
-  },
-};
-
 export const reportsAPI = {
   getDashboard: async (startDate?: string, endDate?: string) => {
     const response = await api.get('/reports/dashboard', {
@@ -973,6 +962,11 @@ export const visitsAPI = {
     return response.data;
   },
 
+  getDoctorPatients: async (params?: { page?: number; limit?: number; search?: string }) => {
+    const response = await api.get('/visits/doctor-patients', { params });
+    return response.data;
+  },
+
   getAwaitingLabPayment: async () => {
     const response = await api.get('/visits/awaiting-lab-payment');
     return response.data;
@@ -1140,6 +1134,14 @@ export const adminAPI = {
   },
   getPatientStats: async (startDate?: string, endDate?: string) => {
     const response = await api.get('/admin/patient-stats', { params: { startDate, endDate } });
+    return response.data;
+  },
+  clearTestDataPreview: async () => {
+    const response = await api.get('/admin/clear-test-data/preview');
+    return response.data as Record<string, number>;
+  },
+  clearTestData: async (confirmation: string) => {
+    const response = await api.post('/admin/clear-test-data', { confirmation });
     return response.data;
   },
 };
