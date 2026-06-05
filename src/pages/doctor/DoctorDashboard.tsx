@@ -224,6 +224,9 @@ export default function DoctorDashboard() {
   // Edit mode state
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [editingPrescription, setEditingPrescription] = useState<any>(null);
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
   const createAdmission = useMutation({
     mutationFn: async () => {
       if (!selectedVisit) return;
@@ -427,29 +430,9 @@ export default function DoctorDashboard() {
           diagnosis: soapForm.diagnosis || undefined,
         },
       });
-      await soapNoteService.create({
-        patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
-        visitId: selectedVisit._id || selectedVisit.id,
-        doctorId: profile?.id,  // Profile ID - soap_note.doctorId refs Profile
-        noteType: SoapNoteTypeEnum.CONSULTATION,
-        chiefComplaint: soapForm.subjective || selectedVisit.chiefComplaint || undefined,
-        historyPresentIllness: soapForm.subjective || undefined,
-        vitalSigns: {
-          temperature: vitalsForm.temperature ? parseFloat(vitalsForm.temperature) : undefined,
-          bloodPressure: vitalsForm.bloodPressure || undefined,
-          heartRate: vitalsForm.heartRate ? parseInt(vitalsForm.heartRate) : undefined,
-          respiratoryRate: vitalsForm.respiratoryRate ? parseInt(vitalsForm.respiratoryRate) : undefined,
-          weight: vitalsForm.weight ? parseFloat(vitalsForm.weight) : undefined,
-          height: vitalsForm.height ? parseFloat(vitalsForm.height) : undefined,
-          oxygenSaturation: vitalsForm.oxygenSaturation ? parseInt(vitalsForm.oxygenSaturation) : undefined,
-        },
-        physicalExamination: soapForm.objective || undefined,
-        diagnosis: soapForm.assessment || soapForm.diagnosis || undefined,
-        treatmentPlan: soapForm.plan || undefined,
-        followUpInstructions: soapForm.plan || undefined,
-      });
       queryClient.invalidateQueries({ queryKey: ['patient-chart', selectedVisit.patientId?._id || selectedVisit.patientId] });
-      toast.success('Notes saved successfully');
+      queryClient.invalidateQueries({ queryKey: ['visits'] });
+      toast.success('Notes saved');
     } catch (error) {
       toast.error('Failed to save notes');
     }
@@ -470,6 +453,34 @@ export default function DoctorDashboard() {
     if (!selectedVisit) return;
 
     try {
+      if (soapForm.subjective || soapForm.objective || soapForm.assessment || soapForm.plan || soapForm.diagnosis) {
+        try {
+          await soapNoteService.create({
+            patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
+            visitId: selectedVisit._id || selectedVisit.id,
+            doctorId: profile?.id,
+            noteType: SoapNoteTypeEnum.CONSULTATION,
+            chiefComplaint: selectedVisit.chiefComplaint || undefined,
+            historyPresentIllness: soapForm.subjective || undefined,
+            vitalSigns: {
+              temperature: vitalsForm.temperature ? parseFloat(vitalsForm.temperature) : undefined,
+              bloodPressure: vitalsForm.bloodPressure || undefined,
+              heartRate: vitalsForm.heartRate ? parseInt(vitalsForm.heartRate) : undefined,
+              respiratoryRate: vitalsForm.respiratoryRate ? parseInt(vitalsForm.respiratoryRate) : undefined,
+              weight: vitalsForm.weight ? parseFloat(vitalsForm.weight) : undefined,
+              height: vitalsForm.height ? parseFloat(vitalsForm.height) : undefined,
+              oxygenSaturation: vitalsForm.oxygenSaturation ? parseInt(vitalsForm.oxygenSaturation) : undefined,
+            },
+            physicalExamination: soapForm.objective || undefined,
+            diagnosis: soapForm.diagnosis || soapForm.assessment || undefined,
+            treatmentPlan: soapForm.plan || undefined,
+            followUpInstructions: soapForm.plan || undefined,
+            isSigned: true,
+          });
+        } catch (e) {
+          // Non-blocking: SOAP note creation is best-effort
+        }
+      }
       await completeVisit.mutateAsync(selectedVisit._id || selectedVisit.id || '');
       toast.success('Visit completed');
       setSelectedVisit(null);
@@ -480,17 +491,10 @@ export default function DoctorDashboard() {
 
   const handleCompleteAndNext = async () => {
     if (!selectedVisit) return;
-
-    try {
-      await completeVisit.mutateAsync(selectedVisit._id || selectedVisit.id || '');
-      toast.success('Visit completed');
-      setSelectedVisit(null);
-      const nextInQueue = waitingQueue.find((v: Visit) => v.status === 'in_queue');
-      if (nextInQueue) {
-        await handleAcceptPatient(nextInQueue);
-      }
-    } catch (error) {
-      toast.error('Failed to complete visit');
+    await handleCompleteVisit();
+    const nextInQueue = waitingQueue.find((v: Visit) => v.status === 'in_queue');
+    if (nextInQueue) {
+      await handleAcceptPatient(nextInQueue);
     }
   };
 
@@ -628,6 +632,29 @@ export default function DoctorDashboard() {
   };
 
   const addMedicationToPrescription = (med: Medication) => {
+    const allergies: string[] = selectedVisit?.patientId?.allergies || [];
+    const medText = `${med.name} ${med.genericName || ''}`.toLowerCase();
+    const matchedAllergy = allergies.find((a) => {
+      const allergen = a.toLowerCase().trim();
+      if (!allergen) return false;
+      if (medText.includes(allergen)) return true;
+      const allergyRoots: Record<string, string[]> = {
+        'penicillin': ['amoxicillin', 'ampicillin', 'penicillin', 'augmentin'],
+        'sulfa': ['sulfamethoxazole', 'trimethoprim', 'bactrim', 'sulfa'],
+        'aspirin': ['aspirin', 'acetylsalicylic', 'asa'],
+        'nsaid': ['ibuprofen', 'diclofenac', 'naproxen', 'ketoprofen', 'nsaid'],
+        'ace inhibitor': ['lisinopril', 'enalapril', 'ramipril', 'captopril'],
+        'beta blocker': ['atenolol', 'metoprolol', 'propranolol', 'carvedilol'],
+      };
+      for (const [root, related] of Object.entries(allergyRoots)) {
+        if (allergen.includes(root) && related.some((r) => medText.includes(r))) return true;
+      }
+      return false;
+    });
+    if (matchedAllergy) {
+      const proceed = window.confirm(`ALLERGY ALERT: Patient is allergic to "${matchedAllergy}". "${med.name}" may contain or relate to this allergen. Prescribe anyway?`);
+      if (!proceed) return;
+    }
     setPrescriptionItems([
       ...prescriptionItems,
       {
@@ -707,6 +734,22 @@ export default function DoctorDashboard() {
   const resultsReady = dashboardData?.resultsReady || [];
   const openEncounterCount = activePatients.length;
 
+  // Global search across all visit queues
+  const searchHits = useMemo(() => {
+    if (globalSearch.trim().length < 2) return [];
+    const q = globalSearch.trim().toLowerCase();
+    const allVisits = [...waitingQueue, ...activePatients, ...resultsReady, ...awaitingLabPayment, ...awaitingResults, ...awaitingPharmacy, ...awaitingDispensing];
+    const seen = new Set<string>();
+    return allVisits.filter((v) => {
+      if (seen.has(v._id)) return false;
+      seen.add(v._id);
+      const name = patientDisplayName(v).toLowerCase();
+      const id = (v.visitNumber || '').toLowerCase();
+      const patientIdStr = (v.patientId?.patientId || '').toLowerCase();
+      return name.includes(q) || id.includes(q) || patientIdStr.includes(q);
+    });
+  }, [globalSearch, waitingQueue, activePatients, resultsReady, awaitingLabPayment, awaitingResults, awaitingPharmacy, awaitingDispensing]);
+
   // Get the active visit for the doctor (if any)
   const currentActiveVisit = activePatients.find((v: Visit) => v.status === 'in_consultation') || activePatients[0];
   const canContinueClinicalWork = !!selectedVisit && ['in_consultation', 'results_ready', 'awaiting_doctor_review'].includes(selectedVisit.status);
@@ -748,6 +791,19 @@ export default function DoctorDashboard() {
       setSelectedVisit(currentActiveVisit);
     }
   }, [currentActiveVisit?._id]);
+
+  // Keep selectedVisit in sync with the latest dashboard data
+  useEffect(() => {
+    if (!selectedVisit) return;
+    const allKnownVisits = [
+      ...waitingQueue, ...activePatients, ...resultsReady,
+      ...awaitingLabPayment, ...awaitingResults, ...awaitingPharmacy, ...awaitingDispensing,
+    ];
+    const refreshed = allKnownVisits.find((v) => v._id === selectedVisit._id);
+    if (refreshed && JSON.stringify(refreshed) !== JSON.stringify(selectedVisit)) {
+      setSelectedVisit(refreshed);
+    }
+  }, [waitingQueue, activePatients, resultsReady, awaitingLabPayment, awaitingResults, awaitingPharmacy, awaitingDispensing]);
 
 
   if (isLoading) {
@@ -793,9 +849,43 @@ export default function DoctorDashboard() {
         <div className="flex items-center gap-3 min-w-0">
           <div className="relative hidden md:block">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input type="text" placeholder="Search patients…" className="h-8 w-48 pl-8 pr-3 rounded-full border border-border bg-muted/30 text-sm focus:outline-none focus:ring-1 focus:ring-primary" />
+            <input
+              type="text"
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && searchHits.length > 0) { setSelectedVisit(searchHits[0]); setActiveTab('soap'); setGlobalSearch(''); setSearchOpen(false); } }}
+              onFocus={() => setSearchOpen(true)}
+              onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
+              placeholder="Search patients…"
+              className="h-8 w-48 pl-8 pr-3 rounded-full border border-border bg-muted/30 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+            />
+            {searchOpen && globalSearch.trim().length >= 2 && (
+              <div className="absolute top-9 right-0 w-72 max-h-80 overflow-y-auto bg-white border border-border rounded-lg shadow-lg z-50">
+                {searchHits.length === 0 ? (
+                  <p className="p-3 text-xs text-muted-foreground">No matches</p>
+                ) : (
+                  searchHits.slice(0, 8).map((v) => (
+                    <button
+                      key={v._id}
+                      type="button"
+                      className="w-full px-3 py-2 text-left hover:bg-muted/40 border-b last:border-b-0"
+                      onMouseDown={() => { setSelectedVisit(v); setActiveTab('soap'); setGlobalSearch(''); setSearchOpen(false); }}
+                    >
+                      <p className="text-xs font-medium truncate">{patientDisplayName(v)}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{v.visitNumber} - {statusLabel(v.status)}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
           </div>
-          <button className="relative p-2 rounded-lg hover:bg-muted/50 transition-colors">
+          <button
+            type="button"
+            onClick={() => { if (resultsReady.length > 0) { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); } }}
+            disabled={resultsReady.length === 0}
+            className="relative p-2 rounded-lg hover:bg-muted/50 transition-colors disabled:opacity-50"
+            title="Results ready"
+          >
             <Activity className="w-4 h-4 text-muted-foreground" />
             {resultsReady.length > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-primary text-[9px] font-bold text-white flex items-center justify-center px-1">{resultsReady.length}</span>
@@ -1057,7 +1147,12 @@ export default function DoctorDashboard() {
                             <h3 className="text-sm font-semibold flex items-center gap-2">
                               <span className="material-symbols-outlined text-[18px] text-primary">chat_bubble</span> Subjective
                             </h3>
-                            <Button variant="ghost" size="sm" className="text-xs h-7" onClick={handleAddSoapNote}>New Note</Button>
+                            <div className="flex items-center gap-1.5">
+                              <Button variant="ghost" size="sm" className="text-xs h-7" onClick={handleAddSoapNote}>New Note</Button>
+                              <Button size="sm" className="text-xs h-7 gap-1" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
+                                <Save className="w-3 h-3" /> Save
+                              </Button>
+                            </div>
                           </div>
                           <div className="p-4">
                             <Label className="text-[11px] text-muted-foreground font-semibold">Chief Complaint</Label>
@@ -1077,7 +1172,9 @@ export default function DoctorDashboard() {
                               <h3 className="text-sm font-semibold flex items-center gap-2">
                                 <span className="material-symbols-outlined text-[18px] text-primary">monitor_heart</span> Objective
                               </h3>
-                              {vitalsForm.temperature && <span className="text-[10px] text-muted-foreground">Updated just now</span>}
+                              <Button size="sm" className="text-xs h-7 gap-1" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
+                                <Save className="w-3 h-3" /> Save
+                              </Button>
                             </div>
                             <div className="p-4 flex flex-col gap-3">
                               <div className="grid grid-cols-2 gap-2">
@@ -1103,10 +1200,13 @@ export default function DoctorDashboard() {
 
                           {/* Assessment Card */}
                           <div className="bg-white border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                            <div className="bg-muted/30 px-4 py-2.5 border-b border-border">
+                            <div className="bg-muted/30 px-4 py-2.5 border-b border-border flex justify-between items-center">
                               <h3 className="text-sm font-semibold flex items-center gap-2">
                                 <span className="material-symbols-outlined text-[18px] text-primary">fact_check</span> Assessment
                               </h3>
+                              <Button size="sm" className="text-xs h-7 gap-1" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
+                                <Save className="w-3 h-3" /> Save
+                              </Button>
                             </div>
                             <div className="p-4 flex flex-col gap-3">
                               <Label className="text-[11px] text-muted-foreground font-semibold">Diagnosis</Label>
@@ -1129,7 +1229,7 @@ export default function DoctorDashboard() {
                           </div>
                           <div className="p-4 flex flex-col gap-4">
                             {/* Action Buttons Row */}
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                               <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!canContinueClinicalWork}>
                                 <span className="material-symbols-outlined text-primary text-[18px]">science</span> Order Labs
                               </Button>
@@ -1138,6 +1238,9 @@ export default function DoctorDashboard() {
                               </Button>
                               <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => setReferralOpen(true)} disabled={!canContinueClinicalWork}>
                                 <span className="material-symbols-outlined text-primary text-[18px]">forward</span> Refer
+                              </Button>
+                              <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => setAdmitOpen(true)} disabled={!canContinueClinicalWork}>
+                                <span className="material-symbols-outlined text-primary text-[18px]">bed</span> Admit
                               </Button>
                             </div>
                             {/* Pending Orders */}
@@ -1298,7 +1401,7 @@ export default function DoctorDashboard() {
                         ))}
                       </div>
                       <div className="mt-6 flex justify-end">
-                        <Button className="rounded-full" onClick={handleCompleteAndNext} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
+                        <Button className="rounded-full" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
                           <CheckCircle className="w-4 h-4 mr-2" /> Close Visit
                         </Button>
                       </div>
@@ -1409,7 +1512,7 @@ export default function DoctorDashboard() {
                             <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('soap')}><FileText className="w-4 h-4 mr-2" /> Consult</Button>
                             <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}><ClipboardList className="w-4 h-4 mr-2" /> Orders</Button>
                             <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}><FlaskConical className="w-4 h-4 mr-2" /> Results</Button>
-                            <Button className="rounded-full" onClick={handleCompleteAndNext} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}><CheckCircle className="w-4 h-4 mr-2" /> Close Visit</Button>
+                            <Button className="rounded-full" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}><CheckCircle className="w-4 h-4 mr-2" /> Close Visit</Button>
                           </div>
                         </div>
                       </div>
@@ -1600,7 +1703,7 @@ export default function DoctorDashboard() {
                           <FlaskConical className="w-3.5 h-3.5 mr-1.5" /> Results
                         </Button>
                         <div className="hidden sm:block w-px h-5 bg-border mx-1" />
-                        <Button size="sm" className="rounded-full bg-[#0d9488] hover:bg-[#0f766e] text-white" onClick={handleCompleteAndNext} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
+                        <Button size="sm" className="rounded-full bg-[#0d9488] hover:bg-[#0f766e] text-white" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
                           {completeVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />}
                           Complete & Next
                         </Button>
@@ -1623,40 +1726,63 @@ export default function DoctorDashboard() {
             {/* Right Context Panel */}
             {selectedVisit && (
               <div className="w-[300px] hidden xl:flex flex-col gap-5 shrink-0">
-                {/* AI Protocol Suggestions */}
-                <div className="bg-white border border-border rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">AI Protocol Suggestions</h4>
-                  <div className="bg-primary/5 border border-primary/20 rounded-lg p-3">
-                    <div className="flex items-start justify-between">
-                      <span className="text-xs font-semibold text-foreground">Standard Protocol</span>
-                      <span className="material-symbols-outlined text-[14px] text-primary">bolt</span>
+                {/* Drug-Allergy Quick Check */}
+                {selectedVisit.patientId?.allergies?.length > 0 && (
+                  <div className="bg-white border border-red-200 rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-red-700 mb-2 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" /> Allergies on file
+                    </h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedVisit.patientId.allergies.map((a: string) => (
+                        <span key={a} className="px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-[11px] font-medium">{a}</span>
+                      ))}
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-1 leading-tight">
-                      Based on chief complaint: {selectedVisit.chiefComplaint || 'No complaint recorded'}. Consider standard workup.
-                    </p>
+                    <p className="text-[10px] text-muted-foreground mt-2">Auto-checked when prescribing</p>
                   </div>
-                </div>
+                )}
 
-                {/* Recent Encounters */}
-                <div className="bg-white border border-border rounded-xl flex flex-col shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex-1 overflow-hidden">
-                  <div className="bg-muted/30 px-4 py-2.5 border-b border-border">
-                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Recent Encounters</h4>
-                  </div>
-                  <div className="overflow-y-auto">
-                    {patientVisits.filter((v: Visit) => v._id !== selectedVisit._id).length === 0 ? (
-                      <div className="p-4 text-center text-[11px] text-muted-foreground">No prior visits</div>
-                    ) : (
-                      patientVisits.filter((v: Visit) => v._id !== selectedVisit._id).slice(0, 5).map((visit: Visit) => (
-                        <div key={visit._id} className="p-3 border-b border-border hover:bg-muted/30 cursor-pointer transition-colors">
-                          <div className="flex justify-between items-center mb-1">
-                            <span className="text-xs font-semibold">{new Date(visit.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground truncate">{visit.chiefComplaint || visit.diagnosis || 'No notes'}</p>
-                        </div>
-                      ))
+                {/* Wallet + Quick Stats */}
+                <div className="bg-white border border-border rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                  <h4 className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Visit Snapshot</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Wallet</span>
+                      <span className="text-sm font-mono font-semibold">Le {selectedWalletBalance.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Orders</span>
+                      <span className="text-sm font-semibold">{currentVisitOrders.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Prescriptions</span>
+                      <span className="text-sm font-semibold">{currentVisitPrescriptions.length}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] text-muted-foreground">Lab results</span>
+                      <span className="text-sm font-semibold">{labResults.length}</span>
+                    </div>
+                    {abnormalLabResults.length > 0 && (
+                      <div className="flex items-center justify-between pt-1 border-t">
+                        <span className="text-[11px] text-red-600">Abnormal flags</span>
+                        <span className="text-sm font-semibold text-red-600">{abnormalLabResults.length}</span>
+                      </div>
                     )}
                   </div>
                 </div>
+
+                {/* Closure Status */}
+                {closureBlockers.length > 0 && (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-2">Cannot close yet</h4>
+                    <ul className="space-y-1">
+                      {closureBlockers.map((b) => (
+                        <li key={b} className="text-[11px] text-amber-800 flex items-start gap-1.5">
+                          <span className="text-amber-500 mt-0.5">•</span> {b}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1757,6 +1883,15 @@ export default function DoctorDashboard() {
           <DialogHeader>
             <DialogTitle>{editingPrescription ? 'Edit Prescription' : 'Prescribe Medication'}</DialogTitle>
           </DialogHeader>
+          {selectedVisit?.patientId?.allergies?.length > 0 && (
+            <div className="rounded-lg border border-red-300 bg-red-50 p-3 flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-semibold text-red-800">Allergy alert</p>
+                <p className="text-[11px] text-red-700">Patient allergies: <span className="font-medium">{selectedVisit.patientId.allergies.join(', ')}</span>. Verify each medication before prescribing.</p>
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-medium">Search Medications</Label>
@@ -1895,6 +2030,32 @@ export default function DoctorDashboard() {
             <Button variant="outline" onClick={() => setAdmitOpen(false)}>Cancel</Button>
             <Button onClick={() => createAdmission.mutate()} disabled={createAdmission.isPending || !admitForm.admissionReason}>
               {createAdmission.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <BedDouble className="w-4 h-4 mr-2" />}Admit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Complete Visit Confirmation */}
+      <Dialog open={confirmCompleteOpen} onOpenChange={setConfirmCompleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete this visit?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              This will close the encounter for <span className="font-semibold text-foreground">{patientDisplayName(selectedVisit)}</span> and advance to the next waiting patient.
+            </p>
+            {closureBlockers.length > 0 && (
+              <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
+                {closureBlockers.length === 1 ? closureBlockers[0] : `${closureBlockers.length} blocker(s) remain`}
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">SOAP notes will be signed and locked.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmCompleteOpen(false)}>Cancel</Button>
+            <Button onClick={() => { setConfirmCompleteOpen(false); handleCompleteAndNext(); }} disabled={completeVisit.isPending || !canCloseEncounter} className="bg-[#0d9488] hover:bg-[#0f766e] text-white">
+              {completeVisit.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}Complete & Next
             </Button>
           </DialogFooter>
         </DialogContent>
