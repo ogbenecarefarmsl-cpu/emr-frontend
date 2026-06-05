@@ -937,27 +937,43 @@ export default function DoctorDashboard() {
                       {waitingQueue.length === 0 ? (
                         <p className="text-[11px] text-muted-foreground text-center py-3">No waiting patients</p>
                       ) : (
-                        waitingQueue.map((visit: Visit) => (
-                          <div key={visit._id} onClick={() => setSelectedVisit(visit)} className={cn("p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0", selectedVisit?._id === visit._id ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-amber-500")}>
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0">
-                                <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
-                                <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
+                        waitingQueue.map((visit: Visit) => {
+                          const isSelected = selectedVisit?._id === visit._id;
+                          return (
+                            <div
+                              key={visit._id}
+                              onClick={() => setSelectedVisit(visit)}
+                              className={cn(
+                                "p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0",
+                                isSelected ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-amber-500"
+                              )}
+                            >
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
+                                  <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  variant="default"
+                                  className="h-7 rounded-full text-[11px] px-3 shrink-0 gap-1 font-semibold"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    handleAcceptPatient(visit);
+                                  }}
+                                  disabled={acceptPatient.isPending}
+                                >
+                                  {acceptPatient.isPending ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <UserCheck className="h-3 w-3" />
+                                  )}
+                                  Accept
+                                </Button>
                               </div>
-                              <Button
-                                size="sm"
-                                className="h-6 rounded-full text-[10px] px-2 shrink-0"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleAcceptPatient(visit);
-                                }}
-                                disabled={acceptPatient.isPending}
-                              >
-                                See
-                              </Button>
                             </div>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   )}
@@ -1718,6 +1734,28 @@ export default function DoctorDashboard() {
                     <User className="w-14 h-14 mx-auto mb-4 text-muted-foreground/30" />
                     <h2 className="text-xl font-semibold">No patient open</h2>
                     <p className="text-sm text-muted-foreground mt-2">Select a patient from the sidebar roster to begin consultation.</p>
+                    {waitingQueue.length > 0 && (
+                      <Button
+                        size="lg"
+                        className="mt-5 gap-2"
+                        onClick={() => handleAcceptPatient(waitingQueue[0])}
+                        disabled={acceptPatient.isPending}
+                      >
+                        {acceptPatient.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
+                        Accept next patient ({patientDisplayName(waitingQueue[0])})
+                      </Button>
+                    )}
+                    {resultsReady.length > 0 && (
+                      <Button
+                        size="lg"
+                        variant="outline"
+                        className="mt-3 gap-2"
+                        onClick={() => { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); }}
+                      >
+                        <FlaskConical className="h-4 w-4" />
+                        Review {resultsReady.length} result{resultsReady.length === 1 ? '' : 's'} ready
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
