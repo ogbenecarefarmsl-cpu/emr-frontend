@@ -6,7 +6,7 @@ import { admissionLocation, patientName } from './nurseUtils';
 
 interface MedicationWorklistProps {
   admissions: any[];
-  onOpenMar: (admission: any, medications: any[]) => void;
+  onOpenMar: (admission: any) => void;
   maxHeightClassName?: string;
 }
 

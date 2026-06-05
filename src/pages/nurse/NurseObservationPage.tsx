@@ -12,7 +12,9 @@ export default function NurseObservationPage() {
       role="nurse"
       userName={profile?.fullName}
     >
-      <RoomWorkBoard mode="observation" />
+      <div className="max-w-7xl">
+        <RoomWorkBoard mode="observation" />
+      </div>
     </RoleLayout>
   );
 }

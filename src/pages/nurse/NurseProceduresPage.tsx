@@ -8,11 +8,13 @@ export default function NurseProceduresPage() {
   return (
     <RoleLayout
       title="Procedure Room"
-      subtitle="Preparation, procedure support, notes and completion"
+      subtitle="Procedure prep, in-procedure tracking and completion notes"
       role="nurse"
       userName={profile?.fullName}
     >
-      <RoomWorkBoard mode="procedure" />
+      <div className="max-w-7xl">
+        <RoomWorkBoard mode="procedure" />
+      </div>
     </RoleLayout>
   );
 }

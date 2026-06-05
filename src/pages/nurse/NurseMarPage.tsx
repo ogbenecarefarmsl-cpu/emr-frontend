@@ -11,7 +11,6 @@ export default function NurseMarPage() {
   const activeAdmissions = dashboard?.activeAdmissions || [];
   const [marOpen, setMarOpen] = useState(false);
   const [selectedAdmission, setSelectedAdmission] = useState<any>(null);
-  const [medications, setMedications] = useState<any[]>([]);
 
   return (
     <RoleLayout
@@ -24,16 +23,14 @@ export default function NurseMarPage() {
         <MedicationWorklist
           admissions={activeAdmissions}
           maxHeightClassName="max-h-[calc(100vh-230px)]"
-          onOpenMar={(admission, scheduledMeds) => {
+          onOpenMar={(admission) => {
             setSelectedAdmission(admission);
-            setMedications(scheduledMeds);
             setMarOpen(true);
           }}
         />
       </div>
       <MarDialog
         admission={selectedAdmission}
-        medications={medications}
         open={marOpen}
         onOpenChange={setMarOpen}
       />

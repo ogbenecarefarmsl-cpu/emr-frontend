@@ -1,4 +1,6 @@
+import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { NurseMetrics } from '@/components/nurse/NurseMetrics';
@@ -8,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Activity,
+  AlertTriangle,
   ArrowRight,
   BedDouble,
   ClipboardCheck,
@@ -78,6 +81,53 @@ export default function NurseDashboard() {
   const activeAdmissions = dashboard?.activeAdmissions || [];
   const stats = dashboard?.stats || { activeTotal: 0, todayAdmissions: 0, todayDischarges: 0, byWard: [] };
 
+  // Alert when ESI 1/2 visits are in the triage queue
+  const lastSeenTriageIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!triageQueue.length) return;
+    const newCritical = triageQueue.filter((v: any) => {
+      const p = (v.triagePriority || '').toLowerCase();
+      return (p === 'emergency' || p === 'urgent') && !lastSeenTriageIds.current.has(v._id);
+    });
+    if (newCritical.length > 0 && lastSeenTriageIds.current.size > 0) {
+      toast.warning(`${newCritical.length} critical patient${newCritical.length === 1 ? '' : 's'} awaiting triage`, {
+        description: newCritical.map((v: any) => `${v.visitNumber} (${v.triagePriority})`).join(', '),
+        duration: 8000,
+        icon: <AlertTriangle className="w-4 h-4 text-red-500" />,
+      });
+    }
+    lastSeenTriageIds.current = new Set(triageQueue.map((v: any) => v._id));
+  }, [triageQueue]);
+
+  // Calculate dueMeds count from active admissions' medicationLog
+  const dueMedsCount = useMemo(() => {
+    let count = 0;
+    for (const adm of activeAdmissions) {
+      const orders = adm.medicationOrders || adm.marOrders || [];
+      const lastLog = (adm.medicationLog || []).slice(-1)[0];
+      if (orders.length > 0 && !lastLog) count += orders.length;
+    }
+    return count;
+  }, [activeAdmissions]);
+
+  const abnormalVitalsCount = useMemo(() => {
+    let count = 0;
+    for (const adm of activeAdmissions) {
+      const log = adm.vitalsLog || [];
+      const latest = log[log.length - 1];
+      if (!latest) continue;
+      if (
+        (latest.oxygenSaturation != null && latest.oxygenSaturation < 92) ||
+        (latest.heartRate != null && (latest.heartRate > 130 || latest.heartRate < 40)) ||
+        (latest.temperature != null && (latest.temperature >= 39.5 || latest.temperature < 35)) ||
+        (latest.respiratoryRate != null && (latest.respiratoryRate > 30 || latest.respiratoryRate < 8))
+      ) {
+        count += 1;
+      }
+    }
+    return count;
+  }, [activeAdmissions]);
+
   return (
     <RoleLayout
       title="Nurse Station"
@@ -85,7 +135,7 @@ export default function NurseDashboard() {
       role="nurse"
       userName={profile?.fullName}
     >
-      <NurseMetrics triageCount={triageQueue.length} stats={stats} />
+      <NurseMetrics triageCount={triageQueue.length} stats={stats} dueMeds={dueMedsCount} abnormalVitals={abnormalVitalsCount} />
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -48,6 +48,8 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
     setVitals(EMPTY_VITALS);
   }, [visit, open]);
 
+  const availableDoctors = doctors.filter((d: any) => d.isActive !== false);
+
   const submitTriage = async () => {
     if (!visit) return;
     if (!doctorId) {
@@ -69,6 +71,8 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
           triageNotes: triageNotes || undefined,
           chiefComplaint: chiefComplaint || undefined,
           doctorId,
+          triageAlert: alerts.length > 0,
+          triageAlerts: alerts,
         },
       });
       toast.success('Triage complete - patient sent to selected doctor');
@@ -160,7 +164,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
                 <SelectValue placeholder="Select receiving doctor" />
               </SelectTrigger>
               <SelectContent>
-                {doctors.map((doctor: any) => (
+                {availableDoctors.map((doctor: any) => (
                   <SelectItem key={doctor._id} value={doctor._id}>
                     {doctor.fullName}
                     {doctor.specialty ? ` - ${String(doctor.specialty).replace(/_/g, ' ')}` : ''}
@@ -169,7 +173,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-1">
-              {doctorsLoading ? 'Loading doctors...' : `${doctors.length} active doctor${doctors.length === 1 ? '' : 's'} available`}
+              {doctorsLoading ? 'Loading doctors...' : `${availableDoctors.length} active doctor${availableDoctors.length === 1 ? '' : 's'} available`}
             </p>
           </div>
 
@@ -186,7 +190,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submitTriage} disabled={completeTriage.isPending || doctorsLoading || !doctorId}>
+          <Button onClick={submitTriage} disabled={completeTriage.isPending || doctorsLoading || !doctorId || availableDoctors.length === 0}>
             {completeTriage.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
             Send to Selected Doctor
           </Button>

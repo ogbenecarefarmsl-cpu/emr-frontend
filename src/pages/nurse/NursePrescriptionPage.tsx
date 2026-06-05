@@ -161,10 +161,45 @@ export default function NursePrescriptionPage() {
     },
   });
 
+  const checkAllergy = (med: any): string | null => {
+    const patient = selectedVisit?.patientId;
+    const allergies: string[] = (patient?.allergies || []).filter(Boolean);
+    if (allergies.length === 0) return null;
+    const medText = `${med.name} ${med.genericName || ''}`.toLowerCase();
+    const allergyRoots: Record<string, string[]> = {
+      'penicillin': ['amoxicillin', 'ampicillin', 'penicillin', 'augmentin'],
+      'sulfa': ['sulfamethoxazole', 'trimethoprim', 'bactrim', 'sulfa'],
+      'aspirin': ['aspirin', 'acetylsalicylic', 'asa'],
+      'nsaid': ['ibuprofen', 'diclofenac', 'naproxen', 'ketoprofen', 'nsaid'],
+      'ace inhibitor': ['lisinopril', 'enalapril', 'ramipril', 'captopril'],
+      'beta blocker': ['atenolol', 'metoprolol', 'propranolol', 'carvedilol'],
+    };
+    return allergies.find((a) => {
+      const allergen = a.toLowerCase().trim();
+      if (!allergen) return false;
+      if (medText.includes(allergen)) return true;
+      for (const [root, related] of Object.entries(allergyRoots)) {
+        if (allergen.includes(root) && related.some((r) => medText.includes(r))) return true;
+      }
+      return false;
+    }) || null;
+  };
+
   const addMedication = (med: any) => {
+    if (!selectedVisit) {
+      toast.error('Select a patient first');
+      return;
+    }
     if (selectedMeds.some((item) => item.medicationId === med._id)) {
       toast.error(`${med.name} is already added`);
       return;
+    }
+    const matchedAllergy = checkAllergy(med);
+    if (matchedAllergy) {
+      const proceed = window.confirm(
+        `ALLERGY ALERT: Patient is allergic to "${matchedAllergy}". "${med.name}" may contain or relate to this allergen. Prescribe anyway?`,
+      );
+      if (!proceed) return;
     }
     setSelectedMeds((current) => [
       ...current,
@@ -231,6 +266,22 @@ export default function NursePrescriptionPage() {
                     <Badge variant="secondary" className="capitalize">{(selectedVisit.status || '').replace(/_/g, ' ')}</Badge>
                   </div>
                   {selectedVisit.chiefComplaint && <p className="mt-2 text-muted-foreground">{selectedVisit.chiefComplaint}</p>}
+                  {(() => {
+                    const allergies = (selectedVisit.patientId?.allergies || []).filter(Boolean);
+                    if (allergies.length === 0) {
+                      return <p className="mt-2 text-xs text-muted-foreground">No known drug allergies on file</p>;
+                    }
+                    return (
+                      <div className="mt-2 flex flex-wrap items-center gap-1">
+                        <span className="text-xs font-semibold text-red-700">Allergies:</span>
+                        {allergies.map((a: string, i: number) => (
+                          <span key={i} className="px-1.5 py-0.5 rounded bg-red-50 text-red-700 text-[11px] font-medium border border-red-200">
+                            {a}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </CardContent>

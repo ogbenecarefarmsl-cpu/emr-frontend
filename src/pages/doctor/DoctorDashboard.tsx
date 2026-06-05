@@ -36,7 +36,7 @@ import {
   Loader2, CheckCircle, User, FileText, FlaskConical, Pill,
   ChevronDown, AlertTriangle, Search, Plus, Trash2, Save,
   Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
-  Pencil
+  Pencil, AlertCircle
 } from 'lucide-react';
 
 // Types
@@ -950,8 +950,18 @@ export default function DoctorDashboard() {
                             >
                               <div className="flex items-center justify-between gap-2">
                                 <div className="min-w-0">
-                                  <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
+                                  <div className="flex items-center gap-1">
+                                    <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
+                                    {visit.triageAlert && (
+                                      <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" aria-label="Nurse triage alert" />
+                                    )}
+                                  </div>
                                   <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
+                                  {visit.triageAlerts && visit.triageAlerts.length > 0 && (
+                                    <p className="text-[10px] text-red-600 truncate font-medium mt-0.5">
+                                      {visit.triageAlerts[0]}{visit.triageAlerts.length > 1 ? ` +${visit.triageAlerts.length - 1}` : ''}
+                                    </p>
+                                  )}
                                 </div>
                                 <Button
                                   size="sm"
@@ -1104,6 +1114,20 @@ export default function DoctorDashboard() {
                       <Badge className={cn("text-[10px]", visitStatusTone(selectedVisit.status))}>{statusLabel(selectedVisit.status)}</Badge>
                     </div>
                   </div>
+
+                  {selectedVisit.triageAlert && selectedVisit.triageAlerts && selectedVisit.triageAlerts.length > 0 && (
+                    <div className="px-4 py-2 bg-red-50 border-b border-red-200 flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold text-red-800">Nurse Triage Alert</p>
+                        <ul className="text-xs text-red-700 list-disc list-inside">
+                          {selectedVisit.triageAlerts.map((alert: string, i: number) => (
+                            <li key={i}>{alert}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Tabs */}
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1">

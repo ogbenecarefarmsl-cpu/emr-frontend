@@ -25,6 +25,29 @@ export function useVisits(status?: string) {
   });
 }
 
+export function useVisitsByRoom(roomType: string | null | undefined) {
+  return useQuery({
+    queryKey: ['visits', 'room', roomType],
+    queryFn: async () => {
+      return await visitsAPI.getAll({ roomType, status: 'in_progress' });
+    },
+    enabled: !!roomType,
+    staleTime: 15 * 1000,
+    refetchInterval: 30 * 1000,
+  });
+}
+
+export function useRooms(roomType?: string, status?: string) {
+  return useQuery({
+    queryKey: ['rooms', roomType, status],
+    queryFn: async () => {
+      return (await import('@/services/api')).roomsAPI.getAll({ roomType, status });
+    },
+    staleTime: 30 * 1000,
+    refetchInterval: 60 * 1000,
+  });
+}
+
 export function useVisit(id: string) {
   return useQuery({
     queryKey: ['visits', id],

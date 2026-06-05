@@ -32,11 +32,12 @@ import { Separator } from '@/components/ui/separator';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
+import { VitalsTrends } from '@/components/doctor/VitalsTrends';
 
 import {
   Activity, Pill, Droplet, FileText, ClipboardList, AlertTriangle,
   LogOut, ArrowRightLeft, Heart, Plus, Loader2, Save, Send, User,
-  CheckCircle, Clock, Stethoscope, BedDouble, Handshake,
+  CheckCircle, Clock, Stethoscope, BedDouble, Handshake, Printer,
 } from 'lucide-react';
 
 interface Props {
@@ -511,13 +512,16 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
         </TabsContent>
 
         {/* ---------- Vitals ---------- */}
-        <TabsContent value="vitals" className="p-5 mt-0">
-          <div className="flex justify-between items-center mb-3">
+        <TabsContent value="vitals" className="p-5 mt-0 space-y-4">
+          <div className="flex justify-between items-center">
             <h3 className="font-semibold text-sm">Vital Signs Log</h3>
             <Button size="sm" onClick={() => setVitalsOpen(true)}>
               <Plus className="w-3.5 h-3.5 mr-1.5" />Record
             </Button>
           </div>
+          {vitalsLog.length > 0 && (
+            <VitalsTrends vitalsHistory={vitalsLog.map((v: any) => ({ ...v, date: v.recordedAt }))} />
+          )}
           {vitalsLog.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground text-sm">No vitals recorded yet</div>
           ) : (
@@ -618,27 +622,57 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
           </div>
 
           {fluidBalance && (
-            <div className="grid grid-cols-3 gap-3">
-              <div className="border rounded-lg p-4 bg-green-50">
-                <p className="text-xs text-green-700">Total Intake</p>
-                <p className="text-xl font-semibold text-green-700">+{fluidBalance.totalIntakeMl} mL</p>
-              </div>
-              <div className="border rounded-lg p-4 bg-blue-50">
-                <p className="text-xs text-blue-700">Total Output</p>
-                <p className="text-xl font-semibold text-blue-700">-{fluidBalance.totalOutputMl} mL</p>
-              </div>
-              <div className={cn(
-                'border rounded-lg p-4',
-                (fluidBalance.netMl ?? 0) >= 0 ? 'bg-emerald-50' : 'bg-red-50',
-              )}>
-                <p className={cn('text-xs', (fluidBalance.netMl ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700')}>Net Balance</p>
-                <p className={cn(
-                  'text-xl font-semibold',
-                  (fluidBalance.netMl ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700',
+            <div className="space-y-3">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="border rounded-lg p-4 bg-green-50">
+                  <p className="text-xs text-green-700">Total Intake</p>
+                  <p className="text-xl font-semibold text-green-700">+{fluidBalance.totalIntakeMl} mL</p>
+                </div>
+                <div className="border rounded-lg p-4 bg-blue-50">
+                  <p className="text-xs text-blue-700">Total Output</p>
+                  <p className="text-xl font-semibold text-blue-700">-{fluidBalance.totalOutputMl} mL</p>
+                </div>
+                <div className={cn(
+                  'border rounded-lg p-4',
+                  (fluidBalance.netMl ?? 0) >= 0 ? 'bg-emerald-50' : 'bg-red-50',
                 )}>
-                  {(fluidBalance.netMl ?? 0) >= 0 ? '+' : ''}{fluidBalance.netMl} mL
-                </p>
+                  <p className={cn('text-xs', (fluidBalance.netMl ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700')}>Net Balance</p>
+                  <p className={cn(
+                    'text-xl font-semibold',
+                    (fluidBalance.netMl ?? 0) >= 0 ? 'text-emerald-700' : 'text-red-700',
+                  )}>
+                    {(fluidBalance.netMl ?? 0) >= 0 ? '+' : ''}{fluidBalance.netMl} mL
+                  </p>
+                </div>
               </div>
+              {(() => {
+                const max = Math.max(Number(fluidBalance.totalIntakeMl || 0), Number(fluidBalance.totalOutputMl || 0), 1);
+                const intakePct = (Number(fluidBalance.totalIntakeMl || 0) / max) * 100;
+                const outputPct = (Number(fluidBalance.totalOutputMl || 0) / max) * 100;
+                return (
+                  <div className="border rounded-lg p-4 bg-muted/10">
+                    <p className="text-xs text-muted-foreground mb-2">Intake vs Output</p>
+                    <div className="space-y-2">
+                      <div>
+                        <div className="flex justify-between text-[10px] text-green-700 mb-0.5">
+                          <span>Intake</span><span>{fluidBalance.totalIntakeMl} mL</span>
+                        </div>
+                        <div className="h-2 bg-green-100 rounded overflow-hidden">
+                          <div className="h-full bg-green-500" style={{ width: `${intakePct}%` }} />
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-[10px] text-blue-700 mb-0.5">
+                          <span>Output</span><span>{fluidBalance.totalOutputMl} mL</span>
+                        </div>
+                        <div className="h-2 bg-blue-100 rounded overflow-hidden">
+                          <div className="h-full bg-blue-500" style={{ width: `${outputPct}%` }} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
 
@@ -725,40 +759,72 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
               <h3 className="font-semibold text-sm">Shift Handover</h3>
               <p className="text-xs text-muted-foreground mt-1">Structured handoff for the next nursing team.</p>
             </div>
-            <Button size="sm" onClick={() => setHandoverOpen(true)}>
-              <Plus className="w-3.5 h-3.5 mr-1.5" />Add Handover
-            </Button>
+            <div className="flex gap-2">
+              {shiftHandovers.length > 0 && (
+                <Button size="sm" variant="outline" onClick={() => {
+                  const printable = document.getElementById('handover-print-area');
+                  if (!printable) return;
+                  const win = window.open('', '_blank', 'width=800,height=900');
+                  if (!win) return;
+                  win.document.write(`<!doctype html><html><head><title>Handover - ${patientName(patient)} - ${admission?.admissionNumber}</title>
+                    <style>
+                      body{font-family:Arial,sans-serif;padding:24px;color:#000}
+                      h1{font-size:18px;margin:0 0 4px 0}
+                      h2{font-size:14px;margin:18px 0 4px 0;border-bottom:1px solid #ccc;padding-bottom:2px}
+                      .meta{font-size:11px;color:#555;margin-bottom:12px}
+                      .handover{border:1px solid #ddd;padding:12px;margin-bottom:12px;border-radius:4px;page-break-inside:avoid}
+                      .label{font-weight:bold}
+                      .row{margin:2px 0}
+                      .badge{display:inline-block;padding:2px 6px;background:#eef;color:#225;border-radius:3px;font-size:10px;text-transform:uppercase}
+                    </style></head><body>
+                    <h1>Shift Handover Note</h1>
+                    <div class="meta">${patientName(patient)} - ${admission?.admissionNumber} - ${admissionLocation(admission)} - Printed ${new Date().toLocaleString()}</div>
+                    ${printable.innerHTML}
+                    </body></html>`);
+                  win.document.close();
+                  win.focus();
+                  setTimeout(() => { win.print(); }, 300);
+                }}>
+                  <Printer className="w-3.5 h-3.5 mr-1.5" />Print
+                </Button>
+              )}
+              <Button size="sm" onClick={() => setHandoverOpen(true)}>
+                <Plus className="w-3.5 h-3.5 mr-1.5" />Add Handover
+              </Button>
+            </div>
           </div>
-          {shiftHandovers.length === 0 ? (
-            <div className="text-center py-10 text-muted-foreground text-sm">No shift handovers recorded yet</div>
-          ) : (
-            <ScrollArea className="max-h-[500px]">
-              <div className="space-y-3 pr-2">
-                {[...shiftHandovers].reverse().map((h: any, i: number) => (
-                  <div key={i} className="border rounded-lg p-4 bg-muted/10">
-                    <div className="flex items-center justify-between gap-3 mb-3">
-                      <div className="flex items-center gap-2">
-                        <Badge className="capitalize">{h.shift}</Badge>
-                        <p className="text-xs text-muted-foreground">To: {h.receivingNurse || 'Next shift'}</p>
+          <div id="handover-print-area">
+            {shiftHandovers.length === 0 ? (
+              <div className="text-center py-10 text-muted-foreground text-sm">No shift handovers recorded yet</div>
+            ) : (
+              <ScrollArea className="max-h-[500px]">
+                <div className="space-y-3 pr-2">
+                  {[...shiftHandovers].reverse().map((h: any, i: number) => (
+                    <div key={i} className="border rounded-lg p-4 bg-muted/10">
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <div className="flex items-center gap-2">
+                          <Badge className="capitalize">{h.shift}</Badge>
+                          <p className="text-xs text-muted-foreground">To: {h.receivingNurse || 'Next shift'}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground">{fmtTime(h.handedOverAt)}</p>
                       </div>
-                      <p className="text-xs text-muted-foreground">{fmtTime(h.handedOverAt)}</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                        {h.conditionSummary && <div><span className="font-semibold">Condition:</span> {h.conditionSummary}</div>}
+                        {h.latestVitalsSummary && <div><span className="font-semibold">Vitals:</span> {h.latestVitalsSummary}</div>}
+                        {h.pendingLabs && <div><span className="font-semibold">Pending labs:</span> {h.pendingLabs}</div>}
+                        {h.medicationsDue && <div><span className="font-semibold">Meds due:</span> {h.medicationsDue}</div>}
+                        {h.fluidBalanceConcern && <div><span className="font-semibold">Fluids:</span> {h.fluidBalanceConcern}</div>}
+                        {h.risksAndAllergies && <div><span className="font-semibold">Risks/allergies:</span> {h.risksAndAllergies}</div>}
+                      </div>
+                      {h.tasksForNextShift && <p className="text-sm mt-3"><span className="font-semibold">Tasks:</span> {h.tasksForNextShift}</p>}
+                      {h.notes && <p className="text-sm text-muted-foreground mt-2 whitespace-pre-line">{h.notes}</p>}
+                      <p className="text-xs text-muted-foreground mt-3">Handed over by {h.handedOverBy?.fullName || 'Nurse'}</p>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                      {h.conditionSummary && <div><span className="font-semibold">Condition:</span> {h.conditionSummary}</div>}
-                      {h.latestVitalsSummary && <div><span className="font-semibold">Vitals:</span> {h.latestVitalsSummary}</div>}
-                      {h.pendingLabs && <div><span className="font-semibold">Pending labs:</span> {h.pendingLabs}</div>}
-                      {h.medicationsDue && <div><span className="font-semibold">Meds due:</span> {h.medicationsDue}</div>}
-                      {h.fluidBalanceConcern && <div><span className="font-semibold">Fluids:</span> {h.fluidBalanceConcern}</div>}
-                      {h.risksAndAllergies && <div><span className="font-semibold">Risks/allergies:</span> {h.risksAndAllergies}</div>}
-                    </div>
-                    {h.tasksForNextShift && <p className="text-sm mt-3"><span className="font-semibold">Tasks:</span> {h.tasksForNextShift}</p>}
-                    {h.notes && <p className="text-sm text-muted-foreground mt-2 whitespace-pre-line">{h.notes}</p>}
-                    <p className="text-xs text-muted-foreground mt-3">Handed over by {h.handedOverBy?.fullName || 'Nurse'}</p>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
+                  ))}
+                </div>
+              </ScrollArea>
+            )}
+          </div>
         </TabsContent>
 
         {/* ---------- Care Plan ---------- */}
