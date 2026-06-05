@@ -3,6 +3,7 @@ import { useAuth } from '@/context/AuthContext';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { TriageDialog } from '@/components/nurse/TriageDialog';
 import { TriageQueuePanel } from '@/components/nurse/TriageQueuePanel';
+import { RapidTestResultDialog } from '@/components/nurse/RapidTestResultDialog';
 import { useAwaitingTriage } from '@/hooks/useVisits';
 
 const ESI_PRIORITY_RANK: Record<string, number> = {
@@ -18,6 +19,8 @@ export default function NurseTriagePage() {
   const { data: triageQueue = [], isLoading } = useAwaitingTriage();
   const [triageVisit, setTriageVisit] = useState<any>(null);
   const [triageOpen, setTriageOpen] = useState(false);
+  const [rapidVisit, setRapidVisit] = useState<any>(null);
+  const [rapidOpen, setRapidOpen] = useState(false);
 
   const sortedQueue = useMemo(() => {
     return [...triageQueue].sort((a: any, b: any) => {
@@ -33,10 +36,15 @@ export default function NurseTriagePage() {
     setTriageOpen(true);
   };
 
+  const openRapidTest = (visit: any) => {
+    setRapidVisit(visit);
+    setRapidOpen(true);
+  };
+
   return (
     <RoleLayout
       title="Nurse Triage"
-      subtitle="Vitals, ESI priority and nurse handoff to doctor queue"
+      subtitle="Vitals, ESI priority, rapid test entry and nurse handoff to doctor queue"
       role="nurse"
       userName={profile?.fullName}
     >
@@ -45,6 +53,7 @@ export default function NurseTriagePage() {
           visits={sortedQueue}
           isLoading={isLoading}
           onOpenTriage={openTriage}
+          onOpenRapidTest={openRapidTest}
           maxHeightClassName="max-h-[calc(100vh-230px)]"
         />
       </div>
@@ -53,6 +62,11 @@ export default function NurseTriagePage() {
         open={triageOpen}
         onOpenChange={setTriageOpen}
         onCompleted={() => setTriageVisit(null)}
+      />
+      <RapidTestResultDialog
+        visit={rapidVisit}
+        open={rapidOpen}
+        onOpenChange={setRapidOpen}
       />
     </RoleLayout>
   );

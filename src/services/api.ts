@@ -977,6 +977,11 @@ export const visitsAPI = {
     return response.data;
   },
 
+  addRapidTestResult: async (id: string, data: { testType: 'malaria' | 'typhoid'; result: 'positive' | 'negative'; parasiteCount?: number; antigen?: string; notes?: string }) => {
+    const response = await api.patch(`/visits/${id}/rapid-test-result`, data);
+    return response.data;
+  },
+
   referToSpecialist: async (id: string, data: { specialistId: string; reason: string; notes?: string }) => {
     const response = await api.patch(`/visits/${id}/refer`, data);
     return response.data;

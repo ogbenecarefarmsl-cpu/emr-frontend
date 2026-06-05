@@ -9,6 +9,10 @@ interface CreateVisitData {
   consultationFee: number;
   chiefComplaint?: string;
   notes?: string;
+  temperature?: number;
+  serviceType?: 'normal_consultation' | 'specialist_consultation' | 'observation_4h' | 'procedure' | 'rapid_malaria' | 'rapid_typhoid';
+  specialistId?: string;
+  procedureType?: string;
 }
 
 export function useVisits(status?: string) {
@@ -134,6 +138,24 @@ export function useCompleteTriage() {
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to complete triage');
+    },
+  });
+}
+
+export function useAddRapidTestResult() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ visitId, data }: {
+      visitId: string;
+      data: { testType: 'malaria' | 'typhoid'; result: 'positive' | 'negative'; parasiteCount?: number; antigen?: string; notes?: string };
+    }) => {
+      return await visitsAPI.addRapidTestResult(visitId, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['visits'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to record rapid test result');
     },
   });
 }

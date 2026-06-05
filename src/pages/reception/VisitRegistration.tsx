@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreateVisit, useMarkConsultationPaid } from '@/hooks/useVisits';
 import { useSearchPatients } from '@/hooks/usePatients';
+import { useDoctors } from '@/hooks/useDoctors';
 import { useAuth } from '@/context/AuthContext';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Button } from '@/components/ui/button';
@@ -13,15 +14,45 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Loader2, Search, UserPlus, Stethoscope, ArrowLeft, Thermometer } from 'lucide-react';
+import { Loader2, Search, UserPlus, Stethoscope, ArrowLeft, Thermometer, TestTube, Scissors, UserCog } from 'lucide-react';
 
-const BILLABLE_SERVICES = [
-  { id: 'normal_consultation', label: 'Normal Consultation', fee: 150, visitType: 'new' },
-  { id: 'specialist_consultation', label: 'Specialist Consultation', fee: 250, visitType: 'new' },
-  { id: 'observation_4h', label: 'Observation Fee (per 4 hours)', fee: 100, visitType: 'new' },
-  { id: 'procedure', label: 'Procedure', fee: 50, visitType: 'new' },
-  { id: 'rapid_malaria', label: 'Rapid Test - Malaria', fee: 50, visitType: 'new' },
-  { id: 'rapid_typhoid', label: 'Rapid Test - Typhoid', fee: 50, visitType: 'new' },
+type ServiceId = 'normal_consultation' | 'specialist_consultation' | 'observation_4h' | 'procedure' | 'rapid_malaria' | 'rapid_typhoid';
+
+interface BillableService {
+  id: ServiceId;
+  label: string;
+  fee: number;
+  visitType: 'new';
+  icon: any;
+  description: string;
+  flag: 'none' | 'specialist' | 'procedure' | 'rapid_test';
+}
+
+const BILLABLE_SERVICES: BillableService[] = [
+  {
+    id: 'normal_consultation', label: 'Normal Consultation', fee: 150, visitType: 'new',
+    icon: Stethoscope, flag: 'none', description: 'Standard general-practice visit',
+  },
+  {
+    id: 'specialist_consultation', label: 'Specialist Consultation', fee: 250, visitType: 'new',
+    icon: UserCog, flag: 'specialist', description: 'Direct booking to a named specialist',
+  },
+  {
+    id: 'observation_4h', label: 'Observation (4 hours)', fee: 100, visitType: 'new',
+    icon: Stethoscope, flag: 'none', description: 'Short-stay monitoring in the observation room',
+  },
+  {
+    id: 'procedure', label: 'Procedure', fee: 50, visitType: 'new',
+    icon: Scissors, flag: 'procedure', description: 'Nurse-prepped procedure room booking',
+  },
+  {
+    id: 'rapid_malaria', label: 'Rapid Test - Malaria', fee: 50, visitType: 'new',
+    icon: TestTube, flag: 'rapid_test', description: 'EMR-internal rapid test (nurse-entered result)',
+  },
+  {
+    id: 'rapid_typhoid', label: 'Rapid Test - Typhoid', fee: 50, visitType: 'new',
+    icon: TestTube, flag: 'rapid_test', description: 'EMR-internal rapid test (nurse-entered result)',
+  },
 ];
 
 export default function VisitRegistration() {
@@ -32,12 +63,20 @@ export default function VisitRegistration() {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedPatient, setSelectedPatient] = useState<any>(null);
-  const [selectedServiceId, setSelectedServiceId] = useState('normal_consultation');
+  const [selectedServiceId, setSelectedServiceId] = useState<ServiceId>('normal_consultation');
   const [visitType, setVisitType] = useState<string>('new');
   const [consultationFee, setConsultationFee] = useState<string>('150');
   const [chiefComplaint, setChiefComplaint] = useState('');
   const [notes, setNotes] = useState('');
   const [temperature, setTemperature] = useState('');
+  const [specialistId, setSpecialistId] = useState('');
+  const [procedureType, setProcedureType] = useState('');
+
+  const { data: doctors = [] } = useDoctors();
+  const specialistOptions = useMemo(
+    () => doctors.filter((d: any) => d.isActive !== false && (d.doctorType === 'specialist' || !!d.specialty)),
+    [doctors],
+  );
 
   const { data: searchResults = [], isLoading: searchLoading } = useSearchPatients(searchTerm);
   const { data: allPatients = [] } = useSearchPatients('');
@@ -85,6 +124,15 @@ export default function VisitRegistration() {
     }
 
     try {
+      if (selectedService.flag === 'specialist' && !specialistId) {
+        toast.error('Please select a specialist for this consultation');
+        return;
+      }
+      if (selectedService.flag === 'procedure' && !procedureType.trim()) {
+        toast.error('Please enter a procedure name');
+        return;
+      }
+
       const visit = await createVisit.mutateAsync({
         patientId: selectedPatient._id || selectedPatient.id,
         visitType: visitType as any,
@@ -92,9 +140,13 @@ export default function VisitRegistration() {
         chiefComplaint,
         notes: [
           `Service: ${selectedService.label}`,
+          procedureType ? `Procedure: ${procedureType}` : undefined,
           notes.trim() || undefined,
         ].filter(Boolean).join('\n'),
         temperature: temperature ? parseFloat(temperature) : undefined,
+        serviceType: selectedService.id,
+        specialistId: selectedService.flag === 'specialist' ? specialistId : undefined,
+        procedureType: selectedService.flag === 'procedure' ? procedureType : undefined,
       });
 
       await markConsultationPaid.mutateAsync({ visitId: visit._id || visit.id, paymentMethod: 'cash' });
@@ -241,7 +293,7 @@ export default function VisitRegistration() {
                     value={selectedServiceId}
                     onValueChange={(value) => {
                       const service = BILLABLE_SERVICES.find((item) => item.id === value);
-                      setSelectedServiceId(value);
+                      setSelectedServiceId(value as ServiceId);
                       if (service) {
                         setConsultationFee(String(service.fee));
                         setVisitType(service.visitType);
@@ -252,14 +304,70 @@ export default function VisitRegistration() {
                       <SelectValue placeholder="Select service" />
                     </SelectTrigger>
                     <SelectContent>
-                      {BILLABLE_SERVICES.map((service) => (
-                        <SelectItem key={service.id} value={service.id}>
-                          {service.label} - Le {service.fee}
-                        </SelectItem>
-                      ))}
+                      {BILLABLE_SERVICES.map((service) => {
+                        const Icon = service.icon;
+                        return (
+                          <SelectItem key={service.id} value={service.id}>
+                            <div className="flex items-center gap-2">
+                              <Icon className="w-3.5 h-3.5" />
+                              <span>{service.label}</span>
+                              <span className="text-muted-foreground">- Le {service.fee}</span>
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
+                  {selectedService.description && (
+                    <p className="text-xs text-muted-foreground">{selectedService.description}</p>
+                  )}
                 </div>
+
+                {selectedService.flag === 'specialist' && (
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="specialist">Receiving Specialist *</Label>
+                    <Select value={specialistId} onValueChange={setSpecialistId}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Pick a specialist" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {specialistOptions.length === 0 ? (
+                          <SelectItem value="__none__" disabled>No specialists registered</SelectItem>
+                        ) : (
+                          specialistOptions.map((d: any) => (
+                            <SelectItem key={d._id} value={d._id}>
+                              {d.fullName}{d.specialty ? ` - ${String(d.specialty).replace(/_/g, ' ')}` : ''}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {specialistOptions.length === 0 && (
+                      <p className="text-xs text-amber-600">
+                        Register a specialist in the Doctors page first.
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {selectedService.flag === 'procedure' && (
+                  <div className="space-y-2 col-span-2">
+                    <Label htmlFor="procedureType">Procedure *</Label>
+                    <Input
+                      id="procedureType"
+                      value={procedureType}
+                      onChange={(e) => setProcedureType(e.target.value)}
+                      placeholder="e.g., Wound dressing, Suturing, Incision & drainage"
+                    />
+                  </div>
+                )}
+
+                {selectedService.flag === 'rapid_test' && (
+                  <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                    <strong>Rapid test workflow:</strong> After vitals, the nurse will run the bedside
+                    rapid test and record the result on the visit. You will not need to route a lab order.
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="visitType">Visit Type</Label>

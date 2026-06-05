@@ -27,6 +27,9 @@ import {
   TrendingDown,
   PiggyBank,
   Phone,
+  TestTube,
+  Scissors,
+  UserCog,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { patientService } from '@/services/patientService';
@@ -94,6 +97,30 @@ export default function ReceptionDashboard() {
     queryFn: () => prescriptionService.findAll(),
     staleTime: 15 * 1000,
   });
+
+  const { data: todayVisits = [] } = useQuery({
+    queryKey: ['visits', 'reception-today'],
+    queryFn: () => visitsAPI.getAll({ startDate: todayStr, endDate: todayStr, limit: 500 }),
+    staleTime: 15 * 1000,
+  });
+
+  const serviceTypeCounts = useMemo(() => {
+    const c: Record<string, number> = {
+      normal_consultation: 0,
+      specialist_consultation: 0,
+      observation_4h: 0,
+      procedure: 0,
+      rapid_malaria: 0,
+      rapid_typhoid: 0,
+      unspecified: 0,
+    };
+    for (const v of todayVisits) {
+      const k = v.serviceType || 'unspecified';
+      if (c[k] != null) c[k] += 1;
+      else c.unspecified += 1;
+    }
+    return c;
+  }, [todayVisits]);
   const markPrescriptionPaid = useMutation({
     mutationFn: (id: string) => prescriptionService.markAsPaid(id),
     onSuccess: () => {
@@ -308,6 +335,27 @@ export default function ReceptionDashboard() {
         <PendingOrders />
       </div>
 
+      {/* Today's visits by service type */}
+      <div className="mb-6 bg-card border rounded-xl shadow-sm">
+        <div className="px-5 py-4 border-b flex items-center justify-between">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <Stethoscope className="w-4 h-4 text-primary" />
+            Today's Visits by Service Type
+          </h3>
+          <span className="text-xs text-muted-foreground">{todayVisits.length} total</span>
+        </div>
+        <div className="p-5">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            <ServiceTypeTile icon={Stethoscope} label="Consultations" value={serviceTypeCounts.normal_consultation} color="blue" />
+            <ServiceTypeTile icon={UserCog} label="Specialist" value={serviceTypeCounts.specialist_consultation} color="violet" />
+            <ServiceTypeTile icon={Stethoscope} label="Observation" value={serviceTypeCounts.observation_4h} color="cyan" />
+            <ServiceTypeTile icon={Scissors} label="Procedures" value={serviceTypeCounts.procedure} color="rose" />
+            <ServiceTypeTile icon={TestTube} label="Rapid Malaria" value={serviceTypeCounts.rapid_malaria} color="amber" />
+            <ServiceTypeTile icon={TestTube} label="Rapid Typhoid" value={serviceTypeCounts.rapid_typhoid} color="amber" />
+          </div>
+        </div>
+      </div>
+
       {pendingPrescriptionPayments.length > 0 && (
         <div className="mb-6 bg-card border rounded-xl shadow-sm">
           <div className="px-5 py-4 border-b flex items-center justify-between">
@@ -422,6 +470,27 @@ export default function ReceptionDashboard() {
         </div>
       </div>
     </RoleLayout>
+  );
+}
+
+const SERVICE_TILE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
+  blue:   { bg: 'bg-blue-50 dark:bg-blue-950/30',   text: 'text-blue-700 dark:text-blue-300',     border: 'border-blue-200' },
+  violet: { bg: 'bg-violet-50 dark:bg-violet-950/30', text: 'text-violet-700 dark:text-violet-300', border: 'border-violet-200' },
+  cyan:   { bg: 'bg-cyan-50 dark:bg-cyan-950/30',   text: 'text-cyan-700 dark:text-cyan-300',     border: 'border-cyan-200' },
+  rose:   { bg: 'bg-rose-50 dark:bg-rose-950/30',   text: 'text-rose-700 dark:text-rose-300',     border: 'border-rose-200' },
+  amber:  { bg: 'bg-amber-50 dark:bg-amber-950/30', text: 'text-amber-800 dark:text-amber-300',   border: 'border-amber-200' },
+};
+
+function ServiceTypeTile({ icon: Icon, label, value, color }: { icon: any; label: string; value: number; color: keyof typeof SERVICE_TILE_COLORS }) {
+  const c = SERVICE_TILE_COLORS[color];
+  return (
+    <div className={cn('rounded-lg border p-3', c.bg, c.border)}>
+      <div className="flex items-center gap-2 mb-1">
+        <Icon className={cn('w-3.5 h-3.5', c.text)} />
+        <p className={cn('text-xs font-medium', c.text)}>{label}</p>
+      </div>
+      <p className={cn('text-lg font-bold', c.text)}>{value}</p>
+    </div>
   );
 }
 

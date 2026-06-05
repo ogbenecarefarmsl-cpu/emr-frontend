@@ -36,7 +36,7 @@ import {
   Loader2, CheckCircle, User, FileText, FlaskConical, Pill,
   ChevronDown, AlertTriangle, Search, Plus, Trash2, Save,
   Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
-  Pencil, AlertCircle
+  Pencil, AlertCircle, TestTube
 } from 'lucide-react';
 
 // Types
@@ -1178,6 +1178,38 @@ export default function DoctorDashboard() {
                                 Nurse notes: {selectedVisit.triageNotes}
                               </p>
                             )}
+                          </div>
+                        )}
+
+                        {/* Rapid Test Results (malaria/typhoid) */}
+                        {selectedVisit.rapidTestResults && selectedVisit.rapidTestResults.length > 0 && (
+                          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-lg p-4">
+                            <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-300 mb-2 flex items-center gap-2">
+                              <TestTube className="w-4 h-4" />
+                              Rapid Test Results (EMR-internal)
+                            </h4>
+                            <div className="space-y-2">
+                              {[...selectedVisit.rapidTestResults].reverse().map((r: any, i: number) => (
+                                <div key={i} className={cn('rounded-md border p-2.5', r.result === 'positive' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200')}>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                      <span className="text-xs font-semibold capitalize text-amber-900">{r.testType}</span>
+                                      <Badge variant={r.result === 'positive' ? 'destructive' : 'default'} className="text-[10px]">
+                                        {r.result === 'positive' ? 'POSITIVE' : 'NEGATIVE'}
+                                      </Badge>
+                                      {r.parasiteCount != null && (
+                                        <span className="text-xs text-amber-900">Parasite load: <span className="font-semibold">{r.parasiteCount}/µL</span></span>
+                                      )}
+                                      {r.antigen && <span className="text-xs text-amber-900">Antigen: {r.antigen}</span>}
+                                    </div>
+                                    <span className="text-[10px] text-amber-700">
+                                      {new Date(r.performedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  {r.notes && <p className="text-xs text-amber-800 italic mt-1">{r.notes}</p>}
+                                </div>
+                              ))}
+                            </div>
                           </div>
                         )}
 
