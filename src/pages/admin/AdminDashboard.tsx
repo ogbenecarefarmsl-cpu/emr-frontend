@@ -568,7 +568,8 @@ function DangerZone() {
   });
 
   const totalToDelete = preview ? Object.values(preview).reduce((s, n) => s + (n as number), 0) : 0;
-  const canSubmit = confirmText === 'DELETE ALL TEST DATA' && !clearMutation.isPending;
+  const typedCorrectly = confirmText === 'DELETE ALL TEST DATA';
+  const canSubmit = typedCorrectly && !clearMutation.isPending;
 
   const reset = () => {
     setOpen(false);
@@ -578,14 +579,19 @@ function DangerZone() {
 
   return (
     <div className="bg-card border-2 border-destructive/30 rounded-xl shadow-sm mt-6">
-      <div className="px-5 py-4 border-b border-destructive/20 bg-destructive/5 rounded-t-xl">
-        <h3 className="font-semibold text-sm flex items-center gap-2 text-destructive">
-          <Skull className="w-4 h-4" />
-          Danger Zone
-        </h3>
-        <p className="text-xs text-muted-foreground mt-1">
-          Destructive operations. Use with care.
-        </p>
+      <div className="px-5 py-4 border-b border-destructive/20 bg-destructive/5 rounded-t-xl flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-sm flex items-center gap-2 text-destructive">
+            <Skull className="w-4 h-4" />
+            Danger Zone
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Destructive operations. Use with care.
+          </p>
+        </div>
+        <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 text-amber-800 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider">
+          Claude review required
+        </span>
       </div>
       <div className="p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div className="flex-1">
@@ -596,6 +602,11 @@ function DangerZone() {
           <p className="text-xs text-muted-foreground mt-1">
             Permanently deletes every patient, visit, order, prescription, payment, lab result, admission, appointment, and audit log.
             Reference data (users, branches, medications, rooms, LIS catalog) is preserved.
+          </p>
+          <p className="text-[11px] text-amber-700 mt-2 leading-relaxed">
+            Policy: this action requires a manual review of the affected records with your assistant (Claude) before
+            clicking Clear. Take a screenshot of the preview counts, share them, and only proceed after Claude
+            has signed off on the specific records to be removed.
           </p>
         </div>
         <Button variant="destructive" onClick={() => setOpen(true)}>
@@ -615,6 +626,18 @@ function DangerZone() {
               This permanently deletes transactional records. The action cannot be undone.
             </DialogDescription>
           </DialogHeader>
+
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold">Before clicking Clear:</p>
+              <ol className="list-decimal pl-4 mt-1 space-y-0.5">
+                <li>Screenshot the record counts below.</li>
+                <li>Share them with Claude and confirm the specific records to delete.</li>
+                <li>Only then type the confirmation phrase and click Clear.</li>
+              </ol>
+            </div>
+          </div>
 
           {result ? (
             <div className="space-y-4">
