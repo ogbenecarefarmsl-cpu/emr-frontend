@@ -36,7 +36,7 @@ import {
   Loader2, CheckCircle, User, FileText, FlaskConical, Pill,
   ChevronDown, AlertTriangle, Search, Plus, Trash2, Save,
   Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
-  Pencil, AlertCircle, TestTube
+  Pencil, AlertCircle, TestTube, Stethoscope, Calendar
 } from 'lucide-react';
 
 // Types
@@ -204,10 +204,12 @@ export default function DoctorDashboard() {
   const [allPatientsOpen, setAllPatientsOpen] = useState(false);
   const [allPatientsSearch, setAllPatientsSearch] = useState('');
   const [allPatientsPage, setAllPatientsPage] = useState(1);
+  const [allPatientsDaysBack, setAllPatientsDaysBack] = useState<number | undefined>(undefined);
   const doctorPatientsQuery = useDoctorPatients({
     page: allPatientsPage,
     limit: 25,
     search: allPatientsSearch,
+    daysBack: allPatientsDaysBack,
   });
   const doctorPatients = doctorPatientsQuery.data?.patients || [];
   const doctorPatientsTotal = doctorPatientsQuery.data?.total || 0;
@@ -864,7 +866,7 @@ export default function DoctorDashboard() {
               onFocus={() => setSearchOpen(true)}
               onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
               placeholder="Search patients…"
-              className="h-8 w-48 pl-8 pr-3 rounded-full border border-border bg-muted/30 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              className="h-8 w-72 pl-8 pr-3 rounded-full border border-border bg-muted/30 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             />
             {searchOpen && globalSearch.trim().length >= 2 && (
               <div className="absolute top-9 right-0 w-72 max-h-80 overflow-y-auto bg-white border border-border rounded-lg shadow-lg z-50">
@@ -893,7 +895,7 @@ export default function DoctorDashboard() {
             className="relative p-2 rounded-lg hover:bg-muted/50 transition-colors disabled:opacity-50"
             title="Results ready"
           >
-            <Activity className="w-4 h-4 text-muted-foreground" />
+            <FlaskConical className="w-4 h-4 text-muted-foreground" />
             {resultsReady.length > 0 && (
               <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-primary text-[9px] font-bold text-white flex items-center justify-center px-1">{resultsReady.length}</span>
             )}
@@ -1066,7 +1068,7 @@ export default function DoctorDashboard() {
               </div>
               <button
                 type="button"
-                onClick={() => { setAllPatientsOpen(true); setAllPatientsPage(1); setAllPatientsSearch(''); }}
+                onClick={() => { setAllPatientsOpen(true); setAllPatientsPage(1); setAllPatientsSearch(''); setAllPatientsDaysBack(undefined); }}
                 className="mt-3 w-full px-3 py-2 rounded-lg border border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 text-xs font-medium text-primary flex items-center justify-center gap-1.5 transition-colors"
               >
                 <UserCheck className="w-3.5 h-3.5" />
@@ -1086,11 +1088,32 @@ export default function DoctorDashboard() {
 
         {/* Main Workspace */}
         <main className="md:ml-64 flex-1 h-[calc(100vh-56px)] flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto flex flex-col xl:flex-row gap-6 p-4 md:p-6">
+          <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row gap-6 p-4 md:p-6">
             {/* Left Editor Area */}
             <div className="flex-1 flex flex-col gap-5 min-w-0">
               {selectedVisit ? (
                 <>
+                  {selectedVisit.triageAlert && selectedVisit.triageAlerts && selectedVisit.triageAlerts.length > 0 && (
+                    <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 flex items-start gap-2.5 shadow-[0_1px_3px_rgba(220,38,38,0.08)]">
+                      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                        <AlertCircle className="w-4 h-4 text-red-600" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-red-800 uppercase tracking-wider">Nurse Triage Alert</p>
+                        <p className="text-sm font-semibold text-red-900 mt-0.5">{selectedVisit.triageAlert}</p>
+                        {selectedVisit.triageAlerts.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {selectedVisit.triageAlerts.map((a: string, i: number) => (
+                              <span key={i} className="px-1.5 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-medium border border-red-200">
+                                {a.replace(/_/g, ' ')}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Patient Context Strip */}
                   <div className="bg-white border border-border rounded-xl p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
                     <div className="flex flex-wrap items-center gap-3 min-w-0">
@@ -1115,8 +1138,9 @@ export default function DoctorDashboard() {
                       <span className="text-[11px] text-muted-foreground truncate max-w-full md:max-w-[180px]">{chiefComplaintForm || selectedVisit.chiefComplaint || 'No complaint'}</span>
                       <div className="flex items-center gap-1 flex-wrap">
                         {selectedVisit.patientId?.allergies?.length > 0 ? (
-                          <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-medium border border-red-200">
-                            {selectedVisit.patientId.allergies.join(', ')}
+                          <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-medium border border-red-200 flex items-center gap-1">
+                            <AlertTriangle className="w-2.5 h-2.5" />
+                            {selectedVisit.patientId.allergies.length} allerg{selectedVisit.patientId.allergies.length === 1 ? 'y' : 'ies'}
                           </span>
                         ) : (
                           <span className="text-[10px] text-muted-foreground">NKDA</span>
@@ -1137,20 +1161,6 @@ export default function DoctorDashboard() {
                       <Badge className={cn("text-[10px]", visitStatusTone(selectedVisit.status))}>{statusLabel(selectedVisit.status)}</Badge>
                     </div>
                   </div>
-
-                  {selectedVisit.triageAlert && selectedVisit.triageAlerts && selectedVisit.triageAlerts.length > 0 && (
-                    <div className="px-4 py-2 bg-red-50 border-b border-red-200 flex items-start gap-2">
-                      <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-semibold text-red-800">Nurse Triage Alert</p>
-                        <ul className="text-xs text-red-700 list-disc list-inside">
-                          {selectedVisit.triageAlerts.map((alert: string, i: number) => (
-                            <li key={i}>{alert}</li>
-                          ))}
-                        </ul>
-                      </div>
-                    </div>
-                  )}
 
                   {/* Tabs */}
                   <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1">
@@ -1780,7 +1790,7 @@ export default function DoctorDashboard() {
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
                         <Button variant="outline" size="sm" className="rounded-full" onClick={() => setActiveTab('soap')}>
-                          <FileText className="w-3.5 h-3.5 mr-1.5" /> Notes
+                          <FileText className="w-3.5 h-3.5 mr-1.5" /> SOAP
                         </Button>
                         <Button variant="outline" size="sm" className="rounded-full" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
                           <ClipboardList className="w-3.5 h-3.5 mr-1.5" /> Orders
@@ -1833,7 +1843,7 @@ export default function DoctorDashboard() {
 
             {/* Right Context Panel */}
             {selectedVisit && (
-              <div className="w-[300px] hidden xl:flex flex-col gap-5 shrink-0">
+              <div className="w-[280px] hidden lg:flex flex-col gap-5 shrink-0">
                 {/* Triage Alert */}
                 {selectedVisit.triageAlert && selectedVisit.triageAlerts && selectedVisit.triageAlerts.length > 0 && (
                   <div className="bg-red-50 border border-red-300 rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
@@ -1884,7 +1894,9 @@ export default function DoctorDashboard() {
 
                 {/* Wallet + Quick Stats */}
                 <div className="bg-white border border-border rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                  <h4 className={cn(CLINICAL_LABEL, "mb-2")}>Visit Snapshot</h4>
+                  <h4 className={cn(CLINICAL_LABEL, "mb-2 flex items-center gap-1.5")}>
+                    <Stethoscope className="w-3.5 h-3.5" /> Visit Snapshot
+                  </h4>
                   <div className="space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="text-[11px] text-muted-foreground">Wallet</span>
@@ -2212,14 +2224,29 @@ export default function DoctorDashboard() {
               <Badge variant="secondary" className="ml-1">{doctorPatientsTotal}</Badge>
             </DialogTitle>
           </DialogHeader>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              value={allPatientsSearch}
-              onChange={(e) => { setAllPatientsSearch(e.target.value); setAllPatientsPage(1); }}
-              placeholder="Search by name, ID, phone, or email..."
-              className="pl-8"
-            />
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={allPatientsSearch}
+                onChange={(e) => { setAllPatientsSearch(e.target.value); setAllPatientsPage(1); }}
+                placeholder="Search by name, ID, phone, or email..."
+                className="pl-8"
+              />
+            </div>
+            <Select value={allPatientsDaysBack?.toString() || 'all'} onValueChange={(v) => { setAllPatientsDaysBack(v === 'all' ? undefined : parseInt(v, 10)); setAllPatientsPage(1); }}>
+              <SelectTrigger className="w-full sm:w-[140px]">
+                <Calendar className="w-3.5 h-3.5 mr-1" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All time</SelectItem>
+                <SelectItem value="7">Last 7 days</SelectItem>
+                <SelectItem value="30">Last 30 days</SelectItem>
+                <SelectItem value="90">Last 90 days</SelectItem>
+                <SelectItem value="365">Last year</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <ScrollArea className="flex-1 min-h-0 -mx-2 px-2">
             {doctorPatientsQuery.isLoading ? (

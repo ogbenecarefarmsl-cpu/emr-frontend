@@ -962,7 +962,7 @@ export const visitsAPI = {
     return response.data;
   },
 
-  getDoctorPatients: async (params?: { page?: number; limit?: number; search?: string }) => {
+  getDoctorPatients: async (params?: { page?: number; limit?: number; search?: string; daysBack?: number }) => {
     const response = await api.get('/visits/doctor-patients', { params });
     return response.data;
   },

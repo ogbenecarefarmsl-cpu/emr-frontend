@@ -85,7 +85,7 @@ export function useDoctorDashboard() {
   });
 }
 
-export function useDoctorPatients(params: { page?: number; limit?: number; search?: string }) {
+export function useDoctorPatients(params: { page?: number; limit?: number; search?: string; daysBack?: number }) {
   return useQuery({
     queryKey: ['visits', 'doctor-patients', params],
     queryFn: async () => {
