@@ -1144,6 +1144,25 @@ export const adminAPI = {
     const response = await api.post('/admin/clear-test-data', { confirmation });
     return response.data;
   },
+  getBackupStatus: async () => {
+    const response = await api.get('/admin/backup/status');
+    return response.data;
+  },
+  listBackups: async () => {
+    const response = await api.get('/admin/backup/list');
+    return response.data as { backups: Array<{ id: string; filename: string; size: number; createdAt: string; triggeredBy: string; documents: number; collections: number; durationMs: number; }> };
+  },
+  triggerBackup: async () => {
+    const response = await api.post('/admin/backup/trigger');
+    return response.data;
+  },
+  deleteBackup: async (id: string) => {
+    const response = await api.delete(`/admin/backup/${id}`);
+    return response.data;
+  },
+  getBackupDownloadUrl: (id: string) => {
+    return `${API_BASE_URL}/admin/backup/${id}/download`;
+  },
 };
 
 export const admissionsAPI = {

@@ -18,6 +18,7 @@ import {
   FlaskConical, BedDouble, TrendingUp, Package, Shield, BarChart3,
   Cpu, Printer, Settings, ArrowRight, Loader2, Activity, UserCog,
   Calendar, FileText, FileSearch, Clock, Skull, Database, Trash2,
+  HardDriveDownload, Download, Play, RefreshCw,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -432,8 +433,165 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      <BackupsCard />
       <DangerZone />
     </RoleLayout>
+  );
+}
+
+function fmtBytes(b: number) {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / 1024 / 1024).toFixed(2)} MB`;
+}
+
+function BackupsCard() {
+  const qc = useQueryClient();
+  const [showAll, setShowAll] = useState(false);
+  const { data: status, refetch: refetchStatus } = useQuery({
+    queryKey: ['admin', 'backup', 'status'],
+    queryFn: () => adminAPI.getBackupStatus(),
+    refetchInterval: 60 * 1000,
+  });
+  const { data: list, refetch: refetchList, isFetching } = useQuery({
+    queryKey: ['admin', 'backup', 'list'],
+    queryFn: () => adminAPI.listBackups(),
+    refetchInterval: 60 * 1000,
+  });
+
+  const trigger = useMutation({
+    mutationFn: () => adminAPI.triggerBackup(),
+    onSuccess: (backup: any) => {
+      toast.success(`Backup ${backup.id} created (${fmtBytes(backup.size)}, ${backup.documents} docs)`);
+      qc.invalidateQueries({ queryKey: ['admin', 'backup'] });
+    },
+    onError: (e: any) => {
+      toast.error(`Backup failed: ${e?.response?.data?.message || e?.message || 'unknown'}`);
+    },
+  });
+
+  const del = useMutation({
+    mutationFn: (id: string) => adminAPI.deleteBackup(id),
+    onSuccess: () => {
+      toast.success('Backup deleted');
+      qc.invalidateQueries({ queryKey: ['admin', 'backup'] });
+    },
+  });
+
+  const backups = list?.backups || [];
+  const visible = showAll ? backups : backups.slice(0, 5);
+
+  return (
+    <div className="bg-card border rounded-xl shadow-sm mb-6">
+      <div className="px-5 py-4 border-b flex items-center justify-between">
+        <h3 className="font-semibold text-sm flex items-center gap-2">
+          <HardDriveDownload className="w-4 h-4 text-primary" />
+          Database Backups
+        </h3>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-xs gap-1"
+            onClick={() => {
+              refetchStatus();
+              refetchList();
+            }}
+          >
+            <RefreshCw className={cn('w-3.5 h-3.5', isFetching && 'animate-spin')} />
+            Refresh
+          </Button>
+          <Button
+            size="sm"
+            className="text-xs gap-1"
+            disabled={trigger.isPending || status?.isRunning}
+            onClick={() => trigger.mutate()}
+          >
+            {trigger.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <Play className="w-3.5 h-3.5" />
+            )}
+            Run backup now
+          </Button>
+        </div>
+      </div>
+
+      <div className="p-5 grid grid-cols-1 md:grid-cols-4 gap-4 border-b">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Last backup</p>
+          <p className="text-sm font-medium mt-1">
+            {status?.lastBackupAt ? new Date(status.lastBackupAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : 'Never'}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Next scheduled</p>
+          <p className="text-sm font-medium mt-1">
+            {status?.nextScheduledAt ? new Date(status.nextScheduledAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '—'}
+          </p>
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total backups</p>
+          <p className="text-sm font-medium mt-1">{status?.totalBackups ?? 0}</p>
+        </div>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total size</p>
+          <p className="text-sm font-medium mt-1">{fmtBytes(status?.totalSizeBytes || 0)}</p>
+        </div>
+      </div>
+
+      <div className="divide-y">
+        {visible.length === 0 ? (
+          <p className="px-5 py-6 text-sm text-muted-foreground text-center">
+            No backups yet. The first daily run is scheduled for 02:00 UTC, or click <strong>Run backup now</strong> to create one.
+          </p>
+        ) : (
+          visible.map((b) => (
+            <div key={b.id} className="px-5 py-3 flex items-center gap-3">
+              <Database className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{b.filename}</p>
+                <p className="text-xs text-muted-foreground">
+                  {new Date(b.createdAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                  {' · '}
+                  {fmtBytes(b.size)}
+                  {b.documents > 0 ? ` · ${b.documents} docs` : ''}
+                  {b.durationMs > 0 ? ` · ${(b.durationMs / 1000).toFixed(1)}s` : ''}
+                </p>
+              </div>
+              <a
+                href={adminAPI.getBackupDownloadUrl(b.id)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+              >
+                <Download className="w-3.5 h-3.5" /> Download
+              </a>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-xs text-red-600 hover:text-red-700 gap-1"
+                onClick={() => {
+                  if (window.confirm(`Delete backup ${b.id}? This cannot be undone.`)) {
+                    del.mutate(b.id);
+                  }
+                }}
+              >
+                <Trash2 className="w-3.5 h-3.5" /> Delete
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
+
+      {backups.length > 5 && (
+        <div className="px-5 py-3 border-t text-center">
+          <Button variant="ghost" size="sm" className="text-xs" onClick={() => setShowAll((v) => !v)}>
+            {showAll ? 'Show fewer' : `Show all ${backups.length}`}
+          </Button>
+        </div>
+      )}
+    </div>
   );
 }
 
