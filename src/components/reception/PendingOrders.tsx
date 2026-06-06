@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePendingClinicalOrders, useMarkOrderPaid } from '@/hooks/useVisits';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -6,13 +7,39 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle, Wallet } from 'lucide-react';
+import { prescriptionService } from '@/services/prescriptionService';
 
 export function PendingOrders() {
   const [activeTab, setActiveTab] = useState('all');
+  const queryClient = useQueryClient();
   const { data: allOrders = [], isLoading, refetch } = usePendingClinicalOrders();
   const { data: labOrders = [] } = usePendingClinicalOrders('lab');
   const { data: pharmacyOrders = [] } = usePendingClinicalOrders('pharmacy');
+  const { data: pendingPrescriptions = [], isLoading: prescriptionsLoading } = useQuery({
+    queryKey: ['prescriptions', 'pending-payment'],
+    queryFn: () => prescriptionService.findPendingPayment(),
+    staleTime: 15 * 1000,
+  });
   const markPaid = useMarkOrderPaid();
+  const markPrescriptionPaid = useMutation({
+    mutationFn: ({ prescriptionId, paymentMethod }: { prescriptionId: string; paymentMethod: string }) =>
+      prescriptionService.markAsPaid(prescriptionId, paymentMethod),
+    onSuccess: () => {
+      toast.success('Prescription payment confirmed');
+      queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['visits'] });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to confirm prescription payment');
+    },
+  });
+
+  const allPaymentItems = [
+    ...allOrders.map((order: any) => ({ ...order, _paymentKind: 'order' })),
+    ...pendingPrescriptions.map((rx: any) => ({ ...rx, _paymentKind: 'prescription' })),
+  ];
 
   const handleMarkPaid = async (orderId: string, paymentMethod: string = 'cash') => {
     try {
@@ -22,6 +49,10 @@ export function PendingOrders() {
     } catch (error: any) {
       toast.error(error.message || 'Failed to confirm payment');
     }
+  };
+
+  const handleMarkPrescriptionPaid = async (prescriptionId: string, paymentMethod: string = 'cash') => {
+    await markPrescriptionPaid.mutateAsync({ prescriptionId, paymentMethod });
   };
 
   const getOrderTypeBadge = (orderType: string) => {
@@ -37,7 +68,7 @@ export function PendingOrders() {
         return (
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
             <Pill className="h-3 w-3 mr-1" />
-            Pharmacy
+            Pharmacy Order
           </Badge>
         );
       default:
@@ -45,50 +76,67 @@ export function PendingOrders() {
     }
   };
 
-  const renderOrderList = (orders: any[]) => {
-    if (orders.length === 0) {
+  const renderPrescriptionBadge = () => (
+    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+      <Pill className="h-3 w-3 mr-1" />
+      Prescription
+    </Badge>
+  );
+
+  const renderOrderList = (items: any[]) => {
+    if (items.length === 0) {
       return (
         <div className="text-center py-8 text-muted-foreground">
           <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p>No pending clinical payments</p>
-          <p className="text-sm">Doctor-created lab and pharmacy orders will appear here</p>
+          <p className="text-sm">Doctor-created lab orders and prescriptions will appear here</p>
         </div>
       );
     }
 
     return (
       <div className="space-y-4">
-        {orders.map((order: any) => {
-          const patient = order.patientId;
+        {items.map((item: any) => {
+          const isPrescription = item._paymentKind === 'prescription';
+          const patient = item.patientId;
           const patientName = patient
             ? `${patient.firstName} ${patient.lastName}`
             : 'Unknown Patient';
+          const total = Number(isPrescription ? item.totalAmount : item.total || 0);
 
           return (
             <div
-              key={order._id || order.id}
+              key={item._id || item.id}
               className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-4 min-w-0">
                 <div className="flex flex-col items-center">
-                  {getOrderTypeBadge(order.orderType)}
+                  {isPrescription ? renderPrescriptionBadge() : getOrderTypeBadge(item.orderType)}
                 </div>
-                <div>
-                  <div className="font-medium">{patientName}</div>
+                <div className="min-w-0">
+                  <div className="font-medium truncate">{patientName}</div>
                   <div className="text-sm text-muted-foreground">
-                    {patient?.patientId} • Order: {order.orderNumber}
+                    {patient?.patientId} - {isPrescription ? 'Prescription' : 'Order'}: {isPrescription ? item.prescriptionNumber : item.orderNumber}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Ordered by: {order.orderedBy?.fullName || order.doctorId?.fullName || 'Unknown'}
+                    Ordered by: {item.orderedBy?.fullName || item.prescribedBy?.fullName || item.doctorId?.fullName || 'Unknown'}
                   </div>
-                  {order.order_tests && order.order_tests.length > 0 && (
+                  {isPrescription && item.items?.length > 0 && (
+                    <div className="text-sm text-muted-foreground mt-1">
+                      Drugs:{' '}
+                      <span className="font-medium text-foreground">
+                        {item.items.map((rxItem: any) => rxItem.medicationName).join(', ')}
+                      </span>
+                    </div>
+                  )}
+                  {!isPrescription && item.order_tests && item.order_tests.length > 0 && (
                     <div className="text-sm text-muted-foreground mt-1">
                       Tests:{' '}
                       <span className="font-medium text-foreground">
-                        {order.order_tests.map((t: any) => t.testCode).join(', ')}
+                        {item.order_tests.map((test: any) => test.testCode).join(', ')}
                       </span>
                       <span className="ml-1 text-xs">
-                        ({order.order_tests.map((t: any) => t.testName).join(', ')})
+                        ({item.order_tests.map((test: any) => test.testName).join(', ')})
                       </span>
                     </div>
                   )}
@@ -97,21 +145,21 @@ export function PendingOrders() {
               <div className="flex items-center gap-4">
                 <div className="text-right">
                   <div className="font-medium text-lg">
-                    Le {order.total?.toLocaleString() || '0'}
+                    Le {total.toLocaleString()}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    {new Date(order.createdAt).toLocaleTimeString([], {
+                    {new Date(item.createdAt).toLocaleTimeString([], {
                       hour: '2-digit',
                       minute: '2-digit',
                     })}
                   </div>
                 </div>
                 <Button
-                  onClick={() => handleMarkPaid(order._id || order.id)}
-                  disabled={markPaid.isPending}
+                  onClick={() => isPrescription ? handleMarkPrescriptionPaid(item._id || item.id) : handleMarkPaid(item._id || item.id)}
+                  disabled={markPaid.isPending || markPrescriptionPaid.isPending}
                   className="bg-green-600 hover:bg-green-700"
                 >
-                  {markPaid.isPending ? (
+                  {(markPaid.isPending || markPrescriptionPaid.isPending) ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
                     <>
@@ -120,14 +168,16 @@ export function PendingOrders() {
                     </>
                   )}
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => handleMarkPaid(order._id || order.id, 'wallet')}
-                  disabled={markPaid.isPending}
-                >
-                  <Wallet className="h-4 w-4 mr-1" />
-                  Wallet
-                </Button>
+                {!isPrescription && (
+                  <Button
+                    variant="outline"
+                    onClick={() => handleMarkPaid(item._id || item.id, 'wallet')}
+                    disabled={markPaid.isPending}
+                  >
+                    <Wallet className="h-4 w-4 mr-1" />
+                    Wallet
+                  </Button>
+                )}
               </div>
             </div>
           );
@@ -136,7 +186,7 @@ export function PendingOrders() {
     );
   };
 
-  if (isLoading) {
+  if (isLoading || prescriptionsLoading) {
     return (
       <div className="flex items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -151,31 +201,37 @@ export function PendingOrders() {
           <CreditCard className="h-5 w-5" />
           Pending Clinical Payments
           <Badge variant="secondary" className="ml-auto">
-            {allOrders.length} orders
+            {allPaymentItems.length} items
           </Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="all">
-              All ({allOrders.length})
+              All ({allPaymentItems.length})
             </TabsTrigger>
             <TabsTrigger value="lab">
               Lab ({labOrders.length})
             </TabsTrigger>
+            <TabsTrigger value="prescription">
+              Prescriptions ({pendingPrescriptions.length})
+            </TabsTrigger>
             <TabsTrigger value="pharmacy">
-              Pharmacy ({pharmacyOrders.length})
+              Pharmacy Orders ({pharmacyOrders.length})
             </TabsTrigger>
           </TabsList>
           <TabsContent value="all" className="mt-4">
-            {renderOrderList(allOrders)}
+            {renderOrderList(allPaymentItems)}
           </TabsContent>
           <TabsContent value="lab" className="mt-4">
-            {renderOrderList(labOrders)}
+            {renderOrderList(labOrders.map((order: any) => ({ ...order, _paymentKind: 'order' })))}
+          </TabsContent>
+          <TabsContent value="prescription" className="mt-4">
+            {renderOrderList(pendingPrescriptions.map((rx: any) => ({ ...rx, _paymentKind: 'prescription' })))}
           </TabsContent>
           <TabsContent value="pharmacy" className="mt-4">
-            {renderOrderList(pharmacyOrders)}
+            {renderOrderList(pharmacyOrders.map((order: any) => ({ ...order, _paymentKind: 'order' })))}
           </TabsContent>
         </Tabs>
       </CardContent>

@@ -1105,7 +1105,7 @@ export const prescriptionsAPI = {
   },
 
   dispense: async (id: string) => {
-    const response = await api.post(`/prescriptions/${id}/dispense`);
+    const response = await api.patch(`/prescriptions/${id}/dispense`);
     return response.data;
   },
 

@@ -12,7 +12,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { getPatientFullName } from '@/utils/orderHelpers';
 import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   UserPlus,
   Users,
@@ -32,16 +32,14 @@ import {
   UserCog,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { patientService } from '@/services/patientService';
 import { prescriptionService } from '@/services/prescriptionService';
+import { visitsAPI } from '@/services/api';
 import { useDoctorQueue, useVisitStats } from '@/hooks/useVisits';
 import { useExpenditureSummary } from '@/hooks/useExpenditures';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 export default function ReceptionDashboard() {
   const { profile } = useAuth();
-  const queryClient = useQueryClient();
   
   useRealtimeOrders();
   useRealtimePatients();
@@ -92,9 +90,9 @@ export default function ReceptionDashboard() {
   const { data: dailyIncome = [] } = useDailyIncome(todayStr, todayStr);
   const { data: outstandingBalances = [] } = useOutstandingBalances();
   const { data: expenditureSummary } = useExpenditureSummary(todayStr, todayStr);
-  const { data: prescriptions = [] } = useQuery({
-    queryKey: ['prescriptions', 'reception-pending'],
-    queryFn: () => prescriptionService.findAll(),
+  const { data: pendingPrescriptions = [] } = useQuery({
+    queryKey: ['prescriptions', 'pending-payment'],
+    queryFn: () => prescriptionService.findPendingPayment(),
     staleTime: 15 * 1000,
   });
 
@@ -121,21 +119,9 @@ export default function ReceptionDashboard() {
     }
     return c;
   }, [todayVisits]);
-  const markPrescriptionPaid = useMutation({
-    mutationFn: (id: string) => prescriptionService.markAsPaid(id),
-    onSuccess: () => {
-      toast.success('Pharmacy payment confirmed');
-      queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to confirm payment');
-    },
-  });
   const todayRevenue = paymentStats?.paidRevenue ?? 0;
   const pendingLabPayments = paymentStats?.pendingOrders ?? 0;
-  const pendingPrescriptionPayments = Array.isArray(prescriptions)
-    ? prescriptions.filter((rx: any) => rx.status === 'pending' && !rx.isPaid)
-    : [];
+  const pendingPrescriptionPayments = Array.isArray(pendingPrescriptions) ? pendingPrescriptions : [];
   const pendingPayments = pendingLabPayments + pendingPrescriptionPayments.length;
   const totalOutstanding = Array.isArray(outstandingBalances)
     ? outstandingBalances.reduce((sum: number, o: any) => sum + (o.balance || o.outstanding || 0), 0)
@@ -356,33 +342,6 @@ export default function ReceptionDashboard() {
         </div>
       </div>
 
-      {pendingPrescriptionPayments.length > 0 && (
-        <div className="mb-6 bg-card border rounded-xl shadow-sm">
-          <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Pending Pharmacy Payments</h3>
-            <span className="text-xs text-muted-foreground">{pendingPrescriptionPayments.length} prescription(s)</span>
-          </div>
-          <div className="divide-y">
-            {pendingPrescriptionPayments.slice(0, 6).map((rx: any) => (
-              <div key={rx._id || rx.id} className="px-5 py-3.5 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-sm truncate">
-                    {rx.patientId?.firstName} {rx.patientId?.lastName}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{rx.prescriptionNumber} • {rx.items?.length || 0} drug(s)</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <p className="text-sm font-semibold">Le {Number(rx.totalAmount || 0).toLocaleString()}</p>
-                  <Button size="sm" onClick={() => markPrescriptionPaid.mutate(rx._id || rx.id)} disabled={markPrescriptionPaid.isPending}>
-                    <CreditCard className="w-3.5 h-3.5 mr-1" />
-                    Mark Paid
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

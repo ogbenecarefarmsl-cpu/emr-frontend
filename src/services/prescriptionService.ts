@@ -69,8 +69,8 @@ export const prescriptionService = {
     return response.data;
   },
 
-  async markAsPaid(id: string): Promise<Prescription> {
-    const response = await api.patch(`/prescriptions/${id}/mark-paid`);
+  async markAsPaid(id: string, paymentMethod = 'cash'): Promise<Prescription> {
+    const response = await api.patch(`/prescriptions/${id}/mark-paid`, { paymentMethod });
     return response.data;
   },
 

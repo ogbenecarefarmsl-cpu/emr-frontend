@@ -4,7 +4,9 @@ import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useOrders, useAddPayment, usePaymentHistory, usePaymentStats, useDailyIncome } from '@/hooks/useOrders';
 import { paymentsAPI } from '@/services/api';
-import { useQuery } from '@tanstack/react-query';
+import { paymentService } from '@/services/paymentService';
+import { prescriptionService } from '@/services/prescriptionService';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +22,7 @@ import { PendingOrders } from '@/components/reception/PendingOrders';
 export default function PaymentsPage() {
   const navigate = useNavigate();
   const { profile, primaryRole } = useAuth();
+  const queryClient = useQueryClient();
   const currentRole = primaryRole === 'admin' ? 'admin' : 'receptionist';
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -30,6 +33,7 @@ export default function PaymentsPage() {
   ]);
   const [showHistoryDialog, setShowHistoryDialog] = useState(false);
   const [historyOrderId, setHistoryOrderId] = useState<string>('');
+  const [historyPrescriptionId, setHistoryPrescriptionId] = useState<string>('');
   const [dateRange, setDateRange] = useState<string>('today');
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   
@@ -38,8 +42,19 @@ export default function PaymentsPage() {
     queryKey: ['payments'],
     queryFn: () => paymentsAPI.getAll(),
   });
+  const { data: pendingPrescriptions = [] } = useQuery({
+    queryKey: ['prescriptions', 'pending-payment'],
+    queryFn: () => prescriptionService.findPendingPayment(),
+  });
   const addPayment = useAddPayment();
-  const { data: paymentHistory, isLoading: historyLoading } = usePaymentHistory(historyOrderId);
+  const { data: orderPaymentHistory, isLoading: orderHistoryLoading } = usePaymentHistory(historyOrderId);
+  const { data: prescriptionPaymentHistory, isLoading: prescriptionHistoryLoading } = useQuery({
+    queryKey: ['payment-history', 'prescription', historyPrescriptionId],
+    queryFn: () => paymentService.findByPrescription(historyPrescriptionId),
+    enabled: !!historyPrescriptionId,
+  });
+  const paymentHistory = historyPrescriptionId ? prescriptionPaymentHistory : orderPaymentHistory;
+  const historyLoading = historyPrescriptionId ? prescriptionHistoryLoading : orderHistoryLoading;
   
   // Get date range for stats
   const getDateRange = () => {
@@ -67,26 +82,44 @@ export default function PaymentsPage() {
   const { data: paymentStats } = usePaymentStats(start, end);
   const { data: dailyIncome } = useDailyIncome(start, end);
 
-  // Merge orders with prescription payments that have no orderId
+  // Merge clinical orders with standalone prescription bills.
   const allItems = Array.isArray(orders) ? [...orders] : [];
+  if (Array.isArray(pendingPrescriptions)) {
+    for (const rx of pendingPrescriptions) {
+      allItems.push({
+        _id: `rx-pending-${rx._id || rx.id}`,
+        _prescriptionId: rx._id || rx.id,
+        orderNumber: rx.prescriptionNumber,
+        patientId: rx.patientId || {},
+        total: Number(rx.totalAmount || 0),
+        amountPaid: 0,
+        balance: Number(rx.totalAmount || 0),
+        paymentStatus: 'pending',
+        createdAt: rx.createdAt,
+        orderType: 'prescription',
+        _isPrescriptionPayment: true,
+        _isPendingPrescription: true,
+      });
+    }
+  }
   if (Array.isArray(allPayments)) {
-    const orderIds = new Set(allItems.map((o: any) => o.id || o._id));
     for (const p of allPayments) {
       if (p.paymentType === 'prescription' && p.prescriptionId && !p.orderId) {
         const rx = p.prescriptionId;
-        const medications = Array.isArray(rx?.medications) ? rx.medications : [];
-        const rxTotal = medications.reduce((sum: number, m: any) => sum + (m.totalPrice || m.price || 0), 0);
+        const items = Array.isArray(rx?.items) ? rx.items : [];
+        const rxTotal = Number(rx?.totalAmount || items.reduce((sum: number, item: any) => sum + Number(item.totalPrice || item.price || 0), 0));
         allItems.push({
           _id: `rx-${p._id}`,
-          orderNumber: `RX-${(rx?.createdAt ? format(new Date(rx.createdAt), 'yyMM') : '0000')}-${String(p._id).slice(-4).toUpperCase()}`,
-          patientId: p.visitId?.patientId || {},
+          _prescriptionId: rx?._id,
+          orderNumber: rx?.prescriptionNumber || `RX-${(rx?.createdAt ? format(new Date(rx.createdAt), 'yyMM') : '0000')}-${String(p._id).slice(-4).toUpperCase()}`,
+          patientId: rx?.patientId || p.visitId?.patientId || {},
           total: rxTotal || p.amount,
           amountPaid: p.amount,
           balance: Math.max(0, (rxTotal || p.amount) - p.amount),
           paymentMethod: p.paymentMethod,
           paymentStatus: p.amount >= (rxTotal || p.amount) ? 'paid' : 'partial',
           createdAt: p.createdAt,
-          orderType: 'pharmacy',
+          orderType: 'prescription',
           _isPrescriptionPayment: true,
           _paymentId: p._id,
         });
@@ -150,6 +183,25 @@ export default function PaymentsPage() {
     }
 
     try {
+      if ((selectedOrder as any)._isPendingPrescription) {
+        if (validRows.length !== 1 || Math.abs(splitTotal - remaining) > 0.001) {
+          toast.error('Prescription payments must be collected in full with one payment method');
+          setIsProcessingPayment(false);
+          return;
+        }
+
+        await prescriptionService.markAsPaid((selectedOrder as any)._prescriptionId, validRows[0].method);
+        toast.success(`Prescription payment of Le ${splitTotal.toLocaleString()} recorded`);
+        queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
+        queryClient.invalidateQueries({ queryKey: ['payments'] });
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        queryClient.invalidateQueries({ queryKey: ['visits'] });
+        setShowPaymentDialog(false);
+        setSelectedOrder(null);
+        setSplitRows([{ method: 'cash', amount: '' }]);
+        return;
+      }
+
       for (const row of validRows) {
         await addPayment.mutateAsync({
           orderId,
@@ -277,7 +329,7 @@ export default function PaymentsPage() {
         <div className="bg-card border rounded-lg p-4">
           <p className="text-xs font-medium text-muted-foreground">Pending Orders</p>
           <p className="text-xl font-bold text-amber-600 mt-1">
-            {Array.isArray(orders) ? orders.filter(o => ['pending', 'partial'].includes(o.paymentStatus || o.payment_status || '')).length : 0}
+            {Array.isArray(allItems) ? allItems.filter((o: any) => ['pending', 'partial'].includes(o.paymentStatus || o.payment_status || '')).length : 0}
           </p>
           <p className="text-xs text-muted-foreground mt-1">
             Awaiting full payment
@@ -337,7 +389,7 @@ export default function PaymentsPage() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input 
-            placeholder="Search orders..." 
+            placeholder="Search orders or prescriptions..." 
             className="pl-10"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
@@ -366,7 +418,7 @@ export default function PaymentsPage() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Order #</th>
+                <th>Bill #</th>
                 <th>Patient</th>
                 <th>Type</th>
                 <th>Total</th>
@@ -409,7 +461,7 @@ export default function PaymentsPage() {
                         orderType === 'pharmacy' ? 'bg-emerald-500/10 text-emerald-600' :
                         'bg-muted'
                       )}>
-                        {order._isPrescriptionPayment ? 'Prescription' : orderType === 'lab' ? 'Lab' : orderType === 'pharmacy' ? 'Pharmacy' : orderType || '—'}
+                        {order._isPrescriptionPayment ? 'Prescription' : orderType === 'lab' ? 'Lab' : orderType === 'pharmacy' ? 'Pharmacy Order' : orderType || '-'}
                       </Badge>
                     </td>
                     <td className="font-bold">Le {Number(total).toLocaleString()}</td>
@@ -436,7 +488,7 @@ export default function PaymentsPage() {
                             size="sm"
                             onClick={() => {
                               setSelectedOrder(order);
-                              setSplitRows([{ method: 'cash', amount: '' }]);
+                              setSplitRows([{ method: 'cash', amount: order._isPendingPrescription ? String(balance) : '' }]);
                               setShowPaymentDialog(true);
                             }}
                           >
@@ -449,7 +501,13 @@ export default function PaymentsPage() {
                             size="sm"
                             variant="outline"
                             title="Reprint receipt"
-                            onClick={() => navigate(`/reception/receipt/${order.id || order._id}`)}
+                            onClick={() => {
+                              if (order._isPrescriptionPayment) {
+                                toast.info('Prescription receipt printing is not available yet');
+                                return;
+                              }
+                              navigate(`/reception/receipt/${order.id || order._id}`);
+                            }}
                           >
                             <Receipt className="w-3 h-3 mr-1" />
                             Reprint
@@ -460,7 +518,13 @@ export default function PaymentsPage() {
                           size="sm"
                           title="Payment history"
                           onClick={() => {
-                            setHistoryOrderId(order.id || order._id || '');
+                            if (order._isPrescriptionPayment) {
+                              setHistoryPrescriptionId(order._prescriptionId || '');
+                              setHistoryOrderId('');
+                            } else {
+                              setHistoryOrderId(order.id || order._id || '');
+                              setHistoryPrescriptionId('');
+                            }
                             setShowHistoryDialog(true);
                           }}
                         >
@@ -494,7 +558,7 @@ export default function PaymentsPage() {
             <div className="py-4">
               <div className="bg-muted rounded-lg p-4 mb-4">
                 <div className="flex justify-between mb-2">
-                  <span className="text-muted-foreground">Order</span>
+                  <span className="text-muted-foreground">{(selectedOrder as any)._isPendingPrescription ? 'Prescription' : 'Order'}</span>
                   <span className="font-mono">{selectedOrder.orderNumber || selectedOrder.order_number}</span>
                 </div>
                 <div className="flex justify-between mb-2">
@@ -531,7 +595,7 @@ export default function PaymentsPage() {
                       <option value="cash">Cash</option>
                       <option value="orange_money">Orange Money</option>
                       <option value="afrimoney">Afrimoney</option>
-                      <option value="wallet">Wallet</option>
+                      {!(selectedOrder as any)._isPendingPrescription && <option value="wallet">Wallet</option>}
                     </select>
                     <Input
                       type="number"
@@ -596,7 +660,13 @@ export default function PaymentsPage() {
       </Dialog>
 
       {/* Payment History Dialog */}
-      <Dialog open={showHistoryDialog} onOpenChange={setShowHistoryDialog}>
+      <Dialog open={showHistoryDialog} onOpenChange={open => {
+        setShowHistoryDialog(open);
+        if (!open) {
+          setHistoryOrderId('');
+          setHistoryPrescriptionId('');
+        }
+      }}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Payment History</DialogTitle>
