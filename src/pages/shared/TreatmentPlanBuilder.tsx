@@ -68,7 +68,6 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
   const [items, setItems] = useState<CreateTreatmentPlanItemInput[]>([]);
 
   // Drug/IV form state
-  const [medSearch, setMedSearch] = useState('');
   const [selectedMed, setSelectedMed] = useState<any>(null);
   const [strengthPerDose, setStrengthPerDose] = useState('1 tablet');
   const [dosesPerDay, setDosesPerDay] = useState(3);
@@ -92,11 +91,11 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
     staleTime: 15_000,
   });
 
-  // Fetch medications
-  const { data: medSearchResults = [], isLoading: medSearchLoading } = useQuery({
-    queryKey: ['medications', 'tp-search', medSearch],
-    queryFn: () => medicationService.search(medSearch),
-    enabled: medSearch.trim().length > 2,
+  // Fetch all medications for dropdown
+  const { data: allMedications = [], isLoading: medsLoading } = useQuery({
+    queryKey: ['medications', 'tp-all'],
+    queryFn: () => medicationService.findAll(),
+    staleTime: 60_000,
   });
 
   // Fetch LIS catalog for lab tests
@@ -129,7 +128,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
   const estimatedTotal = useMemo(() => {
     return items.reduce((sum, item) => {
       if (item.type === 'drug' || item.type === 'iv') {
-        const med = medSearchResults.find((m: any) => m._id === item.medicationId);
+        const med = allMedications.find((m: any) => m._id === item.medicationId);
         const unitPrice = med?.unitPrice || 0;
         const qty = item.dosesPerDay! * item.durationDays!;
         return sum + unitPrice * qty;
@@ -139,7 +138,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
       }
       return sum + (item.amount || 0);
     }, 0);
-  }, [items, medSearchResults]);
+  }, [items, allMedications]);
 
   // ── Add handlers ───────────────────────────────────────────────────────
 
@@ -162,7 +161,6 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
     setItems((prev) => [...prev, newItem]);
     // Reset form
     setSelectedMed(null);
-    setMedSearch('');
     setStrengthPerDose('1 tablet');
     setDosesPerDay(3);
     setDurationDays(7);
@@ -307,10 +305,8 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
         <TabsContent value="drug" className="space-y-3">
           <DrugIvForm
             type="drug"
-            medSearch={medSearch}
-            setMedSearch={setMedSearch}
-            medSearchResults={medSearchResults}
-            medSearchLoading={medSearchLoading}
+            allMedications={allMedications}
+            medsLoading={medsLoading}
             selectedMed={selectedMed}
             setSelectedMed={setSelectedMed}
             strengthPerDose={strengthPerDose}
@@ -328,10 +324,8 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
         <TabsContent value="iv" className="space-y-3">
           <DrugIvForm
             type="iv"
-            medSearch={medSearch}
-            setMedSearch={setMedSearch}
-            medSearchResults={medSearchResults}
-            medSearchLoading={medSearchLoading}
+            allMedications={allMedications}
+            medsLoading={medsLoading}
             selectedMed={selectedMed}
             setSelectedMed={setSelectedMed}
             strengthPerDose={strengthPerDose}
@@ -573,10 +567,8 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
 
 interface DrugIvFormProps {
   type: 'drug' | 'iv';
-  medSearch: string;
-  setMedSearch: (v: string) => void;
-  medSearchResults: any[];
-  medSearchLoading: boolean;
+  allMedications: any[];
+  medsLoading: boolean;
   selectedMed: any;
   setSelectedMed: (med: any) => void;
   strengthPerDose: string;
@@ -592,10 +584,8 @@ interface DrugIvFormProps {
 
 function DrugIvForm({
   type,
-  medSearch,
-  setMedSearch,
-  medSearchResults,
-  medSearchLoading,
+  allMedications,
+  medsLoading,
   selectedMed,
   setSelectedMed,
   strengthPerDose,
@@ -608,51 +598,63 @@ function DrugIvForm({
   setRoute,
   onAdd,
 }: DrugIvFormProps) {
+  const [medFilter, setMedFilter] = useState('');
+
+  const filteredMeds = useMemo(() => {
+    if (!medFilter.trim()) return allMedications.slice(0, 50);
+    const q = medFilter.toLowerCase();
+    return allMedications.filter(
+      (m: any) => m.name.toLowerCase().includes(q) || (m.genericName || '').toLowerCase().includes(q)
+    );
+  }, [allMedications, medFilter]);
+
   return (
     <>
-      {/* Medication search */}
+      {/* Medication dropdown */}
       <div>
         <Label className="text-sm">{type === 'iv' ? 'IV Fluid / Medication' : 'Medication'}</Label>
-        <div className="relative mt-1">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search medication..."
-            value={medSearch}
-            onChange={(e) => {
-              setMedSearch(e.target.value);
-              setSelectedMed(null);
-            }}
-            className="pl-8"
-          />
-        </div>
-        {medSearch.trim().length > 2 && !selectedMed && (
-          <div className="mt-1 max-h-48 overflow-y-auto border rounded-md bg-background">
-            {medSearchResults.map((med: any) => (
-              <div
-                key={med._id}
-                className="px-3 py-2 hover:bg-muted cursor-pointer text-sm flex justify-between"
-                onClick={() => {
-                  setSelectedMed(med);
-                  setMedSearch(med.name);
-                }}
-              >
-                <span>
-                  {med.name}
-                  {med.strength ? ` (${med.strength})` : ''}
-                </span>
-                <span className="text-muted-foreground">
-                  {med.stockQuantity} in stock — Le {med.unitPrice?.toLocaleString()}
-                </span>
+        <Select
+          value={selectedMed?._id || ''}
+          onValueChange={(val) => {
+            const med = allMedications.find((m: any) => m._id === val);
+            setSelectedMed(med || null);
+          }}
+        >
+          <SelectTrigger className="mt-1">
+            <SelectValue placeholder={medsLoading ? 'Loading medications...' : `Select ${type === 'iv' ? 'IV fluid' : 'medication'}...`} />
+          </SelectTrigger>
+          <SelectContent className="max-h-[300px]">
+            <div className="px-2 py-1.5 sticky top-0 bg-background z-10">
+              <div className="relative">
+                <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Filter medications..."
+                  value={medFilter}
+                  onChange={(e) => setMedFilter(e.target.value)}
+                  className="h-8 pl-7 text-sm"
+                  onClick={(e) => e.stopPropagation()}
+                  onKeyDown={(e) => e.stopPropagation()}
+                />
               </div>
+            </div>
+            {filteredMeds.map((med: any) => (
+              <SelectItem key={med._id} value={med._id} className="text-sm">
+                <div className="flex items-center justify-between w-full gap-3">
+                  <span className="truncate">
+                    {med.name}
+                    {med.strength ? ` (${med.strength})` : ''}
+                  </span>
+                  <span className="text-muted-foreground text-xs shrink-0">
+                    {med.stockQuantity} in stock · Le {med.unitPrice?.toLocaleString()}
+                  </span>
+                </div>
+              </SelectItem>
             ))}
-            {medSearchResults.length === 0 && medSearchLoading && (
-              <div className="px-3 py-2 text-sm text-muted-foreground">Searching...</div>
+            {filteredMeds.length === 0 && !medsLoading && (
+              <div className="px-3 py-2 text-sm text-muted-foreground text-center">No medications found</div>
             )}
-            {medSearchResults.length === 0 && !medSearchLoading && (
-              <div className="px-3 py-2 text-sm text-muted-foreground">No medications found</div>
-            )}
-          </div>
-        )}
+          </SelectContent>
+        </Select>
       </div>
 
       {selectedMed && (
