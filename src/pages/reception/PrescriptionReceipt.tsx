@@ -24,6 +24,7 @@ export default function PrescriptionReceipt() {
   const receiptRef = useRef<HTMLDivElement>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [printed, setPrinted] = useState(false);
+  const autoPrintTriggeredRef = useRef(false);
 
   // Fetch the prescription
   const { data: rx, isLoading } = useQuery<Prescription>({
@@ -37,10 +38,14 @@ export default function PrescriptionReceipt() {
     enabled: !!id,
   });
 
-  // Auto-print on mount if enabled
+  // Auto-print on mount after dispense
   useEffect(() => {
-    if (!rx || !receiptRef.current) return;
-    // Auto-print disabled by default here — receptionist prints manually
+    if (!rx || !receiptRef.current || autoPrintTriggeredRef.current) return;
+    autoPrintTriggeredRef.current = true;
+    const timer = setTimeout(() => {
+      handlePrint();
+    }, 500);
+    return () => clearTimeout(timer);
   }, [rx]);
 
   const handlePrint = async () => {

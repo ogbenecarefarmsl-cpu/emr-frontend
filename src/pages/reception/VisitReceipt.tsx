@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Card } from '@/components/ui/card';
@@ -39,6 +39,7 @@ export default function VisitReceipt() {
   const [isPrinting, setIsPrinting] = useState(false);
   const [printed, setPrinted] = useState(false);
   const [receiptData, setReceiptData] = useState<VisitReceiptData | null>(null);
+  const autoPrintTriggeredRef = useRef(false);
 
   // Fetch the visit
   const { data: visit, isLoading } = useQuery<any>({
@@ -106,6 +107,16 @@ export default function VisitReceipt() {
       setIsPrinting(false);
     }
   };
+
+  // Auto-print on mount after payment
+  useEffect(() => {
+    if (!receiptData || autoPrintTriggeredRef.current) return;
+    autoPrintTriggeredRef.current = true;
+    const timer = setTimeout(() => {
+      handlePrint();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [receiptData]);
 
   const formatCurrency = (n: number) => `Le ${n.toLocaleString()}`;
 

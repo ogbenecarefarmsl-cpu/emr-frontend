@@ -66,12 +66,42 @@ export default function ReceptionTreatmentPlans() {
   const payMutation = useMutation({
     mutationFn: ({ id, amount, paymentMethod, notes }: { id: string; amount: number; paymentMethod: string; notes?: string }) =>
       treatmentPlanService.pay(id, { amount, paymentMethod, notes }),
-    onSuccess: (updatedPlan) => {
+    onSuccess: async (updatedPlan) => {
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] });
       setPayPlan(null);
       setPayAmount('');
       setPayNotes('');
       toast.success(`Payment received — Le ${updatedPlan.amountPaid.toLocaleString()}`);
+
+      // Auto-print treatment plan receipt after payment
+      try {
+        if (usbPrinterService.isConnected) {
+          const patient = typeof updatedPlan.patientId === 'object' ? updatedPlan.patientId : null;
+          const visit = typeof updatedPlan.visitId === 'object' ? updatedPlan.visitId : null;
+          const bytes = buildTreatmentPlanESCPOS(
+            {
+              planNumber: updatedPlan.planNumber,
+              patientName: patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown',
+              patientId: patient?.patientId || '',
+              patientAge: patient?.age?.toString(),
+              patientGender: patient?.gender,
+              patientPhone: patient?.phone,
+              visitNumber: visit?.visitNumber,
+              items: updatedPlan.items.map((i) => ({ type: i.type, description: i.description, amount: i.amount })),
+              totalAmount: updatedPlan.totalAmount,
+              amountPaid: updatedPlan.amountPaid,
+              balance: updatedPlan.balance,
+              paymentStatus: updatedPlan.paymentStatus,
+              notes: updatedPlan.notes,
+            },
+            branch
+          );
+          await usbPrinterService.print(bytes);
+          toast.success('Treatment plan receipt printed');
+        }
+      } catch (err: any) {
+        // Silent — payment succeeded, print is best-effort
+      }
     },
     onError: (err: any) => {
       toast.error(err.response?.data?.message || 'Payment failed');

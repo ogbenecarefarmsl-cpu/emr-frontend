@@ -258,7 +258,7 @@ export default function ReceptionDispensePage() {
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
       queryClient.invalidateQueries({ queryKey: ['prescription', id] });
       queryClient.invalidateQueries({ queryKey: ['visits'] });
-      navigate('/reception/payments');
+      navigate(`/reception/prescription-receipt/${rx._id}`);
     } catch (error: any) {
       const msg = error?.response?.data?.message || error?.message || 'Failed to dispense';
       toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
