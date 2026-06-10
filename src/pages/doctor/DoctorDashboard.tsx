@@ -30,6 +30,7 @@ import { AllergyManager } from '@/components/doctor/AllergyManager';
 import { ProblemList } from '@/components/doctor/ProblemList';
 import { VitalsTrends } from '@/components/doctor/VitalsTrends';
 import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
+import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
 
 // Icons
 import {
@@ -237,6 +238,9 @@ export default function DoctorDashboard() {
     diagnosis: '',
     notes: '',
   });
+
+  // Treatment plan modal state
+  const [treatmentPlanOpen, setTreatmentPlanOpen] = useState(false);
 
   // Edit mode state
   const [editingOrder, setEditingOrder] = useState<any>(null);
@@ -616,7 +620,7 @@ export default function DoctorDashboard() {
           instructions: item.instructions?.trim() || undefined,
           pharmacistNote: item.pharmacistNote?.trim() || undefined,
         })),
-        totalAmount: prescriptionItems.reduce((sum, item) => sum + (item.quantity * (item.unitPrice || 0)), 0),
+        // totalAmount is auto-computed on the backend
       });
     },
     onSuccess: () => {
@@ -1337,12 +1341,15 @@ export default function DoctorDashboard() {
                           </div>
                           <div className="p-4 flex flex-col gap-4">
                             {/* Action Buttons Row */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                               <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!canContinueClinicalWork}>
                                 <span className="material-symbols-outlined text-primary text-[18px]">science</span> Order Labs
                               </Button>
                               <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }} disabled={!canContinueClinicalWork}>
                                 <span className="material-symbols-outlined text-primary text-[18px]">prescriptions</span> Prescribe
+                              </Button>
+                              <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => setTreatmentPlanOpen(true)} disabled={!canContinueClinicalWork}>
+                                <span className="material-symbols-outlined text-primary text-[18px]">assignment</span> Treatment Plan
                               </Button>
                               <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => setReferralOpen(true)} disabled={!canContinueClinicalWork}>
                                 <span className="material-symbols-outlined text-primary text-[18px]">forward</span> Refer
@@ -1530,7 +1537,7 @@ export default function DoctorDashboard() {
                               <h3 className="font-semibold text-sm">Lab Results</h3>
                               <p className="text-xs text-muted-foreground mt-1">{labResults.length} result{labResults.length === 1 ? '' : 's'} released, {abnormalLabResults.length} flagged.</p>
                             </div>
-                            <Button variant="outline" size="sm" className="gap-1" onClick={() => { const reportPath = `/lab/reports/${selectedVisit._id || selectedVisit.id}`; navigate(reportPath); }}>
+                            <Button variant="outline" size="sm" className="gap-1" onClick={() => { const reportPath = `/lab/reports/${labOrderId}`; navigate(reportPath); }}>
                               <ExternalLink className="w-3 h-3" /> View Full Report
                             </Button>
                           </div>
@@ -2243,6 +2250,26 @@ export default function DoctorDashboard() {
               {createAdmission.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <BedDouble className="w-4 h-4 mr-2" />}Admit
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Treatment Plan Modal */}
+      <Dialog open={treatmentPlanOpen} onOpenChange={setTreatmentPlanOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Create Treatment Plan</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <TreatmentPlanBuilder
+              preselectedVisitId={selectedVisit?._id || selectedVisit?.id}
+              onPlanCreated={() => {
+                setTreatmentPlanOpen(false);
+                queryClient.invalidateQueries({ queryKey: ['visits'] });
+                queryClient.invalidateQueries({ queryKey: ['treatment-plans'] });
+              }}
+              inline
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

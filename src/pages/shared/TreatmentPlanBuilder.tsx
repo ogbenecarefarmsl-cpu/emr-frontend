@@ -124,13 +124,27 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
     );
   }, [lisCatalog, labSearch]);
 
+  // Helper: extract units per dose from strengthPerDose string (e.g., "2 tablets" → 2)
+  const getUnitsPerDose = (strengthPerDose: string): number => {
+    const s = (strengthPerDose || '').trim().toLowerCase();
+    const m = s.match(/^(\d+(?:\.\d+)?)/);
+    if (m) {
+      const n = parseFloat(m[1]);
+      const rest = s.slice(m[0].length).trim();
+      const countUnits = ['tablet', 'tablets', 'capsule', 'capsules', 'ampule', 'ampules', 'vial', 'vials', 'patch', 'patches', 'drop', 'drops', 'puff', 'puffs', 'sachet', 'sachets', 'ml'];
+      if (countUnits.some((u) => rest.startsWith(u))) return n;
+    }
+    return 1;
+  };
+
   // Estimated total
   const estimatedTotal = useMemo(() => {
     return items.reduce((sum, item) => {
       if (item.type === 'drug' || item.type === 'iv') {
         const med = allMedications.find((m: any) => m._id === item.medicationId);
         const unitPrice = med?.unitPrice || 0;
-        const qty = item.dosesPerDay! * item.durationDays!;
+        const unitsPerDose = getUnitsPerDose(item.strengthPerDose || '');
+        const qty = unitsPerDose * item.dosesPerDay! * item.durationDays!;
         return sum + unitPrice * qty;
       }
       if (item.type === 'lab') {
@@ -148,7 +162,8 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
     if (dosesPerDay < 1) return toast.error('Doses per day must be at least 1');
     if (durationDays < 1) return toast.error('Duration must be at least 1 day');
 
-    const qty = dosesPerDay * durationDays;
+    const unitsPerDose = getUnitsPerDose(strengthPerDose);
+    const qty = unitsPerDose * dosesPerDay * durationDays;
     const newItem: CreateTreatmentPlanItemInput = {
       type: itemType,
       medicationId: selectedMed._id,
