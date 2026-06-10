@@ -107,11 +107,29 @@ export const TreatmentPlanReceipt = forwardRef<HTMLDivElement, TreatmentPlanRece
           })}
         </div>
 
-        {/* Total */}
+        {/* Total + Payment */}
         <div className="totals">
           <div className="total-row grand-total">
             <span>TOTAL:</span>
             <span>{formatCurrency(plan.totalAmount)}</span>
+          </div>
+          {(plan.amountPaid || 0) > 0 && (
+            <div className="total-row" style={{ color: '#16a34a' }}>
+              <span>PAID:</span>
+              <span>{formatCurrency(plan.amountPaid)}</span>
+            </div>
+          )}
+          {(plan.balance || 0) > 0 && (
+            <div className="total-row" style={{ color: '#d97706', fontWeight: 'bold' }}>
+              <span>BALANCE:</span>
+              <span>{formatCurrency(plan.balance)}</span>
+            </div>
+          )}
+          <div className="total-row" style={{ fontSize: '10px', marginTop: '4px' }}>
+            <span>STATUS:</span>
+            <span style={{ fontWeight: 'bold' }}>
+              {plan.paymentStatus === 'paid' ? 'FULLY PAID' : plan.paymentStatus === 'partial' ? 'PARTIALLY PAID' : 'UNPAID'}
+            </span>
           </div>
         </div>
 

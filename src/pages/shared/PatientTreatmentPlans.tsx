@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/ui/badge';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
 import type { TreatmentPlan } from '@/types/treatment-plan';
-import { Loader2, Pill, FlaskConical, Beaker, Scissors, FileText } from 'lucide-react';
+import { Loader2, Pill, FlaskConical, Beaker, Scissors, FileText, DollarSign } from 'lucide-react';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'bg-gray-100 text-gray-700' },
@@ -10,6 +10,12 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   paid: { label: 'Paid', color: 'bg-green-100 text-green-700' },
   completed: { label: 'Completed', color: 'bg-emerald-100 text-emerald-700' },
   cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700' },
+};
+
+const PAYMENT_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  unpaid: { label: 'Unpaid', color: 'bg-red-100 text-red-700' },
+  partial: { label: 'Partial', color: 'bg-amber-100 text-amber-700' },
+  paid: { label: 'Paid', color: 'bg-green-100 text-green-700' },
 };
 
 const TYPE_ICONS: Record<string, any> = {
@@ -52,15 +58,22 @@ export function PatientTreatmentPlans({ patientId }: PatientTreatmentPlansProps)
     <div className="space-y-3">
       {plans.map((plan: TreatmentPlan) => {
         const status = STATUS_CONFIG[plan.status] || STATUS_CONFIG.draft;
+        const payStatus = PAYMENT_STATUS_CONFIG[plan.paymentStatus || 'unpaid'];
         const creator = typeof plan.createdBy === 'object' ? plan.createdBy : null;
+        const remaining = (plan.totalAmount || 0) - (plan.amountPaid || 0);
         return (
           <div key={plan._id} className="border rounded-lg p-3 space-y-2">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-mono text-xs">{plan.planNumber}</span>
                 <Badge variant="outline" className={`text-[10px] ${status.color}`}>
                   {status.label}
                 </Badge>
+                {payStatus && (
+                  <Badge variant="outline" className={`text-[10px] ${payStatus.color}`}>
+                    {payStatus.label}
+                  </Badge>
+                )}
               </div>
               <span className="text-xs text-muted-foreground">
                 {new Date(plan.createdAt).toLocaleDateString()}
@@ -94,8 +107,26 @@ export function PatientTreatmentPlans({ patientId }: PatientTreatmentPlansProps)
               })}
             </div>
 
-            <div className="text-right text-sm font-medium">
-              Total: Le {plan.totalAmount.toLocaleString()}
+            {/* Financial summary */}
+            <div className="border-t pt-2 space-y-1 text-sm">
+              <div className="flex justify-between font-medium">
+                <span>Total:</span>
+                <span>Le {(plan.totalAmount || 0).toLocaleString()}</span>
+              </div>
+              {plan.amountPaid > 0 && (
+                <div className="flex justify-between text-green-700">
+                  <span className="flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" /> Paid:
+                  </span>
+                  <span>Le {plan.amountPaid.toLocaleString()}</span>
+                </div>
+              )}
+              {remaining > 0 && plan.amountPaid > 0 && (
+                <div className="flex justify-between text-amber-700">
+                  <span>Balance:</span>
+                  <span>Le {remaining.toLocaleString()}</span>
+                </div>
+              )}
             </div>
 
             {plan.notes && (

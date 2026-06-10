@@ -303,6 +303,9 @@ export interface TreatmentPlanEscPosData {
     amount: number;
   }>;
   totalAmount: number;
+  amountPaid?: number;
+  balance?: number;
+  paymentStatus?: string;
   notes?: string;
   printedAt?: string;
 }
@@ -386,10 +389,20 @@ export function buildTreatmentPlanESCPOS(
   });
   b.separator('=');
 
-  // ── Total ──────────────────────────────────────────────────────────────
+  // ── Total + Payment ────────────────────────────────────────────────────
   b.bold(true);
   b.line(padLine58('TOTAL:', formatCurrency58(data.totalAmount)));
   b.bold(false);
+  if ((data.amountPaid || 0) > 0) {
+    b.line(padLine58('PAID:', formatCurrency58(data.amountPaid)));
+  }
+  if ((data.balance || 0) > 0) {
+    b.line(padLine58('BALANCE:', formatCurrency58(data.balance)));
+  }
+  if (data.paymentStatus) {
+    const statusText = data.paymentStatus === 'paid' ? 'FULLY PAID' : data.paymentStatus === 'partial' ? 'PARTIALLY PAID' : 'UNPAID';
+    b.line(padLine58('STATUS:', statusText));
+  }
   b.separator('=');
 
   // ── Notes ──────────────────────────────────────────────────────────────

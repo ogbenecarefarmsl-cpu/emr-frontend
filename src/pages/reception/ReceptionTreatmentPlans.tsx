@@ -95,6 +95,9 @@ export default function ReceptionTreatmentPlans() {
             visitNumber: visit?.visitNumber,
             items: plan.items.map((i) => ({ type: i.type, description: i.description, amount: i.amount })),
             totalAmount: plan.totalAmount,
+            amountPaid: plan.amountPaid,
+            balance: plan.balance,
+            paymentStatus: plan.paymentStatus,
             notes: plan.notes,
           },
           branch
