@@ -2,6 +2,7 @@
   "name": "Harbour EMR",
   "short_name": "Harbour EMR",
   "description": "Harbour EMR - Offline-First Electronic Medical Records",
+  "version": "2.6.0-2026-06-10",
   "theme_color": "#0f172a",
   "background_color": "#ffffff",
   "display": "standalone",
