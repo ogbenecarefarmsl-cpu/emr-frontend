@@ -30,6 +30,8 @@ import {
   ClipboardCheck,
   BedDouble,
   HeartPulse,
+  Building2,
+  Receipt,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserRole } from '@/types/lis';
@@ -61,6 +63,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { to: '/admin/report-template', icon: FileEdit, label: 'Report Templates' },
     { to: '/admin/machines', icon: Cpu, label: 'Lab Machines' },
     { to: '/admin/printers', icon: Printer, label: 'Printers' },
+    { to: '/admin/branches', icon: Building2, label: 'Branches & Outlets' },
     { to: '/admin/settings', icon: Settings, label: 'Settings' },
   ],
   receptionist: [
@@ -69,6 +72,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { to: '/reception/visit-registration', icon: ClipboardCheck, label: 'Create Visit' },
     { to: '/reception/patients', icon: Users, label: 'Patients' },
     { to: '/reception/payments', icon: CreditCard, label: 'Payments' },
+    { to: '/reception/walk-in-receipt', icon: Receipt, label: 'Walk-in Receipt' },
     { to: '/reception/orders', icon: ClipboardList, label: 'Clinical Orders' },
     { to: '/pharmacy', icon: Pill, label: 'Dispensing' },
     { to: '/reception/lab-reports', icon: FileText, label: 'Lab Reports' },

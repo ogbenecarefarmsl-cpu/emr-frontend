@@ -505,7 +505,7 @@ export default function PaymentsPage() {
                             title="Reprint receipt"
                             onClick={() => {
                               if (order._isPrescriptionPayment) {
-                                toast.info('Prescription receipt printing is not available yet');
+                                navigate(`/reception/prescription-receipt/${order._prescriptionId || order.id || order._id}`);
                                 return;
                               }
                               navigate(`/reception/receipt/${order.id || order._id}`);

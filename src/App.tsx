@@ -28,6 +28,9 @@ import PaymentReceipt from "./pages/reception/PaymentReceipt";
 import PaymentDemo from "./pages/reception/PaymentDemo";
 import PrinterSetup from "./pages/reception/PrinterSetup";
 import PriceListPage from "./pages/reception/PriceListPage";
+import PrescriptionReceipt from "./pages/reception/PrescriptionReceipt";
+import VisitReceipt from "./pages/reception/VisitReceipt";
+import WalkInReceipt from "./pages/reception/WalkInReceipt";
 import VisitRegistration from "./pages/reception/VisitRegistration";
 import ReceptionDispensePage from "./pages/reception/ReceptionDispensePage";
 import ExpendituresPage from "./pages/reception/ExpendituresPage";
@@ -51,6 +54,7 @@ import MatchResults from "./pages/lab/MatchResults";
 import CommunicationLogs from "./pages/admin/CommunicationLogs";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagementPage from "./pages/admin/UserManagementPage";
+import BranchManagementPage from "./pages/admin/BranchManagementPage";
 import Reports from "./pages/admin/Reports";
 import TestCatalogManagement from "./pages/admin/TestCatalogManagement";
 import ReconciliationReview from "./pages/admin/ReconciliationReview";
@@ -215,6 +219,15 @@ function AppRoutes() {
       <Route path="/reception/dispense/:id" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><ReceptionDispensePage /></RoleGuard>
       } />
+      <Route path="/reception/prescription-receipt/:id" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin', 'pharmacist']}><PrescriptionReceipt /></RoleGuard>
+      } />
+      <Route path="/reception/visit-receipt" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><VisitReceipt /></RoleGuard>
+      } />
+      <Route path="/reception/walk-in-receipt" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><WalkInReceipt /></RoleGuard>
+      } />
       <Route path="/reception/visit-registration" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><VisitRegistration /></RoleGuard>
       } />
@@ -339,6 +352,9 @@ function AppRoutes() {
       } />
       <Route path="/admin/printers" element={
         <RoleGuard allowedRoles={['admin']}><PrinterSettings /></RoleGuard>
+      } />
+      <Route path="/admin/branches" element={
+        <RoleGuard allowedRoles={['admin']}><BranchManagementPage /></RoleGuard>
       } />
       <Route path="/admin/doctors" element={
         <RoleGuard allowedRoles={['admin']}><DoctorsPage /></RoleGuard>
