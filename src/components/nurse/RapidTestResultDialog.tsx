@@ -36,7 +36,8 @@ export function RapidTestResultDialog({ visit, open, onOpenChange }: RapidTestRe
   const qc = useQueryClient();
   const addResult = useAddRapidTestResult();
 
-  const defaultTestType: 'malaria' | 'typhoid' = visit?.serviceType === 'rapid_typhoid' ? 'typhoid' : 'malaria';
+  const requested = (visit?.rapidTestsRequested || []) as ('malaria' | 'typhoid')[];
+  const defaultTestType: 'malaria' | 'typhoid' = requested[0] || 'malaria';
   const [testType, setTestType] = useState<'malaria' | 'typhoid'>(defaultTestType);
   const [result, setResult] = useState<'positive' | 'negative'>('negative');
   const [parasiteCount, setParasiteCount] = useState('');
@@ -78,7 +79,7 @@ export function RapidTestResultDialog({ visit, open, onOpenChange }: RapidTestRe
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TestTube className="w-5 h-5 text-primary" />
-            Rapid Test - {visit?.serviceType === 'rapid_typhoid' ? 'Typhoid' : visit?.serviceType === 'rapid_malaria' ? 'Malaria' : testType}
+            Rapid Test - {testType.charAt(0).toUpperCase() + testType.slice(1)}
           </DialogTitle>
         </DialogHeader>
         <div className="text-xs text-muted-foreground">

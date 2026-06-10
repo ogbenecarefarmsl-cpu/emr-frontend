@@ -10,9 +10,10 @@ interface CreateVisitData {
   chiefComplaint?: string;
   notes?: string;
   temperature?: number;
-  serviceType?: 'normal_consultation' | 'specialist_consultation' | 'observation_4h' | 'procedure' | 'rapid_malaria' | 'rapid_typhoid';
+  serviceType?: 'normal_consultation' | 'specialist_consultation' | 'observation_4h' | 'procedure';
   specialistId?: string;
   procedureType?: string;
+  rapidTestsRequested?: ('malaria' | 'typhoid')[];
 }
 
 export function useVisits(status?: string) {

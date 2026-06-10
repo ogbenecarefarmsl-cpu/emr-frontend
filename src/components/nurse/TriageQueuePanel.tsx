@@ -18,8 +18,6 @@ const SERVICE_TYPE_META: Record<string, { label: string; icon: any; className: s
   specialist_consultation: { label: 'Specialist', icon: UserCog, className: 'bg-violet-50 text-violet-700 border-violet-200', needsTestEntry: false },
   observation_4h: { label: 'Observation', icon: Stethoscope, className: 'bg-cyan-50 text-cyan-700 border-cyan-200', needsTestEntry: false },
   procedure: { label: 'Procedure', icon: Scissors, className: 'bg-rose-50 text-rose-700 border-rose-200', needsTestEntry: false },
-  rapid_malaria: { label: 'Rapid Malaria', icon: TestTube, className: 'bg-amber-50 text-amber-800 border-amber-300', needsTestEntry: true },
-  rapid_typhoid: { label: 'Rapid Typhoid', icon: TestTube, className: 'bg-amber-50 text-amber-800 border-amber-300', needsTestEntry: true },
 };
 
 export function TriageQueuePanel({
@@ -78,6 +76,9 @@ export function TriageQueuePanel({
                       {visit.procedureType && (
                         <p className="text-xs font-medium text-rose-700 mt-0.5">Procedure: {visit.procedureType}</p>
                       )}
+                      {visit.rapidTestsRequested && visit.rapidTestsRequested.length > 0 && (
+                        <p className="text-xs font-medium text-amber-700 mt-0.5">Tests Requested: {visit.rapidTestsRequested.join(', ')}</p>
+                      )}
                       {visit.chiefComplaint && (
                         <p className="text-xs text-muted-foreground italic mt-0.5 line-clamp-2">
                           "{visit.chiefComplaint}"
@@ -93,7 +94,7 @@ export function TriageQueuePanel({
                       )}
                     </div>
                     <div className="flex flex-col gap-1 flex-shrink-0">
-                      {svc?.needsTestEntry && onOpenRapidTest && (
+                      {(svc?.needsTestEntry || (visit.rapidTestsRequested && visit.rapidTestsRequested.length > 0)) && onOpenRapidTest && (
                         <Button
                           size="sm"
                           variant={hasResult ? 'outline' : 'default'}

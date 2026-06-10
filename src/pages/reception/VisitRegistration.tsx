@@ -13,10 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import { Loader2, Search, UserPlus, Stethoscope, ArrowLeft, Thermometer, TestTube, Scissors, UserCog } from 'lucide-react';
+import { Loader2, Search, UserPlus, Stethoscope, ArrowLeft, Thermometer, Scissors, UserCog } from 'lucide-react';
 
-type ServiceId = 'normal_consultation' | 'specialist_consultation' | 'observation_4h' | 'procedure' | 'rapid_malaria' | 'rapid_typhoid';
+type ServiceId = 'normal_consultation' | 'specialist_consultation' | 'observation_4h' | 'procedure';
 
 interface BillableService {
   id: ServiceId;
@@ -25,7 +26,7 @@ interface BillableService {
   visitType: 'new';
   icon: any;
   description: string;
-  flag: 'none' | 'specialist' | 'procedure' | 'rapid_test';
+  flag: 'none' | 'specialist' | 'procedure';
 }
 
 const BILLABLE_SERVICES: BillableService[] = [
@@ -45,14 +46,6 @@ const BILLABLE_SERVICES: BillableService[] = [
     id: 'procedure', label: 'Procedure', fee: 50, visitType: 'new',
     icon: Scissors, flag: 'procedure', description: 'Nurse-prepped procedure room booking',
   },
-  {
-    id: 'rapid_malaria', label: 'Rapid Test - Malaria', fee: 50, visitType: 'new',
-    icon: TestTube, flag: 'rapid_test', description: 'EMR-internal rapid test (nurse-entered result)',
-  },
-  {
-    id: 'rapid_typhoid', label: 'Rapid Test - Typhoid', fee: 50, visitType: 'new',
-    icon: TestTube, flag: 'rapid_test', description: 'EMR-internal rapid test (nurse-entered result)',
-  },
 ];
 
 export default function VisitRegistration() {
@@ -71,6 +64,8 @@ export default function VisitRegistration() {
   const [temperature, setTemperature] = useState('');
   const [specialistId, setSpecialistId] = useState('');
   const [procedureType, setProcedureType] = useState('');
+  const [wantsMalariaTest, setWantsMalariaTest] = useState(false);
+  const [wantsTyphoidTest, setWantsTyphoidTest] = useState(false);
 
   const { data: doctors = [] } = useDoctors();
   const specialistOptions = useMemo(
@@ -112,6 +107,14 @@ export default function VisitRegistration() {
     }
   }, [allPatients, preselectedPatientId, selectedPatient]);
 
+  useEffect(() => {
+    const serviceFee = selectedService.fee;
+    let extraFee = 0;
+    if (wantsMalariaTest) extraFee += 50;
+    if (wantsTyphoidTest) extraFee += 50;
+    setConsultationFee(String(serviceFee + extraFee));
+  }, [selectedServiceId, wantsMalariaTest, wantsTyphoidTest]);
+
   const handleSubmit = async () => {
     if (!selectedPatient) {
       toast.error('Please select a patient');
@@ -133,6 +136,10 @@ export default function VisitRegistration() {
         return;
       }
 
+      const rapidTestsRequested: ('malaria' | 'typhoid')[] = [];
+      if (wantsMalariaTest) rapidTestsRequested.push('malaria');
+      if (wantsTyphoidTest) rapidTestsRequested.push('typhoid');
+
       const visit = await createVisit.mutateAsync({
         patientId: selectedPatient._id || selectedPatient.id,
         visitType: visitType as any,
@@ -141,12 +148,14 @@ export default function VisitRegistration() {
         notes: [
           `Service: ${selectedService.label}`,
           procedureType ? `Procedure: ${procedureType}` : undefined,
+          rapidTestsRequested.length > 0 ? `Rapid tests requested: ${rapidTestsRequested.join(', ')}` : undefined,
           notes.trim() || undefined,
         ].filter(Boolean).join('\n'),
         temperature: temperature ? parseFloat(temperature) : undefined,
         serviceType: selectedService.id,
         specialistId: selectedService.flag === 'specialist' ? specialistId : undefined,
         procedureType: selectedService.flag === 'procedure' ? procedureType : undefined,
+        rapidTestsRequested: rapidTestsRequested.length > 0 ? rapidTestsRequested : undefined,
       });
 
       await markConsultationPaid.mutateAsync({ visitId: visit._id || visit.id, paymentMethod: 'cash' });
@@ -295,7 +304,6 @@ export default function VisitRegistration() {
                       const service = BILLABLE_SERVICES.find((item) => item.id === value);
                       setSelectedServiceId(value as ServiceId);
                       if (service) {
-                        setConsultationFee(String(service.fee));
                         setVisitType(service.visitType);
                       }
                     }}
@@ -362,12 +370,31 @@ export default function VisitRegistration() {
                   </div>
                 )}
 
-                {selectedService.flag === 'rapid_test' && (
+                {(wantsMalariaTest || wantsTyphoidTest) && (
                   <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
                     <strong>Rapid test workflow:</strong> After vitals, the nurse will run the bedside
                     rapid test and record the result on the visit. You will not need to route a lab order.
                   </div>
                 )}
+
+                {/* Rapid Tests check */}
+                <div className="col-span-2 space-y-2 mt-2">
+                  <Label>Rapid Tests (done by Nurse at Triage)</Label>
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="rapidMalaria" checked={wantsMalariaTest} onCheckedChange={(c) => setWantsMalariaTest(!!c)} />
+                      <label htmlFor="rapidMalaria" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Rapid Malaria (+50)
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Checkbox id="rapidTyphoid" checked={wantsTyphoidTest} onCheckedChange={(c) => setWantsTyphoidTest(!!c)} />
+                      <label htmlFor="rapidTyphoid" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        Rapid Typhoid (+50)
+                      </label>
+                    </div>
+                  </div>
+                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="visitType">Visit Type</Label>

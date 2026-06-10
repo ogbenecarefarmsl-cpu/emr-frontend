@@ -27,7 +27,6 @@ import {
   TrendingDown,
   PiggyBank,
   Phone,
-  TestTube,
   Scissors,
   UserCog,
 } from 'lucide-react';
@@ -108,8 +107,6 @@ export default function ReceptionDashboard() {
       specialist_consultation: 0,
       observation_4h: 0,
       procedure: 0,
-      rapid_malaria: 0,
-      rapid_typhoid: 0,
       unspecified: 0,
     };
     for (const v of todayVisits) {
@@ -331,13 +328,11 @@ export default function ReceptionDashboard() {
           <span className="text-xs text-muted-foreground">{todayVisits.length} total</span>
         </div>
         <div className="p-5">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             <ServiceTypeTile icon={Stethoscope} label="Consultations" value={serviceTypeCounts.normal_consultation} color="blue" />
             <ServiceTypeTile icon={UserCog} label="Specialist" value={serviceTypeCounts.specialist_consultation} color="violet" />
             <ServiceTypeTile icon={Stethoscope} label="Observation" value={serviceTypeCounts.observation_4h} color="cyan" />
             <ServiceTypeTile icon={Scissors} label="Procedures" value={serviceTypeCounts.procedure} color="rose" />
-            <ServiceTypeTile icon={TestTube} label="Rapid Malaria" value={serviceTypeCounts.rapid_malaria} color="amber" />
-            <ServiceTypeTile icon={TestTube} label="Rapid Typhoid" value={serviceTypeCounts.rapid_typhoid} color="amber" />
           </div>
         </div>
       </div>
