@@ -15,6 +15,7 @@ import {
   Clock, AlertTriangle, ChevronDown, Calendar, Droplets, ExternalLink, RefreshCw, Cloud,
   Phone, Hash, TrendingUp, ClipboardList
 } from 'lucide-react';
+import { PatientTreatmentPlans } from './PatientTreatmentPlans';
 import { toast } from 'sonner';
 
 const FBC_TEST_ORDER = [
@@ -238,6 +239,9 @@ const PatientRecord = () => {
             </TabsTrigger>
             <TabsTrigger value="vitals" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
               Vitals
+            </TabsTrigger>
+            <TabsTrigger value="treatment-plans" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
+              Treatment Plans
             </TabsTrigger>
           </TabsList>
 
@@ -613,6 +617,11 @@ const PatientRecord = () => {
                 </CardContent>
               </Card>
             )}
+          </TabsContent>
+
+          {/* Treatment Plans Tab */}
+          <TabsContent value="treatment-plans" className="space-y-3">
+            <PatientTreatmentPlans patientId={patient._id} />
           </TabsContent>
         </Tabs>
       </div>

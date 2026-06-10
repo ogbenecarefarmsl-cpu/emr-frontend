@@ -73,6 +73,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { to: '/reception/patients', icon: Users, label: 'Patients' },
     { to: '/reception/payments', icon: CreditCard, label: 'Payments' },
     { to: '/reception/walk-in-receipt', icon: Receipt, label: 'Walk-in Receipt' },
+    { to: '/reception/treatment-plans', icon: ClipboardList, label: 'Treatment Plans' },
     { to: '/reception/orders', icon: ClipboardList, label: 'Clinical Orders' },
     { to: '/pharmacy', icon: Pill, label: 'Dispensing' },
     { to: '/reception/lab-reports', icon: FileText, label: 'Lab Reports' },
@@ -96,10 +97,12 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
   ],
   doctor: [
     { to: '/doctor', icon: Stethoscope, label: 'Consultations' },
+    { to: '/doctor/treatment-plans', icon: ClipboardList, label: 'Treatment Plans' },
     { to: '/patient/search', icon: Users, label: 'Patient History' },
   ],
   specialist: [
     { to: '/doctor', icon: Stethoscope, label: 'Consultations' },
+    { to: '/doctor/treatment-plans', icon: ClipboardList, label: 'Treatment Plans' },
     { to: '/patient/search', icon: Users, label: 'Patient History' },
   ],
   nurse: [
@@ -108,6 +111,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { to: '/nurse/admissions', icon: BedDouble, label: 'Admissions' },
     { to: '/nurse/lab-requests', icon: FlaskConical, label: 'Lab Requests' },
     { to: '/nurse/prescriptions', icon: Pill, label: 'Prescriptions' },
+    { to: '/nurse/treatment-plans', icon: ClipboardList, label: 'Treatment Plans' },
     { to: '/nurse/mar', icon: Pill, label: 'MAR' },
     { to: '/nurse/observation', icon: HeartPulse, label: 'Observation' },
     { to: '/nurse/procedures', icon: ClipboardList, label: 'Procedures' },

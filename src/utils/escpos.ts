@@ -9,6 +9,7 @@ const ESC = 0x1b;
 const GS  = 0x1d;
 
 export const LINE_WIDTH = 42;
+export const LINE_WIDTH_58 = 32;
 
 // Re-exported so callers can share the type without importing ThermalReceipt
 export interface ReceiptData {
@@ -284,4 +285,141 @@ export function buildReceiptESCPOS(
   b.cut();
 
   return b.build();
+}
+
+// ── Treatment Plan (58mm thermal) ────────────────────────────────────────────
+
+export interface TreatmentPlanEscPosData {
+  planNumber: string;
+  patientName: string;
+  patientId: string;
+  patientAge?: string;
+  patientGender?: string;
+  patientPhone?: string;
+  visitNumber?: string;
+  items: Array<{
+    type: string;
+    description: string;
+    amount: number;
+  }>;
+  totalAmount: number;
+  notes?: string;
+  printedAt?: string;
+}
+
+function padLine58(label: string, value: string, width = LINE_WIDTH_58): string {
+  const spaces = width - label.length - value.length;
+  return spaces > 0 ? label + ' '.repeat(spaces) + value : `${label} ${value}`;
+}
+
+function wrapText58(text: string, width: number): string[] {
+  if (text.length <= width) return [text];
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length > width) {
+      if (current) lines.push(current);
+      current = word;
+    } else {
+      current = current ? current + ' ' + word : word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [text.slice(0, width)];
+}
+
+export function buildTreatmentPlanESCPOS(
+  data: TreatmentPlanEscPosData,
+  branch?: BranchHeaderData | null,
+): Uint8Array {
+  const b = new EscPosBuilder();
+  const w = LINE_WIDTH_58;
+
+  // ── Header (branch letterhead) ─────────────────────────────────────────
+  buildBranchHeaderESCPOS(b, branch);
+
+  // ── Title ──────────────────────────────────────────────────────────────
+  b.bold(true);
+  b.align('center');
+  b.line(center('TREATMENT PLAN', w));
+  b.bold(false);
+  b.separator('=');
+
+  // ── Plan info ──────────────────────────────────────────────────────────
+  b.align('left');
+  b.line(padLine58('Plan:', data.planNumber));
+  b.line(padLine58('Date:', data.printedAt || new Date().toLocaleString('en-GB')));
+  if (data.visitNumber) b.line(padLine58('Visit:', data.visitNumber));
+  b.separator();
+
+  // ── Patient info ───────────────────────────────────────────────────────
+  b.bold(true);
+  b.line('PATIENT');
+  b.bold(false);
+  b.line(padLine58('Name:', data.patientName));
+  b.line(padLine58('ID:', data.patientId));
+  if (data.patientAge || data.patientGender) {
+    const ageSex = [data.patientAge, data.patientGender].filter(Boolean).join('/');
+    b.line(padLine58('Age/Sex:', ageSex));
+  }
+  if (data.patientPhone) b.line(padLine58('Phone:', data.patientPhone));
+  b.separator();
+
+  // ── Items ──────────────────────────────────────────────────────────────
+  b.bold(true);
+  b.line('ITEMS');
+  b.bold(false);
+  data.items.forEach((item, idx) => {
+    const typeBadge = item.type.toUpperCase().padEnd(4);
+    const num = `${idx + 1}.`;
+    b.line(`${num} [${typeBadge}]`);
+    // Wrap description across multiple lines if needed
+    const descLines = wrapText58(item.description, w - 2);
+    for (const dl of descLines) {
+      b.line(`   ${dl}`);
+    }
+    b.line(padLine58('   ', formatCurrency58(item.amount)));
+    if (idx < data.items.length - 1) {
+      b.line('   - - -');
+    }
+  });
+  b.separator('=');
+
+  // ── Total ──────────────────────────────────────────────────────────────
+  b.bold(true);
+  b.line(padLine58('TOTAL:', formatCurrency58(data.totalAmount)));
+  b.bold(false);
+  b.separator('=');
+
+  // ── Notes ──────────────────────────────────────────────────────────────
+  if (data.notes) {
+    b.bold(true);
+    b.line('NOTES');
+    b.bold(false);
+    const noteLines = wrapText58(data.notes, w);
+    for (const nl of noteLines) {
+      b.line(nl);
+    }
+    b.separator();
+  }
+
+  // ── Footer ─────────────────────────────────────────────────────────────
+  b.align('center');
+  const footer = (branch?.footerText?.trim()) || 'Thank you for choosing us!';
+  b.line(' ');
+  for (const line of footer.split('|').map((s) => s.trim()).filter(Boolean)) {
+    b.line(line);
+  }
+  b.line(' ');
+  b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
+
+  b.feed(4);
+  b.cut();
+
+  return b.build();
+}
+
+function formatCurrency58(n: number): string {
+  return `Le ${n.toLocaleString('en-US')}`;
 }

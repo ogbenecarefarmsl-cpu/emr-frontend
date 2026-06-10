@@ -1,0 +1,733 @@
+import { useMemo, useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { medicationService } from '@/services/medicationService';
+import { treatmentPlanService, CreateTreatmentPlanItemInput } from '@/services/treatmentPlanService';
+import { visitsAPI, ordersAPI } from '@/services/api';
+import { Loader2, Pill, Plus, Search, Send, Trash2, Beaker, Scissors, FileText, FlaskConical } from 'lucide-react';
+
+const CLOSED_VISIT_STATUSES = new Set(['completed', 'cancelled']);
+
+const ROUTE_OPTIONS = [
+  { value: 'oral', label: 'Oral' },
+  { value: 'intravenous', label: 'IV' },
+  { value: 'intramuscular', label: 'IM' },
+  { value: 'subcutaneous', label: 'SC' },
+  { value: 'topical', label: 'Topical' },
+  { value: 'inhalation', label: 'Inhalation' },
+  { value: 'rectal', label: 'Rectal' },
+  { value: 'ophthalmic', label: 'Eye drops' },
+  { value: 'otic', label: 'Ear drops' },
+  { value: 'nasal', label: 'Nasal' },
+  { value: 'sublingual', label: 'Sublingual' },
+  { value: 'other', label: 'Other' },
+];
+
+const TYPE_META: Record<string, { label: string; icon: any; color: string }> = {
+  drug: { label: 'Drug', icon: Pill, color: 'bg-blue-100 text-blue-700' },
+  iv: { label: 'IV', icon: FlaskConical, color: 'bg-purple-100 text-purple-700' },
+  lab: { label: 'Lab Test', icon: Beaker, color: 'bg-green-100 text-green-700' },
+  procedure: { label: 'Procedure', icon: Scissors, color: 'bg-orange-100 text-orange-700' },
+  other: { label: 'Other', icon: FileText, color: 'bg-gray-100 text-gray-700' },
+};
+
+const patientName = (visit: any) => {
+  const patient = visit?.patientId || visit?.patient;
+  return `${patient?.firstName || ''} ${patient?.lastName || ''}`.trim() || 'Unnamed patient';
+};
+
+const patientIdStr = (visit: any) => {
+  const patient = visit?.patientId || visit?.patient;
+  return typeof patient === 'string' ? patient : patient?._id || patient?.id || '';
+};
+
+interface TreatmentPlanBuilderProps {
+  /** Pre-selected visit ID (optional — if not provided, user selects from list) */
+  preselectedVisitId?: string;
+  /** Called after plan is created successfully */
+  onPlanCreated?: () => void;
+  /** Show as inline form (no Card wrapper) */
+  inline?: boolean;
+}
+
+export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline }: TreatmentPlanBuilderProps) {
+  const { profile } = useAuth();
+  const queryClient = useQueryClient();
+  const [visitId, setVisitId] = useState(preselectedVisitId || '');
+  const [activeTab, setActiveTab] = useState('drug');
+  const [notes, setNotes] = useState('');
+  const [items, setItems] = useState<CreateTreatmentPlanItemInput[]>([]);
+
+  // Drug/IV form state
+  const [medSearch, setMedSearch] = useState('');
+  const [selectedMed, setSelectedMed] = useState<any>(null);
+  const [strengthPerDose, setStrengthPerDose] = useState('1 tablet');
+  const [dosesPerDay, setDosesPerDay] = useState(3);
+  const [durationDays, setDurationDays] = useState(7);
+  const [route, setRoute] = useState('oral');
+  const [itemType, setItemType] = useState<'drug' | 'iv'>('drug');
+
+  // Lab form state
+  const [labSearch, setLabSearch] = useState('');
+  const [selectedLab, setSelectedLab] = useState<any>(null);
+
+  // Procedure/Other form state
+  const [procName, setProcName] = useState('');
+  const [procAmount, setProcAmount] = useState(0);
+  const [procNotes, setProcNotes] = useState('');
+
+  // Fetch visits
+  const { data: visits = [], isLoading: visitsLoading } = useQuery({
+    queryKey: ['visits', 'tp-candidates'],
+    queryFn: () => visitsAPI.getAll({ limit: 200 }),
+    staleTime: 15_000,
+  });
+
+  // Fetch medications
+  const { data: medSearchResults = [], isLoading: medSearchLoading } = useQuery({
+    queryKey: ['medications', 'tp-search', medSearch],
+    queryFn: () => medicationService.search(medSearch),
+    enabled: medSearch.trim().length > 2,
+  });
+
+  // Fetch LIS catalog for lab tests
+  const { data: lisCatalog = [] } = useQuery({
+    queryKey: ['lis-catalog'],
+    queryFn: async () => {
+      const { data } = await ordersAPI.getLisCatalog();
+      return data;
+    },
+    staleTime: 60_000,
+  });
+
+  const activeVisits = useMemo(() => {
+    const list = Array.isArray(visits) ? visits : visits?.data || [];
+    return list
+      .filter((v: any) => !CLOSED_VISIT_STATUSES.has((v.status || '').toLowerCase()))
+      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+  }, [visits]);
+
+  const selectedVisit = activeVisits.find((v: any) => (v._id || v.id) === visitId);
+  const selectedPatientId = patientIdStr(selectedVisit);
+
+  // Filter lab tests by search
+  const filteredLabs = useMemo(() => {
+    if (!labSearch.trim()) return (lisCatalog || []).slice(0, 30);
+    const q = labSearch.toLowerCase();
+    return (lisCatalog || []).filter(
+      (t: any) => (t.testCode || '').toLowerCase().includes(q) || (t.testName || '').toLowerCase().includes(q)
+    );
+  }, [lisCatalog, labSearch]);
+
+  // Estimated total
+  const estimatedTotal = useMemo(() => {
+    return items.reduce((sum, item) => {
+      if (item.type === 'drug' || item.type === 'iv') {
+        const med = medSearchResults.find((m: any) => m._id === item.medicationId);
+        const unitPrice = med?.unitPrice || 0;
+        const qty = item.dosesPerDay! * item.durationDays!;
+        return sum + unitPrice * qty;
+      }
+      if (item.type === 'lab') {
+        return sum + (item.testPrice || 0);
+      }
+      return sum + (item.amount || 0);
+    }, 0);
+  }, [items, medSearchResults]);
+
+  // ── Add handlers ───────────────────────────────────────────────────────
+
+  const addDrugOrIv = () => {
+    if (!selectedMed) return toast.error('Select a medication');
+    if (!strengthPerDose.trim()) return toast.error('Enter strength per dose');
+    if (dosesPerDay < 1) return toast.error('Doses per day must be at least 1');
+    if (durationDays < 1) return toast.error('Duration must be at least 1 day');
+
+    const qty = dosesPerDay * durationDays;
+    const newItem: CreateTreatmentPlanItemInput = {
+      type: itemType,
+      medicationId: selectedMed._id,
+      medicationName: selectedMed.name,
+      strengthPerDose,
+      dosesPerDay,
+      durationDays,
+      route,
+    };
+    setItems((prev) => [...prev, newItem]);
+    // Reset form
+    setSelectedMed(null);
+    setMedSearch('');
+    setStrengthPerDose('1 tablet');
+    setDosesPerDay(3);
+    setDurationDays(7);
+    toast.success(`Added ${itemType === 'iv' ? 'IV' : 'drug'}: ${selectedMed.name}`);
+  };
+
+  const addLabTest = () => {
+    if (!selectedLab) return toast.error('Select a lab test');
+    const newItem: CreateTreatmentPlanItemInput = {
+      type: 'lab',
+      testCode: selectedLab.testCode || selectedLab.code,
+      testName: selectedLab.testName || selectedLab.name,
+      testPrice: selectedLab.price || selectedLab.testPrice || 0,
+      testId: selectedLab._id || selectedLab.testId,
+    };
+    setItems((prev) => [...prev, newItem]);
+    setSelectedLab(null);
+    setLabSearch('');
+    toast.success(`Added lab test: ${newItem.testName}`);
+  };
+
+  const addProcedure = () => {
+    if (!procName.trim()) return toast.error('Enter procedure name');
+    const newItem: CreateTreatmentPlanItemInput = {
+      type: 'procedure',
+      testCode: `PROC-${Date.now()}`,
+      testName: procName,
+      testPrice: procAmount,
+      description: procNotes || procName,
+    };
+    setItems((prev) => [...prev, newItem]);
+    setProcName('');
+    setProcAmount(0);
+    setProcNotes('');
+    toast.success(`Added procedure: ${procName}`);
+  };
+
+  const addOther = () => {
+    if (!procName.trim()) return toast.error('Enter description');
+    const newItem: CreateTreatmentPlanItemInput = {
+      type: 'other',
+      description: procName,
+      amount: procAmount,
+      notes: procNotes,
+    };
+    setItems((prev) => [...prev, newItem]);
+    setProcName('');
+    setProcAmount(0);
+    setProcNotes('');
+    toast.success('Added item');
+  };
+
+  const removeItem = (index: number) => {
+    setItems((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  // ── Create mutation ────────────────────────────────────────────────────
+
+  const createMutation = useMutation({
+    mutationFn: (sendNow: boolean) =>
+      treatmentPlanService.create({
+        patientId: selectedPatientId,
+        visitId: visitId || undefined,
+        items,
+        notes,
+      }),
+    onSuccess: async (plan, sendNow) => {
+      if (sendNow) {
+        try {
+          await treatmentPlanService.sendToReception(plan._id);
+          toast.success('Treatment plan sent to reception!');
+        } catch {
+          toast.success('Treatment plan created (draft). You can send it later.');
+        }
+      } else {
+        toast.success('Treatment plan saved as draft');
+      }
+      queryClient.invalidateQueries({ queryKey: ['treatment-plans'] });
+      setItems([]);
+      setNotes('');
+      onPlanCreated?.();
+    },
+    onError: (err: any) => {
+      toast.error(err?.response?.data?.message || 'Failed to create treatment plan');
+    },
+  });
+
+  // ── Render ─────────────────────────────────────────────────────────────
+
+  const content = (
+    <div className="space-y-4">
+      {/* Visit selector */}
+      {!preselectedVisitId && (
+        <div>
+          <Label className="text-sm font-medium">Select Visit</Label>
+          <Select value={visitId} onValueChange={setVisitId}>
+            <SelectTrigger className="mt-1">
+              <SelectValue placeholder={visitsLoading ? 'Loading visits...' : 'Choose a visit'} />
+            </SelectTrigger>
+            <SelectContent>
+              {activeVisits.map((v: any) => (
+                <SelectItem key={v._id} value={v._id}>
+                  {v.visitNumber} — {patientName(v)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Selected patient info */}
+      {selectedVisit && (
+        <div className="flex items-center gap-2 p-2 bg-muted rounded text-sm">
+          <span className="font-medium">{patientName(selectedVisit)}</span>
+          <Badge variant="outline" className="text-xs">
+            {(selectedVisit as any).patientId?.patientId || (selectedVisit as any).patient?.patientId}
+          </Badge>
+        </div>
+      )}
+
+      {/* Item type tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="drug" className="text-xs">
+            <Pill className="h-3 w-3 mr-1" /> Drug
+          </TabsTrigger>
+          <TabsTrigger value="iv" className="text-xs">
+            <FlaskConical className="h-3 w-3 mr-1" /> IV
+          </TabsTrigger>
+          <TabsTrigger value="lab" className="text-xs">
+            <Beaker className="h-3 w-3 mr-1" /> Lab
+          </TabsTrigger>
+          <TabsTrigger value="procedure" className="text-xs">
+            <Scissors className="h-3 w-3 mr-1" /> Proc
+          </TabsTrigger>
+          <TabsTrigger value="other" className="text-xs">
+            <FileText className="h-3 w-3 mr-1" /> Other
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Drug / IV tab */}
+        <TabsContent value="drug" className="space-y-3">
+          <DrugIvForm
+            type="drug"
+            medSearch={medSearch}
+            setMedSearch={setMedSearch}
+            medSearchResults={medSearchResults}
+            medSearchLoading={medSearchLoading}
+            selectedMed={selectedMed}
+            setSelectedMed={setSelectedMed}
+            strengthPerDose={strengthPerDose}
+            setStrengthPerDose={setStrengthPerDose}
+            dosesPerDay={dosesPerDay}
+            setDosesPerDay={setDosesPerDay}
+            durationDays={durationDays}
+            setDurationDays={setDurationDays}
+            route={route}
+            setRoute={setRoute}
+            onAdd={addDrugOrIv}
+          />
+        </TabsContent>
+
+        <TabsContent value="iv" className="space-y-3">
+          <DrugIvForm
+            type="iv"
+            medSearch={medSearch}
+            setMedSearch={setMedSearch}
+            medSearchResults={medSearchResults}
+            medSearchLoading={medSearchLoading}
+            selectedMed={selectedMed}
+            setSelectedMed={setSelectedMed}
+            strengthPerDose={strengthPerDose}
+            setStrengthPerDose={setStrengthPerDose}
+            dosesPerDay={dosesPerDay}
+            setDosesPerDay={setDosesPerDay}
+            durationDays={durationDays}
+            setDurationDays={setDurationDays}
+            route="intravenous"
+            setRoute={setRoute}
+            onAdd={addDrugOrIv}
+          />
+        </TabsContent>
+
+        {/* Lab tab */}
+        <TabsContent value="lab" className="space-y-3">
+          <div>
+            <Label className="text-sm">Search Lab Tests</Label>
+            <div className="relative mt-1">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by code or name..."
+                value={labSearch}
+                onChange={(e) => {
+                  setLabSearch(e.target.value);
+                  setSelectedLab(null);
+                }}
+                className="pl-8"
+              />
+            </div>
+            {labSearch.trim().length > 0 && !selectedLab && (
+              <div className="mt-1 max-h-48 overflow-y-auto border rounded-md bg-background">
+                {filteredLabs.slice(0, 20).map((test: any, i: number) => (
+                  <div
+                    key={i}
+                    className="px-3 py-2 hover:bg-muted cursor-pointer text-sm flex justify-between"
+                    onClick={() => {
+                      setSelectedLab(test);
+                      setLabSearch(test.testCode || test.code);
+                    }}
+                  >
+                    <span>
+                      <span className="font-mono text-xs text-muted-foreground mr-2">
+                        {test.testCode || test.code}
+                      </span>
+                      {test.testName || test.name}
+                    </span>
+                    <span className="text-muted-foreground">Le {(test.price || test.testPrice || 0).toLocaleString()}</span>
+                  </div>
+                ))}
+                {filteredLabs.length === 0 && (
+                  <div className="px-3 py-2 text-sm text-muted-foreground">No tests found</div>
+                )}
+              </div>
+            )}
+          </div>
+          {selectedLab && (
+            <div className="p-2 bg-muted rounded text-sm">
+              <span className="font-mono text-xs mr-2">{selectedLab.testCode || selectedLab.code}</span>
+              {selectedLab.testName || selectedLab.name}
+              <span className="ml-2 text-muted-foreground">
+                Le {(selectedLab.price || selectedLab.testPrice || 0).toLocaleString()}
+              </span>
+            </div>
+          )}
+          <Button onClick={addLabTest} disabled={!selectedLab} size="sm">
+            <Plus className="h-4 w-4 mr-1" /> Add Lab Test
+          </Button>
+        </TabsContent>
+
+        {/* Procedure tab */}
+        <TabsContent value="procedure" className="space-y-3">
+          <div>
+            <Label className="text-sm">Procedure Name</Label>
+            <Input
+              className="mt-1"
+              placeholder="e.g. Wound Dressing, Injection, etc."
+              value={procName}
+              onChange={(e) => setProcName(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label className="text-sm">Estimated Cost (Le)</Label>
+            <Input
+              type="number"
+              className="mt-1"
+              value={procAmount}
+              onChange={(e) => setProcAmount(Number(e.target.value))}
+            />
+          </div>
+          <div>
+            <Label className="text-sm">Notes (optional)</Label>
+            <Input
+              className="mt-1"
+              placeholder="Additional details..."
+              value={procNotes}
+              onChange={(e) => setProcNotes(e.target.value)}
+            />
+          </div>
+          <Button onClick={addProcedure} disabled={!procName.trim()} size="sm">
+            <Plus className="h-4 w-4 mr-1" /> Add Procedure
+          </Button>
+        </TabsContent>
+
+        {/* Other tab */}
+        <TabsContent value="other" className="space-y-3">
+          <div>
+            <Label className="text-sm">Description</Label>
+            <Input
+              className="mt-1"
+              placeholder="e.g. Referral, Follow-up, etc."
+              value={procName}
+              onChange={(e) => setProcName(e.target.value)}
+            />
+          </div>
+          <div>
+            <Label className="text-sm">Estimated Cost (Le)</Label>
+            <Input
+              type="number"
+              className="mt-1"
+              value={procAmount}
+              onChange={(e) => setProcAmount(Number(e.target.value))}
+            />
+          </div>
+          <div>
+            <Label className="text-sm">Notes (optional)</Label>
+            <Input
+              className="mt-1"
+              placeholder="Additional details..."
+              value={procNotes}
+              onChange={(e) => setProcNotes(e.target.value)}
+            />
+          </div>
+          <Button onClick={addOther} disabled={!procName.trim()} size="sm">
+            <Plus className="h-4 w-4 mr-1" /> Add Item
+          </Button>
+        </TabsContent>
+      </Tabs>
+
+      {/* Items list */}
+      {items.length > 0 && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Treatment Plan Items ({items.length})</Label>
+          <div className="space-y-1">
+            {items.map((item, idx) => {
+              const meta = TYPE_META[item.type] || TYPE_META.other;
+              const Icon = meta.icon;
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-2 bg-muted rounded text-sm"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Badge variant="outline" className={`text-[10px] ${meta.color}`}>
+                      <Icon className="h-3 w-3 mr-0.5" />
+                      {meta.label}
+                    </Badge>
+                    <span className="truncate">
+                      {item.type === 'drug' || item.type === 'iv'
+                        ? `${item.medicationName} ${item.strengthPerDose} — ${item.dosesPerDay}x/day × ${item.durationDays}d`
+                        : item.type === 'lab'
+                        ? `${item.testCode} ${item.testName}`
+                        : item.type === 'procedure'
+                        ? item.testName
+                        : item.description}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="text-muted-foreground">
+                      Le {((item.type === 'lab' ? item.testPrice : item.amount) || 0).toLocaleString()}
+                    </span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 text-destructive"
+                      onClick={() => removeItem(idx)}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="text-right font-semibold text-sm">
+            Total: Le {estimatedTotal.toLocaleString()}
+          </div>
+        </div>
+      )}
+
+      {/* Notes */}
+      <div>
+        <Label className="text-sm">General Notes (optional)</Label>
+        <Textarea
+          className="mt-1"
+          placeholder="Any additional notes for this treatment plan..."
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          rows={2}
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="flex gap-2 pt-2">
+        <Button
+          variant="outline"
+          disabled={items.length === 0 || !selectedPatientId || createMutation.isPending}
+          onClick={() => createMutation.mutate(false)}
+        >
+          {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : null}
+          Save Draft
+        </Button>
+        <Button
+          disabled={items.length === 0 || !selectedPatientId || createMutation.isPending}
+          onClick={() => createMutation.mutate(true)}
+        >
+          {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : (
+            <Send className="h-4 w-4 mr-1" />
+          )}
+          Send to Reception
+        </Button>
+      </div>
+    </div>
+  );
+
+  if (inline) return content;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Create Treatment Plan</CardTitle>
+      </CardHeader>
+      <CardContent>{content}</CardContent>
+    </Card>
+  );
+}
+
+// ── Drug/IV sub-form ───────────────────────────────────────────────────────
+
+interface DrugIvFormProps {
+  type: 'drug' | 'iv';
+  medSearch: string;
+  setMedSearch: (v: string) => void;
+  medSearchResults: any[];
+  medSearchLoading: boolean;
+  selectedMed: any;
+  setSelectedMed: (med: any) => void;
+  strengthPerDose: string;
+  setStrengthPerDose: (v: string) => void;
+  dosesPerDay: number;
+  setDosesPerDay: (v: number) => void;
+  durationDays: number;
+  setDurationDays: (v: number) => void;
+  route: string;
+  setRoute: (v: string) => void;
+  onAdd: () => void;
+}
+
+function DrugIvForm({
+  type,
+  medSearch,
+  setMedSearch,
+  medSearchResults,
+  medSearchLoading,
+  selectedMed,
+  setSelectedMed,
+  strengthPerDose,
+  setStrengthPerDose,
+  dosesPerDay,
+  setDosesPerDay,
+  durationDays,
+  setDurationDays,
+  route,
+  setRoute,
+  onAdd,
+}: DrugIvFormProps) {
+  return (
+    <>
+      {/* Medication search */}
+      <div>
+        <Label className="text-sm">{type === 'iv' ? 'IV Fluid / Medication' : 'Medication'}</Label>
+        <div className="relative mt-1">
+          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search medication..."
+            value={medSearch}
+            onChange={(e) => {
+              setMedSearch(e.target.value);
+              setSelectedMed(null);
+            }}
+            className="pl-8"
+          />
+        </div>
+        {medSearch.trim().length > 2 && !selectedMed && (
+          <div className="mt-1 max-h-48 overflow-y-auto border rounded-md bg-background">
+            {medSearchResults.map((med: any) => (
+              <div
+                key={med._id}
+                className="px-3 py-2 hover:bg-muted cursor-pointer text-sm flex justify-between"
+                onClick={() => {
+                  setSelectedMed(med);
+                  setMedSearch(med.name);
+                }}
+              >
+                <span>
+                  {med.name}
+                  {med.strength ? ` (${med.strength})` : ''}
+                </span>
+                <span className="text-muted-foreground">
+                  {med.stockQuantity} in stock — Le {med.unitPrice?.toLocaleString()}
+                </span>
+              </div>
+            ))}
+            {medSearchResults.length === 0 && medSearchLoading && (
+              <div className="px-3 py-2 text-sm text-muted-foreground">Searching...</div>
+            )}
+            {medSearchResults.length === 0 && !medSearchLoading && (
+              <div className="px-3 py-2 text-sm text-muted-foreground">No medications found</div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {selectedMed && (
+        <div className="p-2 bg-muted rounded text-sm">
+          {selectedMed.name}
+          {selectedMed.strength ? ` (${selectedMed.strength})` : ''}
+          <span className="ml-2 text-muted-foreground">
+            Stock: {selectedMed.stockQuantity} | Le {selectedMed.unitPrice?.toLocaleString()}/unit
+          </span>
+        </div>
+      )}
+
+      {/* Regimen */}
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <Label className="text-xs">Strength/Dose</Label>
+          <Input
+            className="mt-1"
+            value={strengthPerDose}
+            onChange={(e) => setStrengthPerDose(e.target.value)}
+            placeholder="e.g. 500mg"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Doses/Day</Label>
+          <Input
+            type="number"
+            className="mt-1"
+            value={dosesPerDay}
+            onChange={(e) => setDosesPerDay(Number(e.target.value))}
+            min={1}
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Duration (days)</Label>
+          <Input
+            type="number"
+            className="mt-1"
+            value={durationDays}
+            onChange={(e) => setDurationDays(Number(e.target.value))}
+            min={1}
+          />
+        </div>
+      </div>
+
+      {type === 'drug' && (
+        <div>
+          <Label className="text-xs">Route</Label>
+          <Select value={route} onValueChange={setRoute}>
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROUTE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Quantity preview */}
+      <div className="text-xs text-muted-foreground">
+        Qty: {dosesPerDay * durationDays} {selectedMed?.baseUnit || 'units'} (estimated Le{' '}
+        {((selectedMed?.unitPrice || 0) * dosesPerDay * durationDays).toLocaleString()})
+      </div>
+
+      <Button onClick={onAdd} size="sm">
+        <Plus className="h-4 w-4 mr-1" /> Add {type === 'iv' ? 'IV' : 'Drug'}
+      </Button>
+    </>
+  );
+}

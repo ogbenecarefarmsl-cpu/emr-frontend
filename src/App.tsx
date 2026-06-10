@@ -33,6 +33,7 @@ import VisitReceipt from "./pages/reception/VisitReceipt";
 import WalkInReceipt from "./pages/reception/WalkInReceipt";
 import VisitRegistration from "./pages/reception/VisitRegistration";
 import ReceptionDispensePage from "./pages/reception/ReceptionDispensePage";
+import ReceptionTreatmentPlans from "./pages/reception/ReceptionTreatmentPlans";
 import ExpendituresPage from "./pages/reception/ExpendituresPage";
 import AppointmentsPage from "./pages/reception/AppointmentsPage";
 import ReferralLettersPage from "./pages/reception/ReferralLettersPage";
@@ -71,6 +72,7 @@ import ManagementKpisPage from "./pages/admin/ManagementKpisPage";
 // Doctor Pages
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
 import PrescriptionForm from "./pages/doctor/PrescriptionForm";
+import { TreatmentPlanBuilder } from "./pages/shared/TreatmentPlanBuilder";
 
 // Nurse Pages
 import NurseDashboard from "./pages/nurse/NurseDashboard";
@@ -81,6 +83,7 @@ import NursePrescriptionPage from "./pages/nurse/NursePrescriptionPage";
 import NurseObservationPage from "./pages/nurse/NurseObservationPage";
 import NurseProceduresPage from "./pages/nurse/NurseProceduresPage";
 import NurseTriagePage from "./pages/nurse/NurseTriagePage";
+import NurseTreatmentPlanPage from "./pages/nurse/NurseTreatmentPlanPage";
 
 // Pharmacy Pages
 import PharmacyDashboard from "./pages/pharmacy/PharmacyDashboard";
@@ -227,6 +230,9 @@ function AppRoutes() {
       } />
       <Route path="/reception/walk-in-receipt" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><WalkInReceipt /></RoleGuard>
+      } />
+      <Route path="/reception/treatment-plans" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><ReceptionTreatmentPlans /></RoleGuard>
       } />
       <Route path="/reception/visit-registration" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><VisitRegistration /></RoleGuard>
@@ -376,6 +382,13 @@ function AppRoutes() {
       <Route path="/doctor/prescribe/:consultationId" element={
         <RoleGuard allowedRoles={['doctor', 'specialist', 'admin']}><PrescriptionForm /></RoleGuard>
       } />
+      <Route path="/doctor/treatment-plans" element={
+        <RoleGuard allowedRoles={['doctor', 'specialist', 'admin']}>
+          <div className="p-6">
+            <TreatmentPlanBuilder />
+          </div>
+        </RoleGuard>
+      } />
 
       {/* Nurse Routes */}
       <Route path="/nurse" element={
@@ -395,6 +408,9 @@ function AppRoutes() {
       } />
       <Route path="/nurse/prescriptions" element={
         <RoleGuard allowedRoles={['nurse', 'admin']}><NursePrescriptionPage /></RoleGuard>
+      } />
+      <Route path="/nurse/treatment-plans" element={
+        <RoleGuard allowedRoles={['nurse', 'admin']}><NurseTreatmentPlanPage /></RoleGuard>
       } />
       <Route path="/nurse/observation" element={
         <RoleGuard allowedRoles={['nurse', 'admin']}><NurseObservationPage /></RoleGuard>
