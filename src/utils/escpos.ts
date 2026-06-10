@@ -29,9 +29,56 @@ export interface ReceiptData {
   paymentDate: string;
   cashier: string;
   collectionDate?: string;
+  /** Optional branch letterhead. If omitted, falls back to generic placeholder. */
+  branch?: BranchHeaderData;
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Branch letterhead data. Pulled from the user's assigned branch in
+ * the DB (via useMyBranch hook) so every receipt prints the right
+ * outlet address/phone/email. Falls back to generic strings if null.
+ */
+export interface BranchHeaderData {
+  name: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  tagline?: string;
+  website?: string;
+  operatingHours?: string;
+  footerText?: string;
+}
+
+const FALLBACK_BRANCH: BranchHeaderData = {
+  name: 'Harbour Medical Diagnostic',
+  address: '114, Fourah Bay Road, Freetown, Sierra Leone',
+  phone: '+23274414434',
+  email: 'harbourmedicaldiagnostics@gmail.com',
+  footerText: 'Thank you for choosing us! | Open 24/7 | Trusted by Clinics & Hospitals',
+};
+
+/**
+ * Build the ESC/POS header (centered) from a branch object.
+ * Use this when you have the branch in memory (e.g. you called useMyBranch
+ * already). For a sync fallback use buildGenericHeaderESCPOS.
+ */
+export function buildBranchHeaderESCPOS(b: EscPosBuilder, branch: BranchHeaderData | null | undefined) {
+  const data = branch || FALLBACK_BRANCH;
+  b.init();
+  b.align('center');
+  b.bold(true).fontSize(0x11);
+  b.line(data.name.toUpperCase());
+  b.fontSize(0x00).bold(false);
+  if (data.tagline) b.line(data.tagline);
+  if (data.address) b.line(data.address);
+  if (data.phone) b.line(`Tel: ${data.phone}`);
+  if (data.email) b.line(data.email);
+  if (data.website) b.line(data.website);
+  if (data.operatingHours) b.line(data.operatingHours);
+  b.separator('=');
+}
 
 /** Right-aligns `value` and left-aligns `label`, filling with spaces. */
 function padLine(label: string, value: string, width = LINE_WIDTH): string {
@@ -123,10 +170,13 @@ export class EscPosBuilder {
 /**
  * Builds the full ESC/POS byte sequence for one receipt copy.
  * Both patient and lab copies are supported via `copyType`.
+ * Pass `branch` to print the user's assigned branch letterhead; if
+ * omitted, falls back to a generic placeholder.
  */
 export function buildReceiptESCPOS(
   data: ReceiptData,
-  copyType: 'patient' | 'lab'
+  copyType: 'patient' | 'lab',
+  branch?: BranchHeaderData | null
 ): Uint8Array {
   const paymentDate = new Date(data.paymentDate);
   const dateStr =
@@ -141,16 +191,8 @@ export function buildReceiptESCPOS(
 
   const b = new EscPosBuilder();
 
-  // ── Header ───────────────────────────────────────────────────────────────
-  b.init();
-  b.align('center');
-  b.bold(true).fontSize(0x11);
-  b.line('HARBOUR Medical Diagnostic');
-  b.fontSize(0x00).bold(false);
-  b.line('114, Fourah Bay Road, Freetown, Sierra Leone');
-  b.line('Tel: +23274414434');
-  b.line('harbourmedicaldiagnostics@gmail.com');
-  b.separator('=');
+  // ── Header (branch letterhead from DB) ──────────────────────────────────
+  buildBranchHeaderESCPOS(b, branch);
 
   // ── Copy type ────────────────────────────────────────────────────────────
   b.bold(true);
@@ -226,11 +268,13 @@ export function buildReceiptESCPOS(
   }
   b.separator();
 
-  // ── Footer ───────────────────────────────────────────────────────────────
+  // ── Footer (uses branch's footerText or a generic thank-you) ─────────────
   b.align('center');
-  b.bold(true).line('THANK YOU FOR CHOOSING US!').bold(false);
-  b.line('Open 24/7  |  Onsite & Online Access');
-  b.line('Trusted by Clinics & Hospitals');
+  const footer = (branch?.footerText?.trim()) || 'Thank you for choosing us! | Open 24/7 | Trusted by Clinics & Hospitals';
+  b.line(' ');
+  for (const line of footer.split('|').map((s) => s.trim()).filter(Boolean)) {
+    b.line(line);
+  }
   b.line(' ');
   b.line(`*** ${data.orderNumber} ***`);
   b.line(' ');

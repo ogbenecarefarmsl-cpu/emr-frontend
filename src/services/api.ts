@@ -625,6 +625,35 @@ export const usersAPI = {
   removeRole: async (id: string, role: string) => {
     await api.delete(`/users/${id}/roles/${role}`);
   },
+
+  assignBranch: async (id: string, branchId: string | null) => {
+    const response = await api.patch(`/users/${id}/branch`, { branchId });
+    return response.data;
+  },
+
+  getMyBranch: async () => {
+    const response = await api.get('/users/me/branch');
+    return response.data;
+  },
+};
+
+export const branchesAPI = {
+  getAll: async () => {
+    const response = await api.get('/branches');
+    return response.data;
+  },
+  getById: async (id: string) => {
+    const response = await api.get(`/branches/${id}`);
+    return response.data;
+  },
+  create: async (data: any) => {
+    const response = await api.post('/branches', data);
+    return response.data;
+  },
+  update: async (id: string, data: any) => {
+    const response = await api.patch(`/branches/${id}`, data);
+    return response.data;
+  },
 };
 
 export const reportsAPI = {

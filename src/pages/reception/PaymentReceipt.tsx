@@ -12,6 +12,8 @@ import { getPatientAgeDisplay, getPatientName } from '@/utils/orderHelpers';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { usePrinterContext } from '@/context/PrinterContext';
 import type { ReceiptData } from '@/utils/escpos';
+import { BranchLetterhead, BranchFooterText } from '@/components/receipts/BranchLetterhead';
+import { useMyBranch } from '@/hooks/useBranch';
 
 export default function PaymentReceipt() {
   const { orderId } = useParams();
@@ -20,6 +22,7 @@ export default function PaymentReceipt() {
   const { data: order, isLoading } = useOrder(orderId!);
   const { printBothCopies } = useThermalPrint();
   const { settings } = usePrinterContext();
+  const { data: branch } = useMyBranch();
   const patientReceiptRef = useRef<HTMLDivElement>(null);
   const labReceiptRef = useRef<HTMLDivElement>(null);
   const autoPrintTriggeredRef = useRef(false);
@@ -76,6 +79,18 @@ export default function PaymentReceipt() {
     paymentDate: (() => { const d = new Date(order.created_at || order.createdAt || ''); return isValid(d) ? d.toISOString() : new Date().toISOString(); })(),
     cashier: profile?.fullName || 'Cashier',
     collectionDate: (() => { const raw = order.collection_date || order.collectionDate; if (!raw) return undefined; const d = new Date(raw); return isValid(d) ? format(d, 'yyyy-MM-dd HH:mm') : undefined; })(),
+    branch: branch
+      ? {
+          name: branch.name,
+          address: branch.address,
+          phone: branch.phone,
+          email: branch.email,
+          tagline: branch.tagline,
+          website: branch.website,
+          operatingHours: branch.operatingHours,
+          footerText: branch.footerText,
+        }
+      : undefined,
   } : null;
 
   const formatCurrency = (amount: number) => {
@@ -148,13 +163,9 @@ export default function PaymentReceipt() {
 
   const ReceiptContent = ({ copyType }: { copyType: 'patient' | 'lab' }) => (
     <div className="receipt">
-      {/* Header */}
+      {/* Header (branch letterhead from DB) */}
       <div className="header">
-        <div className="logo">🏥</div>
-        <div className="company-name">HARBOUR Medical Diagnostic</div>
-        <div className="company-info">114, Fourah Bay Road, Freetown, Sierra Leone</div>
-        <div className="company-info">Tel: +23274414434</div>
-        <div className="company-info">habourlab@gmail.com</div>
+        <BranchLetterhead />
       </div>
 
       {/* Copy Type Badge */}
@@ -299,13 +310,12 @@ export default function PaymentReceipt() {
       {/* Barcode */}
       <div className="barcode">{receiptData.orderNumber}</div>
 
-      {/* Footer — patient copy only */}
+      {/* Footer — patient copy only (uses branch footerText) */}
       {copyType === 'patient' && (
         <>
-          <div className="thank-you">THANK YOU FOR CHOOSING US!</div>
+          <div className="thank-you">THANK YOU!</div>
           <div className="footer">
-            <div>Open 24/7 | Onsite & Online Access</div>
-            <div>Trusted by Clinics & Hospitals</div>
+            <BranchFooterText />
             <div style={{ marginTop: '10px', fontSize: '9px' }}>
               This is a computer-generated receipt
             </div>

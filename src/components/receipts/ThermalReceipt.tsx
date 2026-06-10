@@ -1,6 +1,7 @@
 import { forwardRef } from 'react';
 import { format } from 'date-fns';
 import type { ReceiptData } from '@/utils/escpos';
+import { BranchLetterhead, BranchFooterText } from './BranchLetterhead';
 
 export type { ReceiptData };
 
@@ -22,13 +23,9 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
 
     return (
       <div ref={ref} className="receipt">
-        {/* Header */}
+        {/* Header (branch letterhead from DB) */}
         <div className="header">
-          <div className="logo">🏥</div>
-          <div className="company-name">HARBOUR Medical Diagnostic</div>
-          <div className="company-info">114, Fourah Bay Road, Freetown, Sierra Leone</div>
-          <div className="company-info">Tel: +23274414434</div>
-          <div className="company-info">habourlab@gmail.com</div>
+          <BranchLetterhead />
         </div>
 
         {/* Copy Type Badge */}
@@ -188,13 +185,12 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
         {/* Barcode */}
         <div className="barcode">{data.orderNumber}</div>
 
-        {/* Footer — patient copy only */}
+        {/* Footer — patient copy only (uses branch's footerText) */}
         {copyType === 'patient' && (
           <>
-            <div className="thank-you">THANK YOU FOR CHOOSING US!</div>
+            <div className="thank-you">THANK YOU!</div>
             <div className="footer">
-              <div>Open 24/7 | Onsite & Online Access</div>
-              <div>Trusted by Clinics & Hospitals</div>
+              <BranchFooterText />
               <div style={{ marginTop: '10px', fontSize: '9px' }}>
                 This is a computer-generated receipt
               </div>
@@ -250,15 +246,48 @@ export const thermalPrintStyles = `
     font-weight: bold;
     margin-bottom: 5px;
   }
-  
+
+  .logo-image {
+    max-height: 60px;
+    max-width: 120px;
+    object-fit: contain;
+    margin: 0 auto 5px;
+    display: block;
+  }
+
   .company-name {
     font-size: 14px;
     font-weight: bold;
   }
-  
+
+  .company-tagline {
+    font-size: 10px;
+    font-style: italic;
+    margin-top: 2px;
+  }
+
   .company-info {
     font-size: 10px;
     margin-top: 3px;
+  }
+
+  .company-info-muted {
+    color: #555;
+  }
+
+  .company-info-warn {
+    color: #b00;
+    font-weight: bold;
+  }
+
+  .branch-letterhead {
+    text-align: center;
+    margin-bottom: 4px;
+  }
+
+  .branch-letterhead .logo,
+  .branch-letterhead .logo-image {
+    margin-bottom: 4px;
   }
   
   .copy-type {
