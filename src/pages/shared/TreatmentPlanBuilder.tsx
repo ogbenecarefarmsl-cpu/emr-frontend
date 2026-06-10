@@ -120,7 +120,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
     if (!labSearch.trim()) return (lisCatalog || []).slice(0, 30);
     const q = labSearch.toLowerCase();
     return (lisCatalog || []).filter(
-      (t: any) => (t.testCode || '').toLowerCase().includes(q) || (t.testName || '').toLowerCase().includes(q)
+      (t: any) => ((t.testCode || t.code || '') as string).toLowerCase().includes(q) || ((t.testName || t.name || '') as string).toLowerCase().includes(q)
     );
   }, [lisCatalog, labSearch]);
 
