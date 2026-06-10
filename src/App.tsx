@@ -29,6 +29,7 @@ import PaymentDemo from "./pages/reception/PaymentDemo";
 import PrinterSetup from "./pages/reception/PrinterSetup";
 import PriceListPage from "./pages/reception/PriceListPage";
 import VisitRegistration from "./pages/reception/VisitRegistration";
+import ReceptionDispensePage from "./pages/reception/ReceptionDispensePage";
 import ExpendituresPage from "./pages/reception/ExpendituresPage";
 import AppointmentsPage from "./pages/reception/AppointmentsPage";
 import ReferralLettersPage from "./pages/reception/ReferralLettersPage";
@@ -210,6 +211,9 @@ function AppRoutes() {
       } />
       <Route path="/reception/price-list" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PriceListPage /></RoleGuard>
+      } />
+      <Route path="/reception/dispense/:id" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><ReceptionDispensePage /></RoleGuard>
       } />
       <Route path="/reception/visit-registration" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><VisitRegistration /></RoleGuard>

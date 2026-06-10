@@ -191,7 +191,7 @@ export default function PaymentsPage() {
         }
 
         await prescriptionService.markAsPaid((selectedOrder as any)._prescriptionId, validRows[0].method);
-        toast.success(`Prescription payment of Le ${splitTotal.toLocaleString()} recorded`);
+        toast.success(`Prescription payment of Le ${splitTotal.toLocaleString()} recorded. Now dispense.`);
         queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
         queryClient.invalidateQueries({ queryKey: ['payments'] });
         queryClient.invalidateQueries({ queryKey: ['orders'] });
@@ -199,6 +199,8 @@ export default function PaymentsPage() {
         setShowPaymentDialog(false);
         setSelectedOrder(null);
         setSplitRows([{ method: 'cash', amount: '' }]);
+        // Navigate to the new dispense page
+        navigate(`/reception/dispense/${(selectedOrder as any)._prescriptionId}`);
         return;
       }
 
