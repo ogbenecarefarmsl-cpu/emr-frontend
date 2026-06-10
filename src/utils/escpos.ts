@@ -51,7 +51,7 @@ export interface BranchHeaderData {
   footerText?: string;
 }
 
-const FALLBACK_BRANCH: BranchHeaderData = {
+export const FALLBACK_BRANCH: BranchHeaderData = {
   name: 'Harbour Medical Diagnostic',
   address: '114, Fourah Bay Road, Freetown, Sierra Leone',
   phone: '+23274414434',
