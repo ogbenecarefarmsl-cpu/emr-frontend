@@ -10,9 +10,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2, Search, Printer, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { EscPosBuilder, LINE_WIDTH } from '@/utils/escpos';
+import { EscPosBuilder, LINE_WIDTH, buildBranchHeaderESCPOS, FALLBACK_BRANCH } from '@/utils/escpos';
 import { usbPrinterService } from '@/services/usbPrinterService';
 import { thermalPrintStyles } from '@/components/receipts/ThermalReceipt';
+import { BranchLetterhead, BranchFooterText } from '@/components/receipts/BranchLetterhead';
+import { useMyBranch } from '@/hooks/useBranch';
 import { cn } from '@/lib/utils';
 
 function padLine(label: string, value: string, width = LINE_WIDTH): string {
@@ -26,6 +28,7 @@ function formatCurrency(n: number): string {
 
 export default function PriceListPage() {
   const { profile, primaryRole } = useAuth();
+  const { data: branch } = useMyBranch();
   const currentRole = primaryRole === 'admin' ? 'admin' : 'receptionist';
   const { data: tests, isLoading } = useActiveTests();
 
@@ -95,13 +98,7 @@ export default function PriceListPage() {
     }, {});
 
     const b = new EscPosBuilder();
-    b.init();
-    b.align('center');
-    b.bold(true).fontSize(0x11);
-    b.line('HARBOUR Medical Diagnostic');
-    b.fontSize(0x00).bold(false);
-    b.line('114, Fourah Bay Road, Freetown');
-    b.line('Tel: +23274414434');
+    buildBranchHeaderESCPOS(b, branch);
     b.separator('=');
     b.bold(true).line(selectedTests.length > 0 ? 'SELECTED TESTS — QUOTATION' : 'FULL PRICE LIST').bold(false);
     b.line(format(new Date(), 'dd/MM/yyyy HH:mm'));
@@ -160,6 +157,18 @@ export default function PriceListPage() {
       ? `<div class="total-row grand-total" style="margin-top:8px"><span>TOTAL:</span><span>${formatCurrency(selectedTotal)}</span></div>`
       : '';
 
+    const br = branch || FALLBACK_BRANCH;
+    const headerLines = [
+      br.logoUrl ? `<img class="logo-image" src="${br.logoUrl}" alt="Logo" />` : '<div class="logo">🏥</div>',
+      `<div class="company-name">${(br.name || '').toUpperCase()}</div>`,
+      br.tagline ? `<div class="company-tagline">${br.tagline}</div>` : '',
+      br.address ? `<div class="company-info">${br.address}</div>` : '',
+      br.phone ? `<div class="company-info">Tel: ${br.phone}</div>` : '',
+      br.email ? `<div class="company-info">${br.email}</div>` : '',
+      br.website ? `<div class="company-info">${br.website}</div>` : '',
+      br.operatingHours ? `<div class="company-info company-info-muted">${br.operatingHours}</div>` : '',
+    ].filter(Boolean).join('\n          ');
+
     const html = `<html><head><title>Price List</title><style>
       ${thermalPrintStyles}
       .item-row{display:flex;justify-content:space-between;margin:4px 0;font-size:11px}
@@ -167,19 +176,15 @@ export default function PriceListPage() {
       .item-price{white-space:nowrap;font-weight:bold}
     </style></head><body>
       <div class="receipt">
-        <div class="header">
-          <div class="logo">🏥</div>
-          <div class="company-name">HARBOUR Medical Diagnostic</div>
-          <div class="company-info">114, Fourah Bay Road, Freetown, Sierra Leone</div>
-          <div class="company-info">Tel: +23274414434</div>
+        <div class="header branch-letterhead">
+          ${headerLines}
         </div>
         <div class="copy-type">${selectedTests.length > 0 ? 'SELECTED TESTS — QUOTATION' : 'FULL PRICE LIST'}</div>
         <div class="company-info" style="text-align:center;margin-bottom:8px">${format(new Date(), 'dd/MM/yyyy HH:mm')}</div>
         ${rows}
         ${totalRow}
         <div class="footer" style="margin-top:12px">
-          <div>Prices subject to change</div>
-          <div>Thank you for choosing us!</div>
+          <div>${br.footerText || 'Prices subject to change'}</div>
         </div>
       </div>
     </body></html>`;
