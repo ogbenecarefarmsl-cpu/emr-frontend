@@ -102,10 +102,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
   // Fetch LIS catalog for lab tests
   const { data: lisCatalog = [] } = useQuery({
     queryKey: ['lis-catalog'],
-    queryFn: async () => {
-      const { data } = await ordersAPI.getLisCatalog();
-      return data;
-    },
+    queryFn: () => ordersAPI.getLisCatalog(),
     staleTime: 60_000,
   });
 
