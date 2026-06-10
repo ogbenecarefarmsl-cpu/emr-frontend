@@ -85,7 +85,20 @@ export default function NursePrescriptionPage() {
   const selectedVisit = activeVisits.find((visit: any) => (visit._id || visit.id) === visitId);
   const selectedPatientId = patientId(selectedVisit);
 
-  const totalAmount = selectedMeds.reduce((sum, med) => sum + med.unitPrice * med.quantity, 0);
+  // Compute estimated total from structured fields (backend re-computes authoritatively)
+  const totalAmount = selectedMeds.reduce((sum, med) => {
+    const s = (med.strengthPerDose || '').trim().toLowerCase();
+    const m = s.match(/^(\d+(?:\.\d+)?)/);
+    let unitsPerDose = 1;
+    if (m) {
+      const n = parseFloat(m[1]);
+      const rest = s.slice(m[0].length).trim();
+      const countUnits = ['tablet', 'tablets', 'capsule', 'capsules', 'ampule', 'ampules', 'vial', 'vials', 'patch', 'patches', 'drop', 'drops', 'puff', 'puffs', 'sachet', 'sachets', 'ml'];
+      if (countUnits.some((u) => rest.startsWith(u))) unitsPerDose = n;
+    }
+    const qty = unitsPerDose * (med.dosesPerDay || 0) * (med.durationDays || 0);
+    return sum + med.unitPrice * qty;
+  }, 0);
 
   const medicationOptions = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -131,22 +144,23 @@ export default function NursePrescriptionPage() {
       if (selectedMeds.length === 0) throw new Error('Add at least one medication');
 
       for (const med of selectedMeds) {
-        if (!med.dosage.trim() || !med.frequency.trim() || !med.duration.trim()) {
-          throw new Error(`Complete dosage, frequency and duration for ${med.medicationName}`);
+        if (!med.strengthPerDose || !med.dosesPerDay || !med.durationDays) {
+          throw new Error(`Complete per-dose, doses-per-day and days for ${med.medicationName}`);
         }
-        if (med.quantity < 1) throw new Error(`Quantity for ${med.medicationName} must be at least 1`);
+        if (med.dosesPerDay < 1) throw new Error(`Doses per day for ${med.medicationName} must be at least 1`);
+        if (med.durationDays < 1) throw new Error(`Days for ${med.medicationName} must be at least 1`);
       }
 
       return prescriptionService.create({
         patientId: selectedPatientId,
         visitId,
-        items: selectedMeds.map(({ unitPrice, stockQuantity, ...item }) => ({
+        items: selectedMeds.map(({ unitPrice, stockQuantity, sellMode, packSizes, baseUnit, ...item }) => ({
           ...item,
           instructions: item.instructions?.trim() || undefined,
           pharmacistNote: item.pharmacistNote?.trim() || undefined,
         })),
         notes: notes.trim() || undefined,
-        totalAmount: Math.round(totalAmount * 100) / 100,
+        // totalAmount is now auto-computed on the backend
       });
     },
     onSuccess: (prescription: any) => {
@@ -206,15 +220,25 @@ export default function NursePrescriptionPage() {
       {
         medicationId: med._id,
         medicationName: med.name,
+        // Structured regimen (NEW)
+        strengthPerDose: med.strength || '1',
+        dosesPerDay: 1,
+        durationDays: 7,
+        // Free-text overrides
         dosage: '',
         frequency: '',
         duration: '',
-        quantity: 1,
+        // Computed from structured fields
+        quantity: 0,
         route: RouteOfAdministrationEnum.ORAL,
         instructions: '',
         pharmacistNote: '',
         unitPrice: Number(med.unitPrice || 0),
         stockQuantity: med.stockQuantity,
+        // For UI display
+        sellMode: med.sellMode,
+        packSizes: med.packSizes,
+        baseUnit: med.baseUnit,
       },
     ]);
     setSearchTerm('');
@@ -351,39 +375,65 @@ export default function NursePrescriptionPage() {
                 <CardTitle className="text-lg">Medication Orders</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {selectedMeds.map((med, index) => (
+                {selectedMeds.map((med, index) => {
+                  // Compute quantity preview from structured fields
+                  const unitsPerDose = (() => {
+                    const s = (med.strengthPerDose || '').trim().toLowerCase();
+                    const m = s.match(/^(\d+(?:\.\d+)?)/);
+                    if (!m) return 1;
+                    const n = parseFloat(m[1]);
+                    const rest = s.slice(m[0].length).trim();
+                    const countUnits = ['tablet', 'tablets', 'capsule', 'capsules', 'ampule', 'ampules', 'vial', 'vials', 'patch', 'patches', 'drop', 'drops', 'puff', 'puffs', 'sachet', 'sachets', 'ml'];
+                    return countUnits.some((u) => rest.startsWith(u)) ? n : 1;
+                  })();
+                  const computedQty = unitsPerDose * (med.dosesPerDay || 0) * (med.durationDays || 0);
+                  return (
                   <div key={med.medicationId} className="rounded-lg border p-4 space-y-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="font-semibold">{med.medicationName}</p>
-                        <p className="text-sm text-muted-foreground">Le {med.unitPrice.toLocaleString()} per unit</p>
+                        <p className="text-sm text-muted-foreground">Le {med.unitPrice.toLocaleString()} per {med.baseUnit || 'unit'}</p>
+                        {med.packSizes && med.packSizes.length > 0 && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Packs: {med.packSizes.map((ps: any) => `${ps.name} (${ps.unitsPerPack ?? ps.quantityPerPack} ${med.baseUnit || ps.unit}) @ Le ${(ps.sellingPrice || 0).toLocaleString()}`).join(' • ')}
+                          </p>
+                        )}
                       </div>
                       <Button variant="ghost" size="icon" onClick={() => setSelectedMeds((current) => current.filter((_, i) => i !== index))}>
                         <Trash2 className="h-4 w-4 text-destructive" />
                       </Button>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-3 gap-3">
                       <div className="space-y-1">
-                        <Label>Dosage</Label>
-                        <Input value={med.dosage} onChange={(event) => updateMedication(index, 'dosage', event.target.value)} placeholder="500mg, 1 tablet" />
+                        <Label>Per dose</Label>
+                        <Input
+                          value={med.strengthPerDose || ''}
+                          onChange={(event) => updateMedication(index, 'strengthPerDose', event.target.value)}
+                          placeholder="e.g. 500mg or 1 tablet"
+                        />
                       </div>
                       <div className="space-y-1">
-                        <Label>Frequency</Label>
-                        <Input value={med.frequency} onChange={(event) => updateMedication(index, 'frequency', event.target.value)} placeholder="3 times daily" />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Duration</Label>
-                        <Input value={med.duration} onChange={(event) => updateMedication(index, 'duration', event.target.value)} placeholder="7 days" />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Quantity</Label>
+                        <Label>Doses/day</Label>
                         <Input
                           type="number"
                           min={1}
-                          value={med.quantity}
-                          onChange={(event) => updateMedication(index, 'quantity', Math.max(1, Number(event.target.value)))}
+                          value={med.dosesPerDay || 1}
+                          onChange={(event) => updateMedication(index, 'dosesPerDay', Math.max(1, Number(event.target.value)))}
                         />
                       </div>
+                      <div className="space-y-1">
+                        <Label>Days</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={med.durationDays || 1}
+                          onChange={(event) => updateMedication(index, 'durationDays', Math.max(1, Number(event.target.value)))}
+                        />
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground bg-muted/50 px-3 py-2 rounded">
+                      Computed quantity: <strong>{computedQty} {med.baseUnit || 'unit'}</strong>
+                      {med.unitPrice ? <> · Est. line: Le {(computedQty * med.unitPrice).toLocaleString()}</> : null}
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="space-y-1">
@@ -409,12 +459,13 @@ export default function NursePrescriptionPage() {
                       <Textarea
                         value={med.instructions || ''}
                         onChange={(event) => updateMedication(index, 'instructions', event.target.value)}
-                        placeholder="Leave blank to auto-generate from dosage, frequency, duration and route"
+                        placeholder="Leave blank to auto-generate from dose, frequency and route"
                         rows={2}
                       />
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </CardContent>
             </Card>
           )}

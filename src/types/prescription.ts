@@ -22,11 +22,31 @@ export enum RouteOfAdministrationEnum {
 export interface PrescriptionItem {
   medicationId: string | Medication;
   medicationName: string;
-  dosage: string;
-  frequency: string;
-  duration: string;
+  // === Structured regimen (NEW) ===
+  /** Strength per dose — e.g. "500mg", "1 tablet", "2 ampules" */
+  strengthPerDose: string;
+  /** Doses per day. 3 = "3x daily" */
+  dosesPerDay: number;
+  /** Duration in days. 7 = "1 week" */
+  durationDays: number;
+  /** Total in base units. Backend computes from above. */
   quantity: number;
+  // === Legacy free-text (auto-generated from above) ===
+  dosage?: string;
+  frequency?: string;
+  duration?: string;
   route?: RouteOfAdministrationEnum;
+  // === Reception dispense data (filled at dispense time) ===
+  dispenseMode?: 'individual' | 'pack';
+  packSizeIndex?: number;
+  dispensedPackName?: string;
+  dispensedBaseUnits?: number;
+  dispensedSellUnits?: number;
+  priceAtDispense?: number;
+  lineTotalAtDispense?: number;
+  substituteForId?: string;
+  substituteForName?: string;
+  // === Doctor's notes (kept) ===
   /** Patient-facing label text — printed on dispensing label */
   instructions?: string;
   /** Internal pharmacist note — NOT printed on label */
@@ -76,8 +96,19 @@ export interface Prescription {
   cancellationReason?: string;
   isPaid: boolean;
   totalAmount?: number;
+  /** Computed at dispense time from actual sell units × price */
+  actualTotalAmount?: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PackSize {
+  name: string;
+  unit: string;
+  unitsPerPack: number;
+  sellingPrice: number;
+  barcode?: string;
+  isDefault?: boolean;
 }
 
 export interface Medication {
@@ -91,6 +122,15 @@ export interface Medication {
   stockQuantity: number;
   unitPrice: number;
   unit?: string;
+  /** Smallest indivisible unit — "tablet", "ampule", "ml" */
+  baseUnit?: string;
+  /** How the medication is sold: "individual", "pack", or "both" */
+  sellMode?: 'individual' | 'pack' | 'both';
+  /** Available pack variants (Box of 30, Strip of 10, etc.) */
+  packSizes?: PackSize[];
+  /** True if this medication is sourced from CAF (no local stock) */
+  isCafSourced?: boolean;
+  cafProductId?: string;
   reorderLevel?: number;
   expiryDate?: string;
 }
