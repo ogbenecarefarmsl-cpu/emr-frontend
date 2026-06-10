@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { Pill, Package, Loader2, AlertTriangle, Check, Search, User, ArrowRight } from 'lucide-react';
 import { medicationService } from '@/services/medicationService';
@@ -331,7 +332,9 @@ export default function ReceptionDispensePage() {
             </CardContent>
           </Card>
         ) : (
-          lines.map((line) => {
+          <ScrollArea className="h-[calc(100vh-280px)] pr-3">
+          <div className="space-y-4">
+          {lines.map((line) => {
             const med = line.medication;
             const packSizes = med?.packSizes || [];
             return (
@@ -450,7 +453,9 @@ export default function ReceptionDispensePage() {
                 </CardContent>
               </Card>
             );
-          })
+          })}
+          </div>
+          </ScrollArea>
         )}
 
         {/* Total + actions */}
