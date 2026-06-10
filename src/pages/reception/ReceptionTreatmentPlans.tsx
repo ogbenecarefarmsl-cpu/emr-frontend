@@ -5,13 +5,16 @@ import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { useMyBranch } from '@/hooks/useBranch';
 import { buildTreatmentPlanESCPOS } from '@/utils/escpos';
 import { usbPrinterService } from '@/services/usbPrinterService';
 import type { TreatmentPlan } from '@/types/treatment-plan';
-import { Printer, Check, Eye, Loader2, Send, Clock } from 'lucide-react';
+import { Printer, Eye, Loader2, Send, DollarSign, Wallet, Banknote } from 'lucide-react';
 import { TreatmentPlanReceipt, treatmentPlanPrintStyles } from '@/components/receipts/TreatmentPlanReceipt';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
@@ -22,11 +25,28 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700' },
 };
 
+const PAYMENT_STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  unpaid: { label: 'Unpaid', color: 'bg-red-100 text-red-700' },
+  partial: { label: 'Partial', color: 'bg-amber-100 text-amber-700' },
+  paid: { label: 'Paid', color: 'bg-green-100 text-green-700' },
+};
+
+const PAYMENT_METHODS = [
+  { value: 'cash', label: 'Cash', icon: Banknote },
+  { value: 'orange_money', label: 'Orange Money', icon: Wallet },
+  { value: 'afrimoney', label: 'AfriMoney', icon: Wallet },
+  { value: 'wallet', label: 'Wallet Balance', icon: Wallet },
+];
+
 export default function ReceptionTreatmentPlans() {
   const queryClient = useQueryClient();
   const { data: branch } = useMyBranch();
   const { printReceipt } = useThermalPrint();
   const [viewPlan, setViewPlan] = useState<TreatmentPlan | null>(null);
+  const [payPlan, setPayPlan] = useState<TreatmentPlan | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState('cash');
+  const [payNotes, setPayNotes] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
   const receiptRef = useRef<HTMLDivElement>(null);
 
@@ -43,10 +63,24 @@ export default function ReceptionTreatmentPlans() {
     },
   });
 
+  const payMutation = useMutation({
+    mutationFn: ({ id, amount, paymentMethod, notes }: { id: string; amount: number; paymentMethod: string; notes?: string }) =>
+      treatmentPlanService.pay(id, { amount, paymentMethod, notes }),
+    onSuccess: (updatedPlan) => {
+      queryClient.invalidateQueries({ queryKey: ['treatment-plans'] });
+      setPayPlan(null);
+      setPayAmount('');
+      setPayNotes('');
+      toast.success(`Payment received — Le ${updatedPlan.amountPaid.toLocaleString()}`);
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Payment failed');
+    },
+  });
+
   const handlePrint = async (plan: TreatmentPlan) => {
     setIsPrinting(true);
     try {
-      // Try ESC/POS first
       if (usbPrinterService.isConnected) {
         const patient = typeof plan.patientId === 'object' ? plan.patientId : null;
         const visit = typeof plan.visitId === 'object' ? plan.visitId : null;
@@ -72,7 +106,6 @@ export default function ReceptionTreatmentPlans() {
         return;
       }
 
-      // Browser fallback
       await printReceipt(receiptRef.current, {
         title: `Treatment Plan ${plan.planNumber}`,
         onSuccess: () => {
@@ -87,7 +120,29 @@ export default function ReceptionTreatmentPlans() {
     }
   };
 
-  // Sent plans (waiting for reception)
+  const handlePay = () => {
+    if (!payPlan || !payAmount) return;
+    const amount = parseFloat(payAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    const remaining = (payPlan.totalAmount || 0) - (payPlan.amountPaid || 0);
+    if (amount > remaining + 0.01) {
+      toast.error(`Amount exceeds remaining balance of Le ${remaining.toLocaleString()}`);
+      return;
+    }
+    payMutation.mutate({ id: payPlan._id, amount, paymentMethod: payMethod, notes: payNotes || undefined });
+  };
+
+  const openPayDialog = (plan: TreatmentPlan) => {
+    setPayPlan(plan);
+    const remaining = (plan.totalAmount || 0) - (plan.amountPaid || 0);
+    setPayAmount(remaining > 0 ? remaining.toString() : '');
+    setPayMethod('cash');
+    setPayNotes('');
+  };
+
   const sentPlans = useMemo(
     () => plans.filter((p: TreatmentPlan) => p.status === 'sent_to_reception'),
     [plans]
@@ -97,8 +152,67 @@ export default function ReceptionTreatmentPlans() {
     [plans]
   );
 
+  const renderPlanRow = (plan: TreatmentPlan, showPayButton = false) => {
+    const status = STATUS_CONFIG[plan.status] || STATUS_CONFIG.draft;
+    const payStatus = PAYMENT_STATUS_CONFIG[plan.paymentStatus || 'unpaid'];
+    const patient = typeof plan.patientId === 'object' ? plan.patientId : null;
+    const creator = typeof plan.createdBy === 'object' ? plan.createdBy : null;
+    const remaining = (plan.totalAmount || 0) - (plan.amountPaid || 0);
+
+    return (
+      <div key={plan._id} className="flex items-center justify-between p-3 border rounded-lg bg-blue-50/50">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-mono text-xs">{plan.planNumber}</span>
+            <Badge variant="outline" className={`text-[10px] ${status.color}`}>{status.label}</Badge>
+            {payStatus && (
+              <Badge variant="outline" className={`text-[10px] ${payStatus.color}`}>
+                {payStatus.label}
+              </Badge>
+            )}
+          </div>
+          <div className="text-sm mt-1">
+            {patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown'}
+          </div>
+          <div className="text-xs text-muted-foreground">
+            {plan.items.length} items — Le {plan.totalAmount.toLocaleString()}
+            {plan.amountPaid > 0 && ` — Paid: Le ${plan.amountPaid.toLocaleString()}`}
+            {remaining > 0 && plan.amountPaid > 0 && ` — Bal: Le ${remaining.toLocaleString()}`}
+            {creator && ` — by ${creator.fullName}`}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={() => setViewPlan(plan)}>
+            <Eye className="h-4 w-4 mr-1" /> View
+          </Button>
+          {showPayButton && remaining > 0.01 && (
+            <Button
+              size="sm"
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => openPayDialog(plan)}
+            >
+              <DollarSign className="h-4 w-4 mr-1" /> Pay
+            </Button>
+          )}
+          <Button
+            size="sm"
+            disabled={isPrinting}
+            onClick={() => handlePrint(plan)}
+          >
+            {isPrinting ? (
+              <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+            ) : (
+              <Printer className="h-4 w-4 mr-1" />
+            )}
+            Print
+          </Button>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <RoleLayout title="Treatment Plans" subtitle="View and print treatment plans" role="receptionist">
+    <RoleLayout title="Treatment Plans" subtitle="View, pay, and print treatment plans" role="receptionist">
       <div className="space-y-6">
         {/* Sent plans queue */}
         <Card>
@@ -118,53 +232,7 @@ export default function ReceptionTreatmentPlans() {
               </div>
             ) : (
               <div className="space-y-2">
-                {sentPlans.map((plan: TreatmentPlan) => {
-                  const patient = typeof plan.patientId === 'object' ? plan.patientId : null;
-                  const creator = typeof plan.createdBy === 'object' ? plan.createdBy : null;
-                  return (
-                    <div
-                      key={plan._id}
-                      className="flex items-center justify-between p-3 border rounded-lg bg-blue-50/50"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs">{plan.planNumber}</span>
-                          <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-700">
-                            PENDING
-                          </Badge>
-                        </div>
-                        <div className="text-sm mt-1">
-                          {patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {plan.items.length} items — Le {plan.totalAmount.toLocaleString()}
-                          {creator && ` — by ${creator.fullName}`}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setViewPlan(plan)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" /> View
-                        </Button>
-                        <Button
-                          size="sm"
-                          disabled={isPrinting}
-                          onClick={() => handlePrint(plan)}
-                        >
-                          {isPrinting ? (
-                            <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                          ) : (
-                            <Printer className="h-4 w-4 mr-1" />
-                          )}
-                          Print
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
+                {sentPlans.map((plan) => renderPlanRow(plan, true))}
               </div>
             )}
           </CardContent>
@@ -178,50 +246,7 @@ export default function ReceptionTreatmentPlans() {
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {otherPlans.map((plan: TreatmentPlan) => {
-                  const status = STATUS_CONFIG[plan.status] || STATUS_CONFIG.draft;
-                  const patient = typeof plan.patientId === 'object' ? plan.patientId : null;
-                  return (
-                    <div
-                      key={plan._id}
-                      className="flex items-center justify-between p-3 border rounded-lg"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs">{plan.planNumber}</span>
-                          <Badge variant="outline" className={`text-[10px] ${status.color}`}>
-                            {status.label}
-                          </Badge>
-                        </div>
-                        <div className="text-sm mt-1">
-                          {patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown'}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {plan.items.length} items — Le {plan.totalAmount.toLocaleString()}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setViewPlan(plan)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
-                        {(plan.status === 'sent_to_reception' || plan.status === 'paid') && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={isPrinting}
-                            onClick={() => handlePrint(plan)}
-                          >
-                            <Printer className="h-4 w-4 mr-1" /> Print
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                {otherPlans.map((plan) => renderPlanRow(plan, plan.status === 'paid' || plan.paymentStatus === 'partial'))}
               </div>
             </CardContent>
           </Card>
@@ -258,6 +283,11 @@ export default function ReceptionTreatmentPlans() {
                   <Badge className={STATUS_CONFIG[viewPlan.status]?.color}>
                     {STATUS_CONFIG[viewPlan.status]?.label}
                   </Badge>
+                  {PAYMENT_STATUS_CONFIG[viewPlan.paymentStatus || 'unpaid'] && (
+                    <Badge className={PAYMENT_STATUS_CONFIG[viewPlan.paymentStatus || 'unpaid'].color}>
+                      {PAYMENT_STATUS_CONFIG[viewPlan.paymentStatus || 'unpaid'].label}
+                    </Badge>
+                  )}
                   {typeof viewPlan.createdBy === 'object' && (
                     <span className="text-sm text-muted-foreground">
                       by {viewPlan.createdBy.fullName}
@@ -283,8 +313,23 @@ export default function ReceptionTreatmentPlans() {
                   ))}
                 </div>
 
-                <div className="text-right font-semibold">
-                  Total: Le {viewPlan.totalAmount.toLocaleString()}
+                <div className="border-t pt-2 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span>Total:</span>
+                    <span className="font-semibold">Le {(viewPlan.totalAmount || 0).toLocaleString()}</span>
+                  </div>
+                  {viewPlan.amountPaid > 0 && (
+                    <div className="flex justify-between text-green-700">
+                      <span>Paid:</span>
+                      <span>Le {viewPlan.amountPaid.toLocaleString()}</span>
+                    </div>
+                  )}
+                  {(viewPlan.balance || 0) > 0 && (
+                    <div className="flex justify-between text-amber-700">
+                      <span>Balance:</span>
+                      <span className="font-semibold">Le {viewPlan.balance.toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
 
                 {viewPlan.notes && (
@@ -294,6 +339,14 @@ export default function ReceptionTreatmentPlans() {
                 )}
 
                 <div className="flex gap-2 pt-2">
+                  {(viewPlan.balance || 0) > 0.01 && (
+                    <Button
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => { setViewPlan(null); openPayDialog(viewPlan); }}
+                    >
+                      <DollarSign className="h-4 w-4 mr-1" /> Receive Payment
+                    </Button>
+                  )}
                   <Button
                     disabled={isPrinting}
                     onClick={() => handlePrint(viewPlan)}
@@ -304,6 +357,106 @@ export default function ReceptionTreatmentPlans() {
                       <Printer className="h-4 w-4 mr-1" />
                     )}
                     Print Treatment Plan
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Payment dialog */}
+        {payPlan && (
+          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+            <Card className="w-full max-w-md">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <DollarSign className="h-4 w-4" />
+                    Receive Payment — {payPlan.planNumber}
+                  </CardTitle>
+                  <Button variant="ghost" size="sm" onClick={() => setPayPlan(null)}>
+                    Close
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {typeof payPlan.patientId === 'object' && (
+                  <div className="text-sm">
+                    Patient: {payPlan.patientId.firstName} {payPlan.patientId.lastName}
+                  </div>
+                )}
+
+                <div className="bg-muted p-3 rounded text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span>Total:</span>
+                    <span>Le {(payPlan.totalAmount || 0).toLocaleString()}</span>
+                  </div>
+                  {payPlan.amountPaid > 0 && (
+                    <div className="flex justify-between text-green-700">
+                      <span>Already Paid:</span>
+                      <span>Le {payPlan.amountPaid.toLocaleString()}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between font-semibold">
+                    <span>Balance Due:</span>
+                    <span>Le {((payPlan.totalAmount || 0) - (payPlan.amountPaid || 0)).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pay-amount">Amount (Le)</Label>
+                  <Input
+                    id="pay-amount"
+                    type="number"
+                    min="1"
+                    step="100"
+                    value={payAmount}
+                    onChange={(e) => setPayAmount(e.target.value)}
+                    placeholder="Enter amount"
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Payment Method</Label>
+                  <Select value={payMethod} onValueChange={setPayMethod}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_METHODS.map((m) => (
+                        <SelectItem key={m.value} value={m.value}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="pay-notes">Notes (optional)</Label>
+                  <Input
+                    id="pay-notes"
+                    value={payNotes}
+                    onChange={(e) => setPayNotes(e.target.value)}
+                    placeholder="Payment notes..."
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-2">
+                  <Button
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                    disabled={!payAmount || payMutation.isPending}
+                    onClick={handlePay}
+                  >
+                    {payMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                    ) : (
+                      <DollarSign className="h-4 w-4 mr-1" />
+                    )}
+                    {payMethod === 'wallet' ? 'Pay from Wallet' : 'Receive Payment'}
+                  </Button>
+                  <Button variant="outline" onClick={() => setPayPlan(null)}>
+                    Cancel
                   </Button>
                 </div>
               </CardContent>

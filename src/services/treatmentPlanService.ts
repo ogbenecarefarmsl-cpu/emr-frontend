@@ -46,4 +46,9 @@ export const treatmentPlanService = {
     const response = await api.delete(`/treatment-plans/${id}`);
     return response.data;
   },
+
+  async pay(id: string, data: { amount: number; paymentMethod: string; notes?: string }): Promise<TreatmentPlan> {
+    const response = await api.post(`/treatment-plans/${id}/pay`, data);
+    return response.data;
+  },
 };

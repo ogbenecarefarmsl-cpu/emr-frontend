@@ -1,5 +1,6 @@
 export type TreatmentPlanItemType = 'drug' | 'iv' | 'lab' | 'procedure' | 'other';
 export type TreatmentPlanStatus = 'draft' | 'sent_to_reception' | 'paid' | 'completed' | 'cancelled';
+export type TreatmentPlanPaymentStatus = 'unpaid' | 'partial' | 'paid';
 
 export interface TreatmentPlanItem {
   type: TreatmentPlanItemType;
@@ -43,6 +44,9 @@ export interface TreatmentPlan {
   orderIds: any[];
   items: TreatmentPlanItem[];
   totalAmount: number;
+  amountPaid: number;
+  balance: number;
+  paymentStatus: TreatmentPlanPaymentStatus;
   notes?: string;
   sentToReceptionAt?: string;
   printedAt?: string;
