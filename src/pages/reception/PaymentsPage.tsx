@@ -124,6 +124,25 @@ export default function PaymentsPage() {
           _paymentId: p._id,
         });
       }
+      if (p.paymentType === 'consultation') {
+        const patient = p.visitId?.patientId || {};
+        const visitId = typeof p.visitId === 'object' ? p.visitId?._id : p.visitId;
+        allItems.push({
+          _id: `consult-${p._id}`,
+          _visitId: visitId,
+          orderNumber: `CONSULT-${p.createdAt ? format(new Date(p.createdAt), 'yyMMdd') : '000000'}-${String(p._id).slice(-4).toUpperCase()}`,
+          patientId: patient,
+          total: p.amount,
+          amountPaid: p.amount,
+          balance: 0,
+          paymentMethod: p.paymentMethod,
+          paymentStatus: 'paid',
+          createdAt: p.createdAt,
+          orderType: 'consultation',
+          _isConsultationPayment: true,
+          _paymentId: p._id,
+        });
+      }
     }
   }
 
@@ -458,12 +477,13 @@ export default function PaymentsPage() {
                     <td>
                       <Badge variant="outline" className={cn(
                         'text-[10px]',
+                        order._isConsultationPayment ? 'bg-orange-500/10 text-orange-600' :
                         order._isPrescriptionPayment ? 'bg-purple-500/10 text-purple-600' :
                         orderType === 'lab' ? 'bg-blue-500/10 text-blue-600' :
                         orderType === 'pharmacy' ? 'bg-emerald-500/10 text-emerald-600' :
                         'bg-muted'
                       )}>
-                        {order._isPrescriptionPayment ? 'Prescription' : orderType === 'lab' ? 'Lab' : orderType === 'pharmacy' ? 'Pharmacy Order' : orderType || '-'}
+                        {order._isConsultationPayment ? 'Consultation' : order._isPrescriptionPayment ? 'Prescription' : orderType === 'lab' ? 'Lab' : orderType === 'pharmacy' ? 'Pharmacy Order' : orderType || '-'}
                       </Badge>
                     </td>
                     <td className="font-bold">Le {Number(total).toLocaleString()}</td>
@@ -506,6 +526,10 @@ export default function PaymentsPage() {
                             onClick={() => {
                               if (order._isPrescriptionPayment) {
                                 navigate(`/reception/prescription-receipt/${order._prescriptionId || order.id || order._id}`);
+                                return;
+                              }
+                              if (order._isConsultationPayment && order._visitId) {
+                                navigate(`/reception/visit-receipt?visitId=${order._visitId}`);
                                 return;
                               }
                               navigate(`/reception/receipt/${order.id || order._id}`);
