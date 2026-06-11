@@ -125,53 +125,83 @@ export default function VisitReceipt() {
         cashier: receiptData.cashier,
       }, branchHeader);
 
+      console.log('Print: built ESC/POS bytes:', bytes.length);
+
       let printed = false;
+      let lastError: any = null;
 
       if (usbPrinterService.isConnected) {
         try {
+          console.log('Print: trying USB...');
           await usbPrinterService.print(bytes);
           printed = true;
-        } catch { /* fall through */ }
+          console.log('Print: USB success');
+        } catch (err) {
+          console.error('Print: USB failed:', err);
+          lastError = err;
+        }
       }
 
       if (!printed && btPrinterService.isConnected) {
         try {
+          console.log('Print: trying BT...');
           await btPrinterService.print(bytes);
           printed = true;
-        } catch { /* fall through */ }
+          console.log('Print: BT success');
+        } catch (err) {
+          console.error('Print: BT failed:', err);
+          lastError = err;
+        }
       }
 
       if (!printed && !usbPrinterService.isConnected) {
         try {
+          console.log('Print: trying USB auto-connect...');
           const ok = await usbPrinterService.autoConnect();
           if (ok) {
             await usbPrinterService.print(bytes);
             printed = true;
+            console.log('Print: USB auto-connect success');
           }
-        } catch { /* fall through */ }
+        } catch (err) {
+          console.error('Print: USB auto-connect failed:', err);
+          lastError = err;
+        }
       }
 
       if (!printed && !btPrinterService.isConnected) {
         try {
+          console.log('Print: trying BT auto-connect...');
           const ok = await btPrinterService.autoConnect();
           if (ok) {
             await btPrinterService.print(bytes);
             printed = true;
+            console.log('Print: BT auto-connect success');
           }
-        } catch { /* fall through */ }
+        } catch (err) {
+          console.error('Print: BT auto-connect failed:', err);
+          lastError = err;
+        }
       }
 
       if (!printed && receiptRef.current) {
+        console.log('Print: falling back to browser print');
         await printReceipt(receiptRef.current, {
           title: `Visit ${receiptData.visitNumber}`,
           onSuccess: () => {},
           onError: () => {},
         });
+        printed = true;
       }
 
-      setPrinted(true);
-      toast.success('Visit receipt printed');
+      if (printed) {
+        setPrinted(true);
+        toast.success('Visit receipt printed');
+      } else {
+        throw lastError || new Error('All print methods failed');
+      }
     } catch (err: any) {
+      console.error('Print: final error:', err);
       toast.error(`Print failed: ${err.message}`);
     } finally {
       setIsPrinting(false);
