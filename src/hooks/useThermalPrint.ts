@@ -2,6 +2,7 @@ import { useCallback } from 'react';
 import { thermalPrintStyles } from '@/components/receipts/ThermalReceipt';
 import { usePrinterContext } from '@/context/PrinterContext';
 import { usbPrinterService } from '@/services/usbPrinterService';
+import { btPrinterService } from '@/services/bluetoothPrinterService';
 import { qzTrayService } from '@/services/qzTrayService';
 import { buildReceiptESCPOS, type ReceiptData } from '@/utils/escpos';
 import { printBothReceiptCopies } from '@/services/browserThermalPrint';
@@ -13,7 +14,7 @@ interface PrintOptions {
 }
 
 export const useThermalPrint = () => {
-  const { settings, thermalConnected, qzTrayConnected } = usePrinterContext();
+  const { settings, thermalConnected, btConnected, qzTrayConnected } = usePrinterContext();
 
   // ── ESC/POS path (WebUSB) ──────────────────────────────────────────────
 
@@ -151,7 +152,7 @@ export const useThermalPrint = () => {
               console.log('🔌 USB not connected, attempting auto-connect...');
               const connected = await usbPrinterService.autoConnect();
               if (!connected) {
-                console.log('⚠️ Auto-connect failed, will try QZ Tray or browser fallback');
+                console.log('⚠️ USB auto-connect failed, trying Bluetooth...');
                 throw new Error('USB auto-connect failed');
               }
               console.log('✅ USB auto-connected successfully');
@@ -178,16 +179,48 @@ export const useThermalPrint = () => {
             return { success: true, printedCount };
           } catch (usbError) {
             console.log('⚠️ USB printing failed:', usbError);
-            console.log('🔄 Trying QZ Tray fallback...');
-            
-            // Try QZ Tray as fallback
-            if (qzTrayConnected) {
-              console.log('✅ Using QZ Tray for automatic printing');
-              return await qzTrayService.printBothCopies(receiptData);
+
+            // Try Bluetooth as second fallback
+            console.log('🔄 Trying Bluetooth fallback...');
+            try {
+              if (!btPrinterService.isConnected) {
+                const btConnected = await btPrinterService.autoConnect();
+                if (!btConnected) {
+                  console.log('⚠️ Bluetooth auto-connect failed, trying QZ Tray...');
+                  throw new Error('BT auto-connect failed');
+                }
+              }
+
+              console.log('🖨️ Printing patient copy via Bluetooth...');
+              const patientBytes = buildReceiptESCPOS(receiptData, 'patient');
+              await btPrinterService.print(patientBytes);
+              console.log('✅ Patient copy sent to Bluetooth printer');
+
+              let printedCount = 1;
+
+              if (settings.thermal.copies === 2) {
+                await new Promise(r => setTimeout(r, 800));
+                console.log('🖨️ Printing lab copy via Bluetooth...');
+                const labBytes = buildReceiptESCPOS(receiptData, 'lab');
+                await btPrinterService.print(labBytes);
+                console.log('✅ Lab copy sent to Bluetooth printer');
+                printedCount = 2;
+              }
+
+              return { success: true, printedCount };
+            } catch (btError) {
+              console.log('⚠️ Bluetooth printing failed:', btError);
+              console.log('🔄 Trying QZ Tray fallback...');
+
+              // Try QZ Tray as third fallback
+              if (qzTrayConnected) {
+                console.log('✅ Using QZ Tray for automatic printing');
+                return await qzTrayService.printBothCopies(receiptData);
+              }
+
+              // If all direct methods failed, throw to trigger browser fallback
+              throw usbError;
             }
-            
-            // If both USB and QZ Tray failed, throw to trigger browser fallback
-            throw usbError;
           }
         }
 
@@ -208,7 +241,7 @@ export const useThermalPrint = () => {
         }
       }
     },
-    [settings.thermal.copies, qzTrayConnected]
+    [settings.thermal.copies, qzTrayConnected, btConnected]
   );
 
   return {

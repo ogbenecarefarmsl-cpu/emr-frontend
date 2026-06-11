@@ -3,6 +3,7 @@ import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { usePrinterContext } from '@/context/PrinterContext';
 import { usbPrinterService } from '@/services/usbPrinterService';
+import { btPrinterService } from '@/services/bluetoothPrinterService';
 import { buildReceiptESCPOS } from '@/utils/escpos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Printer,
   Usb,
+  Bluetooth,
   CheckCircle2,
   XCircle,
   AlertTriangle,
@@ -56,13 +58,21 @@ export default function PrinterSetup() {
     thermalDevice,
     thermalConnected,
     webUsbSupported,
+    btDevice,
+    btConnected,
+    btSupported,
     connectThermalPrinter,
     disconnectThermalPrinter,
+    connectBtPrinter,
+    disconnectBtPrinter,
   } = usePrinterContext();
 
   const [connectingThermal, setConnectingThermal] = useState(false);
   const [disconnectingThermal, setDisconnectingThermal] = useState(false);
+  const [connectingBt, setConnectingBt] = useState(false);
+  const [disconnectingBt, setDisconnectingBt] = useState(false);
   const [testPrintingThermal, setTestPrintingThermal] = useState(false);
+  const [testPrintingBt, setTestPrintingBt] = useState(false);
   const [showZadigGuide, setShowZadigGuide] = useState(false);
 
   const handleConnect = async () => {
@@ -101,6 +111,36 @@ export default function PrinterSetup() {
     }
   };
 
+  const handleBtConnect = async () => {
+    setConnectingBt(true);
+    try {
+      await connectBtPrinter();
+      toast.success('Bluetooth printer connected successfully');
+    } catch (err: unknown) {
+      const msg = (err instanceof Error ? err.message : null) ?? 'Failed to connect Bluetooth printer';
+      if (msg?.includes('User cancelled')) {
+        toast.info('Bluetooth pairing cancelled');
+      } else {
+        toast.error(msg || 'Failed to connect Bluetooth printer');
+      }
+    } finally {
+      setConnectingBt(false);
+    }
+  };
+
+  const handleBtDisconnect = async () => {
+    setDisconnectingBt(true);
+    try {
+      await disconnectBtPrinter();
+      toast.success('Bluetooth printer disconnected');
+    } catch (err: unknown) {
+      const msg = (err instanceof Error ? err.message : null) ?? 'Failed to disconnect';
+      toast.error(msg);
+    } finally {
+      setDisconnectingBt(false);
+    }
+  };
+
   const handleTestPrint = async () => {
     setTestPrintingThermal(true);
     try {
@@ -110,12 +150,30 @@ export default function PrinterSetup() {
       }
       const bytes = buildReceiptESCPOS(TEST_RECEIPT_DATA, 'patient');
       await usbPrinterService.print(bytes);
-      toast.success('Test receipt sent to printer');
+      toast.success('Test receipt sent to USB printer');
     } catch (err: unknown) {
       const msg = (err instanceof Error ? err.message : null) ?? 'Test print failed';
       toast.error(msg);
     } finally {
       setTestPrintingThermal(false);
+    }
+  };
+
+  const handleBtTestPrint = async () => {
+    setTestPrintingBt(true);
+    try {
+      if (!btConnected) {
+        const ok = await btPrinterService.autoConnect();
+        if (!ok) throw new Error('Bluetooth printer not connected. Please connect first.');
+      }
+      const bytes = buildReceiptESCPOS(TEST_RECEIPT_DATA, 'patient');
+      await btPrinterService.print(bytes);
+      toast.success('Test receipt sent to Bluetooth printer');
+    } catch (err: unknown) {
+      const msg = (err instanceof Error ? err.message : null) ?? 'Test print failed';
+      toast.error(msg);
+    } finally {
+      setTestPrintingBt(false);
     }
   };
 
@@ -133,6 +191,84 @@ export default function PrinterSetup() {
       userName={profile?.fullName}
     >
       <div className="max-w-2xl mx-auto space-y-6">
+        {/* Bluetooth Thermal Printer */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-50 rounded-lg">
+                  <Bluetooth className="w-5 h-5 text-indigo-600" />
+                </div>
+                <div>
+                  <CardTitle>Bluetooth Thermal Printer</CardTitle>
+                  <CardDescription>58 mm / 80 mm Bluetooth thermal</CardDescription>
+                </div>
+              </div>
+              <Badge
+                variant={btConnected ? 'default' : 'secondary'}
+                className={btConnected ? 'bg-green-600' : ''}
+              >
+                {btConnected ? (
+                  <><CheckCircle2 className="w-3 h-3 mr-1" /> Connected</>
+                ) : (
+                  <><XCircle className="w-3 h-3 mr-1" /> Disconnected</>
+                )}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {btDevice && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded p-2">
+                <Printer className="w-4 h-4 shrink-0" />
+                <span>{btDevice.name}</span>
+              </div>
+            )}
+
+            {!btSupported && (
+              <Alert variant="destructive">
+                <AlertTriangle className="w-4 h-4" />
+                <AlertDescription>
+                  Web Bluetooth is not supported in this browser. Please use{' '}
+                  <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              {!btConnected ? (
+                <Button onClick={handleBtConnect} disabled={!btSupported || connectingBt}>
+                  {connectingBt ? (
+                    <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Pairing…</>
+                  ) : (
+                    <><Bluetooth className="w-4 h-4 mr-2" />Connect Bluetooth</>
+                  )}
+                </Button>
+              ) : (
+                <Button variant="outline" onClick={handleBtDisconnect} disabled={disconnectingBt}>
+                  {disconnectingBt ? (
+                    <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Disconnecting…</>
+                  ) : (
+                    <><XCircle className="w-4 h-4 mr-2" />Disconnect</>
+                  )}
+                </Button>
+              )}
+
+              <Button
+                variant="outline"
+                onClick={handleBtTestPrint}
+                disabled={testPrintingBt || !btConnected}
+              >
+                {testPrintingBt ? (
+                  <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Printing…</>
+                ) : (
+                  <><TestTube2 className="w-4 h-4 mr-2" />Test Print</>
+                )}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* USB Thermal Printer */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -141,7 +277,7 @@ export default function PrinterSetup() {
                   <Usb className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <CardTitle>Receipt Printer</CardTitle>
+                  <CardTitle>USB Thermal Printer</CardTitle>
                   <CardDescription>Xprinter · 80 mm USB thermal</CardDescription>
                 </div>
               </div>
@@ -158,7 +294,6 @@ export default function PrinterSetup() {
             </div>
           </CardHeader>
           <CardContent className="space-y-5">
-            {/* Device info */}
             {deviceLabel && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground bg-muted/50 rounded p-2">
                 <Printer className="w-4 h-4 shrink-0" />
@@ -166,7 +301,6 @@ export default function PrinterSetup() {
               </div>
             )}
 
-            {/* WebUSB warning */}
             {!webUsbSupported && (
               <Alert variant="destructive">
                 <AlertTriangle className="w-4 h-4" />
@@ -177,14 +311,13 @@ export default function PrinterSetup() {
               </Alert>
             )}
 
-            {/* Action buttons */}
             <div className="flex flex-wrap gap-2">
               {!thermalConnected ? (
                 <Button onClick={handleConnect} disabled={!webUsbSupported || connectingThermal}>
                   {connectingThermal ? (
                     <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Connecting…</>
                   ) : (
-                    <><Usb className="w-4 h-4 mr-2" />Connect Printer</>
+                    <><Usb className="w-4 h-4 mr-2" />Connect USB</>
                   )}
                 </Button>
               ) : (
@@ -210,74 +343,6 @@ export default function PrinterSetup() {
               </Button>
             </div>
 
-            {/* Current settings (read-only info) */}
-            <div className="space-y-3 pt-2 border-t">
-              <p className="text-sm font-medium">Printer Settings</p>
-              
-              {/* Enable/Disable Toggle */}
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded">
-                <div className="space-y-0.5">
-                  <Label htmlFor="thermal-enabled" className="text-sm font-medium">
-                    Enable Thermal Printing
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Print receipts directly to USB thermal printer
-                  </p>
-                </div>
-                <Switch
-                  id="thermal-enabled"
-                  checked={settings.thermal.enabled}
-                  onCheckedChange={(checked) => updateThermalSettings({ enabled: checked })}
-                />
-              </div>
-
-              {/* Copies Setting */}
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded">
-                <div className="space-y-0.5">
-                  <Label htmlFor="thermal-copies" className="text-sm font-medium">
-                    Number of Copies
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    1 = Patient copy only, 2 = Patient + Lab copy
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant={settings.thermal.copies === 1 ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => updateThermalSettings({ copies: 1 })}
-                  >
-                    1
-                  </Button>
-                  <Button
-                    variant={settings.thermal.copies === 2 ? 'default' : 'outline'}
-                    size="sm"
-                    onClick={() => updateThermalSettings({ copies: 2 })}
-                  >
-                    2
-                  </Button>
-                </div>
-              </div>
-
-              {/* Auto-print Toggle */}
-              <div className="flex items-center justify-between p-3 bg-muted/30 rounded">
-                <div className="space-y-0.5">
-                  <Label htmlFor="thermal-auto" className="text-sm font-medium">
-                    Auto-print on Payment
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    Automatically print receipts when payment is confirmed
-                  </p>
-                </div>
-                <Switch
-                  id="thermal-auto"
-                  checked={settings.thermal.autoPrintOnPayment}
-                  onCheckedChange={(checked) => updateThermalSettings({ autoPrintOnPayment: checked })}
-                />
-              </div>
-            </div>
-
-            {/* Zadig driver guide */}
             <Accordion
               type="single"
               collapsible
@@ -290,7 +355,7 @@ export default function PrinterSetup() {
                     <Info className={`w-4 h-4 ${showZadigGuide ? 'text-destructive' : 'text-blue-500'}`} />
                     {showZadigGuide
                       ? 'Action required: replace the USB driver (see steps below)'
-                      : 'Having trouble connecting? See setup instructions'}
+                      : 'Having trouble connecting via USB? See setup instructions'}
                   </span>
                 </AccordionTrigger>
                 <AccordionContent>
@@ -307,7 +372,7 @@ export default function PrinterSetup() {
                       <li>Select <strong>Xprinter</strong> from the dropdown</li>
                       <li>In the driver box on the right, choose <strong>WinUSB</strong></li>
                       <li>Click <strong>Replace Driver</strong> and wait ~30 s</li>
-                      <li>Return here and click <strong>Connect Printer</strong></li>
+                      <li>Return here and click <strong>Connect USB</strong></li>
                     </ol>
                     <Alert>
                       <AlertTriangle className="w-4 h-4" />
@@ -321,6 +386,73 @@ export default function PrinterSetup() {
                 </AccordionContent>
               </AccordionItem>
             </Accordion>
+          </CardContent>
+        </Card>
+
+        {/* Shared Settings */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Receipt Settings</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded">
+              <div className="space-y-0.5">
+                <Label htmlFor="thermal-enabled" className="text-sm font-medium">
+                  Enable Thermal Printing
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Print receipts directly to thermal printer
+                </p>
+              </div>
+              <Switch
+                id="thermal-enabled"
+                checked={settings.thermal.enabled}
+                onCheckedChange={(checked) => updateThermalSettings({ enabled: checked })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded">
+              <div className="space-y-0.5">
+                <Label htmlFor="thermal-copies" className="text-sm font-medium">
+                  Number of Copies
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  1 = Patient copy only, 2 = Patient + Lab copy
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  variant={settings.thermal.copies === 1 ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => updateThermalSettings({ copies: 1 })}
+                >
+                  1
+                </Button>
+                <Button
+                  variant={settings.thermal.copies === 2 ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => updateThermalSettings({ copies: 2 })}
+                >
+                  2
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-3 bg-muted/30 rounded">
+              <div className="space-y-0.5">
+                <Label htmlFor="thermal-auto" className="text-sm font-medium">
+                  Auto-print on Payment
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Automatically print receipts when payment is confirmed
+                </p>
+              </div>
+              <Switch
+                id="thermal-auto"
+                checked={settings.thermal.autoPrintOnPayment}
+                onCheckedChange={(checked) => updateThermalSettings({ autoPrintOnPayment: checked })}
+              />
+            </div>
           </CardContent>
         </Card>
       </div>

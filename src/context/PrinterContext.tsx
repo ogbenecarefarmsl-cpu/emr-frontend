@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { usbPrinterService, type SavedDeviceInfo } from '@/services/usbPrinterService';
+import { btPrinterService, type SavedBtDeviceInfo } from '@/services/bluetoothPrinterService';
 import { qzTrayService } from '@/services/qzTrayService';
 import { settingsAPI } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
@@ -90,10 +91,21 @@ export interface PrinterContextValue {
   /** QZ Tray printer name */
   qzTrayPrinter: string | null;
 
+  /** Info about the paired Bluetooth thermal printer (null if none) */
+  btDevice: SavedBtDeviceInfo | null;
+  /** True when the Bluetooth device is connected */
+  btConnected: boolean;
+  /** Whether the browser supports Web Bluetooth */
+  btSupported: boolean;
+
   /** Triggers the browser USB picker and pairs the chosen device */
   connectThermalPrinter: () => Promise<void>;
   /** Releases claim, closes device, removes pairing */
   disconnectThermalPrinter: () => Promise<void>;
+  /** Triggers the browser Bluetooth picker and pairs the chosen device */
+  connectBtPrinter: () => Promise<void>;
+  /** Disconnects the Bluetooth printer */
+  disconnectBtPrinter: () => Promise<void>;
   /** Connect to QZ Tray */
   connectQZTray: () => Promise<void>;
   /** Disconnect from QZ Tray */
@@ -115,12 +127,22 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
   const [webUsbSupported] = useState(() => usbPrinterService.isSupported);
   const [qzTrayConnected, setQzTrayConnected] = useState(false);
   const [qzTrayPrinter, setQzTrayPrinter] = useState<string | null>(null);
+  const [btDevice, setBtDevice] = useState<SavedBtDeviceInfo | null>(
+    () => btPrinterService.getSavedDevice()
+  );
+  const [btConnected, setBtConnected] = useState(false);
+  const [btSupported] = useState(() => btPrinterService.isSupported);
 
   // Attempt silent reconnect on mount
   useEffect(() => {
     usbPrinterService.autoConnect().then(connected => {
       setThermalConnected(connected);
       if (connected) setThermalDevice(usbPrinterService.getSavedDevice());
+    });
+
+    btPrinterService.autoConnect().then(connected => {
+      setBtConnected(connected);
+      if (connected) setBtDevice(btPrinterService.getSavedDevice());
     });
 
     // Try to connect to QZ Tray on mount
@@ -207,6 +229,18 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
     setThermalConnected(false);
   }, []);
 
+  const connectBtPrinter = useCallback(async () => {
+    const info = await btPrinterService.requestAndConnect();
+    setBtDevice(info);
+    setBtConnected(true);
+  }, []);
+
+  const disconnectBtPrinter = useCallback(async () => {
+    await btPrinterService.disconnect();
+    setBtDevice(null);
+    setBtConnected(false);
+  }, []);
+
   const connectQZTray = useCallback(async () => {
     const connected = await qzTrayService.connect();
     setQzTrayConnected(connected);
@@ -236,8 +270,13 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
         webUsbSupported,
         qzTrayConnected,
         qzTrayPrinter,
+        btDevice,
+        btConnected,
+        btSupported,
         connectThermalPrinter,
         disconnectThermalPrinter,
+        connectBtPrinter,
+        disconnectBtPrinter,
         connectQZTray,
         disconnectQZTray,
       }}
