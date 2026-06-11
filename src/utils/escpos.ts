@@ -466,3 +466,167 @@ export function buildTreatmentPlanESCPOS(
 function formatCurrency58(n: number): string {
   return `Le ${n.toLocaleString('en-US')}`;
 }
+
+// ── Visit Receipt ─────────────────────────────────────────────────────────────
+
+export interface VisitReceiptEscPosData {
+  visitNumber: string;
+  patientName: string;
+  patientId: string;
+  serviceLabel: string;
+  procedureType?: string;
+  amount: number;
+  paymentMethod: string;
+  paymentDate: string;
+  cashier: string;
+}
+
+export function buildVisitReceiptESCPOS(
+  data: VisitReceiptEscPosData,
+  branch?: BranchHeaderData | null,
+): Uint8Array {
+  const b = new EscPosBuilder();
+  const dateStr = new Date(data.paymentDate).toLocaleDateString('en-GB') +
+    ' ' + new Date(data.paymentDate).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  buildBranchHeaderESCPOS(b, branch);
+
+  b.bold(true);
+  b.align('center');
+  b.line(center('VISIT FEE RECEIPT'));
+  b.bold(false);
+  b.separator('=');
+
+  b.align('left');
+  b.line(padLine('Visit No:', data.visitNumber));
+  b.line(padLine('Date:', dateStr));
+  b.separator();
+
+  b.bold(true).line('PATIENT').bold(false);
+  b.line(padLine('Name:', data.patientName));
+  b.line(padLine('ID:', data.patientId));
+  b.separator();
+
+  b.bold(true).line('SERVICE').bold(false);
+  b.line(padLine('Type:', data.serviceLabel));
+  if (data.procedureType) b.line(padLine('Procedure:', data.procedureType));
+  b.separator();
+
+  b.bold(true);
+  b.line(padLine('TOTAL PAID:', formatCurrency(data.amount)));
+  b.bold(false);
+  b.line(padLine('Method:', data.paymentMethod.toUpperCase()));
+  b.line(padLine('Cashier:', data.cashier));
+  b.separator('=');
+
+  b.align('center');
+  const footer = (branch?.footerText?.trim()) || 'Thank you for choosing us!';
+  b.line(' ');
+  for (const line of footer.split('|').map((s) => s.trim()).filter(Boolean)) {
+    b.line(line);
+  }
+  b.line(' ');
+  b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
+
+  b.feed(4);
+  b.cut();
+
+  return b.build();
+}
+
+// ── Prescription Receipt ──────────────────────────────────────────────────────
+
+export interface PrescriptionReceiptEscPosData {
+  prescriptionNumber: string;
+  patientName: string;
+  patientId: string;
+  dispenseDate: string;
+  status: string;
+  items: Array<{
+    medicationName: string;
+    strengthPerDose?: string;
+    dosesPerDay?: number;
+    durationDays?: number;
+    instructions?: string;
+    dispensedSellUnits?: number;
+    priceAtDispense?: number;
+    lineTotalAtDispense?: number;
+    dispenseMode?: string;
+    dispensedPackName?: string;
+  }>;
+  totalAmount: number;
+  actualTotalAmount?: number;
+  isPaid: boolean;
+}
+
+export function buildPrescriptionReceiptESCPOS(
+  data: PrescriptionReceiptEscPosData,
+  branch?: BranchHeaderData | null,
+): Uint8Array {
+  const b = new EscPosBuilder();
+
+  buildBranchHeaderESCPOS(b, branch);
+
+  b.bold(true);
+  b.align('center');
+  b.line(center('PRESCRIPTION'));
+  b.bold(false);
+  b.separator('=');
+
+  b.align('left');
+  b.line(padLine('Rx No:', data.prescriptionNumber));
+  b.line(padLine('Date:', data.dispenseDate));
+  b.line(padLine('Status:', data.status.toUpperCase()));
+  b.separator();
+
+  b.bold(true).line('PATIENT').bold(false);
+  b.line(padLine('Name:', data.patientName));
+  b.line(padLine('ID:', data.patientId));
+  b.separator();
+
+  b.bold(true).line('MEDICATIONS DISPENSED').bold(false);
+  data.items.forEach((item, i) => {
+    b.line(`${i + 1}. ${item.medicationName}`);
+    if (item.dispenseMode === 'pack' && item.dispensedPackName) {
+      b.line(`   Pack: ${item.dispensedPackName}`);
+    }
+    if (item.strengthPerDose) {
+      b.line(`   ${item.strengthPerDose}, ${item.dosesPerDay}x/day, ${item.durationDays}d`);
+    }
+    if (item.instructions) {
+      b.line(`   ${item.instructions}`);
+    }
+    if (item.lineTotalAtDispense != null) {
+      b.line(padLine('   ', `${item.dispensedSellUnits} x ${formatCurrency(item.priceAtDispense || 0)} = ${formatCurrency(item.lineTotalAtDispense)}`));
+    }
+  });
+  b.separator();
+
+  const total = data.actualTotalAmount || data.totalAmount;
+  if (data.actualTotalAmount && data.actualTotalAmount !== data.totalAmount) {
+    b.line(padLine('Prescribed:', formatCurrency(data.totalAmount)));
+    b.bold(true);
+    b.line(padLine('Dispensed:', formatCurrency(data.actualTotalAmount)));
+    b.bold(false);
+  } else {
+    b.bold(true);
+    b.line(padLine('TOTAL:', formatCurrency(total)));
+    b.bold(false);
+  }
+  b.line(padLine('Payment:', data.isPaid ? 'PAID' : 'UNPAID'));
+  b.separator('=');
+
+  b.align('center');
+  const footer = (branch?.footerText?.trim()) || 'Thank you for choosing us!';
+  b.line(' ');
+  for (const line of footer.split('|').map((s) => s.trim()).filter(Boolean)) {
+    b.line(line);
+  }
+  b.line(' ');
+  b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
+
+  b.feed(4);
+  b.cut();
+
+  return b.build();
+}

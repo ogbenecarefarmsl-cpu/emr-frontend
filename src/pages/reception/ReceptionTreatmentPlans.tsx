@@ -13,6 +13,7 @@ import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { useMyBranch } from '@/hooks/useBranch';
 import { buildTreatmentPlanESCPOS } from '@/utils/escpos';
 import { usbPrinterService } from '@/services/usbPrinterService';
+import { btPrinterService } from '@/services/bluetoothPrinterService';
 import type { TreatmentPlan } from '@/types/treatment-plan';
 import { Printer, Eye, Loader2, Send, DollarSign, Wallet, Banknote } from 'lucide-react';
 import { TreatmentPlanReceipt, treatmentPlanPrintStyles } from '@/components/receipts/TreatmentPlanReceipt';
@@ -75,31 +76,42 @@ export default function ReceptionTreatmentPlans() {
 
       // Auto-print treatment plan receipt after payment
       try {
+        const patient = typeof updatedPlan.patientId === 'object' ? updatedPlan.patientId : null;
+        const visit = typeof updatedPlan.visitId === 'object' ? updatedPlan.visitId : null;
+        const bytes = buildTreatmentPlanESCPOS(
+          {
+            planNumber: updatedPlan.planNumber,
+            patientName: patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown',
+            patientId: patient?.patientId || '',
+            patientAge: patient?.age?.toString(),
+            patientGender: patient?.gender,
+            patientPhone: patient?.phone,
+            visitNumber: visit?.visitNumber,
+            items: updatedPlan.items.map((i) => ({ type: i.type, description: i.description, amount: i.amount })),
+            totalAmount: updatedPlan.totalAmount,
+            amountPaid: updatedPlan.amountPaid,
+            balance: updatedPlan.balance,
+            paymentStatus: updatedPlan.paymentStatus,
+            notes: updatedPlan.notes,
+          },
+          branch
+        );
+
+        let printed = false;
         if (usbPrinterService.isConnected) {
-          const patient = typeof updatedPlan.patientId === 'object' ? updatedPlan.patientId : null;
-          const visit = typeof updatedPlan.visitId === 'object' ? updatedPlan.visitId : null;
-          const bytes = buildTreatmentPlanESCPOS(
-            {
-              planNumber: updatedPlan.planNumber,
-              patientName: patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown',
-              patientId: patient?.patientId || '',
-              patientAge: patient?.age?.toString(),
-              patientGender: patient?.gender,
-              patientPhone: patient?.phone,
-              visitNumber: visit?.visitNumber,
-              items: updatedPlan.items.map((i) => ({ type: i.type, description: i.description, amount: i.amount })),
-              totalAmount: updatedPlan.totalAmount,
-              amountPaid: updatedPlan.amountPaid,
-              balance: updatedPlan.balance,
-              paymentStatus: updatedPlan.paymentStatus,
-              notes: updatedPlan.notes,
-            },
-            branch
-          );
-          await usbPrinterService.print(bytes);
-          toast.success('Treatment plan receipt printed');
+          try { await usbPrinterService.print(bytes); printed = true; } catch {}
         }
-      } catch (err: any) {
+        if (!printed && btPrinterService.isConnected) {
+          try { await btPrinterService.print(bytes); printed = true; } catch {}
+        }
+        if (!printed && !usbPrinterService.isConnected) {
+          try { if (await usbPrinterService.autoConnect()) { await usbPrinterService.print(bytes); printed = true; } } catch {}
+        }
+        if (!printed && !btPrinterService.isConnected) {
+          try { if (await btPrinterService.autoConnect()) { await btPrinterService.print(bytes); printed = true; } } catch {}
+        }
+        if (printed) toast.success('Treatment plan receipt printed');
+      } catch {
         // Silent — payment succeeded, print is best-effort
       }
     },
@@ -111,28 +123,42 @@ export default function ReceptionTreatmentPlans() {
   const handlePrint = async (plan: TreatmentPlan) => {
     setIsPrinting(true);
     try {
+      const patient = typeof plan.patientId === 'object' ? plan.patientId : null;
+      const visit = typeof plan.visitId === 'object' ? plan.visitId : null;
+      const bytes = buildTreatmentPlanESCPOS(
+        {
+          planNumber: plan.planNumber,
+          patientName: patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown',
+          patientId: patient?.patientId || '',
+          patientAge: patient?.age?.toString(),
+          patientGender: patient?.gender,
+          patientPhone: patient?.phone,
+          visitNumber: visit?.visitNumber,
+          items: plan.items.map((i) => ({ type: i.type, description: i.description, amount: i.amount })),
+          totalAmount: plan.totalAmount,
+          amountPaid: plan.amountPaid,
+          balance: plan.balance,
+          paymentStatus: plan.paymentStatus,
+          notes: plan.notes,
+        },
+        branch
+      );
+
+      let printed = false;
       if (usbPrinterService.isConnected) {
-        const patient = typeof plan.patientId === 'object' ? plan.patientId : null;
-        const visit = typeof plan.visitId === 'object' ? plan.visitId : null;
-        const bytes = buildTreatmentPlanESCPOS(
-          {
-            planNumber: plan.planNumber,
-            patientName: patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown',
-            patientId: patient?.patientId || '',
-            patientAge: patient?.age?.toString(),
-            patientGender: patient?.gender,
-            patientPhone: patient?.phone,
-            visitNumber: visit?.visitNumber,
-            items: plan.items.map((i) => ({ type: i.type, description: i.description, amount: i.amount })),
-            totalAmount: plan.totalAmount,
-            amountPaid: plan.amountPaid,
-            balance: plan.balance,
-            paymentStatus: plan.paymentStatus,
-            notes: plan.notes,
-          },
-          branch
-        );
-        await usbPrinterService.print(bytes);
+        try { await usbPrinterService.print(bytes); printed = true; } catch {}
+      }
+      if (!printed && btPrinterService.isConnected) {
+        try { await btPrinterService.print(bytes); printed = true; } catch {}
+      }
+      if (!printed && !usbPrinterService.isConnected) {
+        try { if (await usbPrinterService.autoConnect()) { await usbPrinterService.print(bytes); printed = true; } } catch {}
+      }
+      if (!printed && !btPrinterService.isConnected) {
+        try { if (await btPrinterService.autoConnect()) { await btPrinterService.print(bytes); printed = true; } } catch {}
+      }
+
+      if (printed) {
         markPrintedMutation.mutate(plan._id);
         toast.success('Treatment plan printed');
         setViewPlan(null);

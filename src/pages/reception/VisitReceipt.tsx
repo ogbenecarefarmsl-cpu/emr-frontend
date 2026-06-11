@@ -8,11 +8,15 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
-import { visitsAPI, paymentsAPI } from '@/services/api';
+import { visitsAPI } from '@/services/api';
 import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { useMyBranch } from '@/hooks/useBranch';
 import { BranchLetterhead, BranchFooterText } from '@/components/receipts/BranchLetterhead';
 import { thermalPrintStyles } from '@/components/receipts/ThermalReceipt';
+import { usbPrinterService } from '@/services/usbPrinterService';
+import { btPrinterService } from '@/services/bluetoothPrinterService';
+import { buildVisitReceiptESCPOS } from '@/utils/escpos';
+import type { BranchHeaderData } from '@/utils/escpos';
 
 interface VisitReceiptData {
   visitId: string;
@@ -88,21 +92,87 @@ export default function VisitReceipt() {
   }
 
   const handlePrint = async () => {
-    if (!receiptRef.current || !receiptData) return;
+    if (!receiptData) return;
     setIsPrinting(true);
     try {
-      await printReceipt(receiptRef.current, {
-        title: `Visit ${receiptData.visitNumber}`,
-        onSuccess: () => {
-          setPrinted(true);
-          toast.success('Visit receipt printed');
-        },
-        onError: (err) => {
-          toast.error(`Print failed: ${err.message}`);
-        },
-      });
-    } catch {
-      // already toasted
+      const branchHeader: BranchHeaderData | null = receiptData.branch ? {
+        name: receiptData.branch.name || '',
+        address: receiptData.branch.address,
+        phone: receiptData.branch.phone,
+        email: receiptData.branch.email,
+        tagline: receiptData.branch.tagline,
+        website: receiptData.branch.website,
+        operatingHours: receiptData.branch.operatingHours,
+        footerText: receiptData.branch.footerText,
+      } : null;
+
+      const serviceLabelMap: Record<string, string> = {
+        normal_consultation: 'Normal Consultation',
+        specialist_consultation: 'Specialist Consultation',
+        observation_4h: 'Observation (4 hours)',
+        procedure: 'Procedure',
+      };
+
+      const bytes = buildVisitReceiptESCPOS({
+        visitNumber: receiptData.visitNumber,
+        patientName: receiptData.patientName,
+        patientId: receiptData.patientId,
+        serviceLabel: serviceLabelMap[receiptData.serviceLabel] || receiptData.serviceLabel,
+        procedureType: receiptData.procedureType,
+        amount: receiptData.amount,
+        paymentMethod: receiptData.paymentMethod,
+        paymentDate: receiptData.paymentDate,
+        cashier: receiptData.cashier,
+      }, branchHeader);
+
+      let printed = false;
+
+      if (usbPrinterService.isConnected) {
+        try {
+          await usbPrinterService.print(bytes);
+          printed = true;
+        } catch { /* fall through */ }
+      }
+
+      if (!printed && btPrinterService.isConnected) {
+        try {
+          await btPrinterService.print(bytes);
+          printed = true;
+        } catch { /* fall through */ }
+      }
+
+      if (!printed && !usbPrinterService.isConnected) {
+        try {
+          const ok = await usbPrinterService.autoConnect();
+          if (ok) {
+            await usbPrinterService.print(bytes);
+            printed = true;
+          }
+        } catch { /* fall through */ }
+      }
+
+      if (!printed && !btPrinterService.isConnected) {
+        try {
+          const ok = await btPrinterService.autoConnect();
+          if (ok) {
+            await btPrinterService.print(bytes);
+            printed = true;
+          }
+        } catch { /* fall through */ }
+      }
+
+      if (!printed && receiptRef.current) {
+        await printReceipt(receiptRef.current, {
+          title: `Visit ${receiptData.visitNumber}`,
+          onSuccess: () => {},
+          onError: () => {},
+        });
+      }
+
+      setPrinted(true);
+      toast.success('Visit receipt printed');
+    } catch (err: any) {
+      toast.error(`Print failed: ${err.message}`);
     } finally {
       setIsPrinting(false);
     }

@@ -14,6 +14,10 @@ import { useMyBranch } from '@/hooks/useBranch';
 import { BranchLetterhead, BranchFooterText } from '@/components/receipts/BranchLetterhead';
 import { thermalPrintStyles } from '@/components/receipts/ThermalReceipt';
 import type { Prescription } from '@/types/prescription';
+import { usbPrinterService } from '@/services/usbPrinterService';
+import { btPrinterService } from '@/services/bluetoothPrinterService';
+import { buildPrescriptionReceiptESCPOS } from '@/utils/escpos';
+import type { BranchHeaderData } from '@/utils/escpos';
 
 export default function PrescriptionReceipt() {
   const { id } = useParams<{ id: string }>();
@@ -49,21 +53,96 @@ export default function PrescriptionReceipt() {
   }, [rx]);
 
   const handlePrint = async () => {
-    if (!receiptRef.current || !rx) return;
+    if (!rx) return;
     setIsPrinting(true);
     try {
-      await printReceipt(receiptRef.current, {
-        title: `Prescription ${rx.prescriptionNumber}`,
-        onSuccess: () => {
-          setPrinted(true);
-          toast.success('Prescription receipt printed');
-        },
-        onError: (err) => {
-          toast.error(`Print failed: ${err.message}`);
-        },
-      });
-    } catch (e) {
-      // already toasted
+      const branchHeader: BranchHeaderData | null = branch ? {
+        name: branch.name || '',
+        address: branch.address,
+        phone: branch.phone,
+        email: branch.email,
+        tagline: branch.tagline,
+        website: branch.website,
+        operatingHours: branch.operatingHours,
+        footerText: branch.footerText,
+      } : null;
+
+      const pName = `${rx.patientId?.firstName || ''} ${rx.patientId?.lastName || ''}`.trim();
+      const dDate = rx.dispensedAt
+        ? format(new Date(rx.dispensedAt), 'dd/MM/yyyy HH:mm')
+        : format(new Date(), 'dd/MM/yyyy HH:mm');
+
+      const bytes = buildPrescriptionReceiptESCPOS({
+        prescriptionNumber: rx.prescriptionNumber,
+        patientName: pName,
+        patientId: rx.patientId?.patientId || '',
+        dispenseDate: dDate,
+        status: rx.status,
+        items: (rx.items || []).map((item: any) => ({
+          medicationName: item.medicationName,
+          strengthPerDose: item.strengthPerDose,
+          dosesPerDay: item.dosesPerDay,
+          durationDays: item.durationDays,
+          instructions: item.instructions,
+          dispensedSellUnits: item.dispensedSellUnits,
+          priceAtDispense: item.priceAtDispense,
+          lineTotalAtDispense: item.lineTotalAtDispense,
+          dispenseMode: item.dispenseMode,
+          dispensedPackName: item.dispensedPackName,
+        })),
+        totalAmount: rx.totalAmount || 0,
+        actualTotalAmount: rx.actualTotalAmount,
+        isPaid: rx.isPaid,
+      }, branchHeader);
+
+      let printed = false;
+
+      if (usbPrinterService.isConnected) {
+        try {
+          await usbPrinterService.print(bytes);
+          printed = true;
+        } catch { /* fall through */ }
+      }
+
+      if (!printed && btPrinterService.isConnected) {
+        try {
+          await btPrinterService.print(bytes);
+          printed = true;
+        } catch { /* fall through */ }
+      }
+
+      if (!printed && !usbPrinterService.isConnected) {
+        try {
+          const ok = await usbPrinterService.autoConnect();
+          if (ok) {
+            await usbPrinterService.print(bytes);
+            printed = true;
+          }
+        } catch { /* fall through */ }
+      }
+
+      if (!printed && !btPrinterService.isConnected) {
+        try {
+          const ok = await btPrinterService.autoConnect();
+          if (ok) {
+            await btPrinterService.print(bytes);
+            printed = true;
+          }
+        } catch { /* fall through */ }
+      }
+
+      if (!printed && receiptRef.current) {
+        await printReceipt(receiptRef.current, {
+          title: `Prescription ${rx.prescriptionNumber}`,
+          onSuccess: () => {},
+          onError: () => {},
+        });
+      }
+
+      setPrinted(true);
+      toast.success('Prescription receipt printed');
+    } catch (err: any) {
+      toast.error(`Print failed: ${err.message}`);
     } finally {
       setIsPrinting(false);
     }
