@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import { usePrinterContext } from '@/context/PrinterContext';
 import { usbPrinterService } from '@/services/usbPrinterService';
 import { btPrinterService } from '@/services/bluetoothPrinterService';
-import { buildReceiptESCPOS } from '@/utils/escpos';
+import { buildReceiptESCPOS, buildTestReceiptESCPOS } from '@/utils/escpos';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,26 +29,6 @@ import {
   Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
-
-const TEST_RECEIPT_DATA = {
-  receiptNumber: 'RCP-TEST-001',
-  orderNumber: 'ORD-TEST-20260308',
-  patientName: 'Test Patient',
-  patientId: 'LAB-TEST-001',
-  patientPhone: '+232 75 000000',
-  tests: [
-    { code: 'CBC', name: 'Complete Blood Count', price: 50000 },
-    { code: 'LFT', name: 'Liver Function Test', price: 75000 },
-  ],
-  subtotal: 125000,
-  discount: 10,
-  discountType: 'percentage' as const,
-  total: 112500,
-  amountPaid: 120000,
-  paymentMethod: 'cash' as const,
-  paymentDate: new Date().toISOString(),
-  cashier: 'Receptionist',
-};
 
 export default function PrinterSetup() {
   const { profile } = useAuth();
@@ -148,7 +128,7 @@ export default function PrinterSetup() {
         const ok = await usbPrinterService.autoConnect();
         if (!ok) throw new Error('Printer not connected. Please connect first.');
       }
-      const bytes = buildReceiptESCPOS(TEST_RECEIPT_DATA, 'patient');
+      const bytes = buildTestReceiptESCPOS();
       await usbPrinterService.print(bytes);
       toast.success('Test receipt sent to USB printer');
     } catch (err: unknown) {
@@ -166,7 +146,7 @@ export default function PrinterSetup() {
         const ok = await btPrinterService.autoConnect();
         if (!ok) throw new Error('Bluetooth printer not connected. Please connect first.');
       }
-      const bytes = buildReceiptESCPOS(TEST_RECEIPT_DATA, 'patient');
+      const bytes = buildTestReceiptESCPOS();
       await btPrinterService.print(bytes);
       toast.success('Test receipt sent to Bluetooth printer');
     } catch (err: unknown) {

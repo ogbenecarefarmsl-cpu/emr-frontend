@@ -174,6 +174,36 @@ export class EscPosBuilder {
  * Pass `branch` to print the user's assigned branch letterhead; if
  * omitted, falls back to a generic placeholder.
  */
+export function buildTestReceiptESCPOS(): Uint8Array {
+  const b = new EscPosBuilder();
+  const now = new Date();
+
+  b.init();
+  b.align('center');
+  b.bold(true);
+  b.fontSize(1);
+  b.line('PRINTER TEST');
+  b.fontSize(0);
+  b.bold(false);
+  b.separator();
+
+  b.align('left');
+  b.line(`Time: ${now.toLocaleTimeString('en-GB')}`);
+  b.line(`Date: ${now.toLocaleDateString('en-GB')}`);
+  b.separator();
+
+  b.align('center');
+  b.bold(true);
+  b.line('TEST SUCCESSFUL');
+  b.bold(false);
+  b.line('Printer is working correctly');
+
+  b.feed(3);
+  b.cut();
+
+  return b.build();
+}
+
 export function buildReceiptESCPOS(
   data: ReceiptData,
   copyType: 'patient' | 'lab',
