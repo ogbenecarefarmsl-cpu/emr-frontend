@@ -1397,16 +1397,6 @@ export default function DoctorDashboard() {
 
                     {/* Orders Tab */}
                     <TabsContent value="orders" className="p-5 md:p-6 mt-0">
-                      {closureBlockers.length > 0 && (
-                        <div className="mb-5 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-                          <p className="text-xs font-semibold text-amber-800">Before closing</p>
-                          <ul className="mt-1 text-xs text-amber-700 space-y-1">
-                            {closureBlockers.map((blocker) => (
-                              <li key={blocker}>- {blocker}</li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
                       {currentVisitOrders.length > 0 && (
                         <div className="mb-6">
                           <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Existing Orders</h4>
@@ -1485,24 +1475,6 @@ export default function DoctorDashboard() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-                        <Button variant="outline" className="h-auto justify-start rounded-lg p-4" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!canContinueClinicalWork}>
-                          <FlaskConical className="w-5 h-5 mr-3 text-blue-500" />
-                          <span className="text-left"><span className="block font-medium">Order Lab Tests</span><span className="block text-xs text-muted-foreground">Send tests to LIS.</span></span>
-                        </Button>
-                        <Button variant="outline" className="h-auto justify-start rounded-lg p-4" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }} disabled={!canContinueClinicalWork}>
-                          <Pill className="w-5 h-5 mr-3 text-purple-500" />
-                          <span className="text-left"><span className="block font-medium">Prescribe Medication</span><span className="block text-xs text-muted-foreground">Create medication order.</span></span>
-                        </Button>
-                        <Button variant="outline" className="h-auto justify-start rounded-lg p-4" onClick={() => setReferralOpen(true)} disabled={!canContinueClinicalWork}>
-                          <UserCheck className="w-5 h-5 mr-3 text-cyan-600" />
-                          <span className="text-left"><span className="block font-medium">Refer Patient</span><span className="block text-xs text-muted-foreground">Send clinical referral.</span></span>
-                        </Button>
-                        <Button variant="outline" className="h-auto justify-start rounded-lg p-4" onClick={() => setAdmitOpen(true)} disabled={!canContinueClinicalWork}>
-                          <BedDouble className="w-5 h-5 mr-3 text-emerald-600" />
-                          <span className="text-left"><span className="block font-medium">Admit Patient</span><span className="block text-xs text-muted-foreground">Start inpatient care.</span></span>
-                        </Button>
-                      </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6">
                         {[
                           { label: 'Awaiting lab payment', value: awaitingLabPayment.length },
@@ -1514,11 +1486,6 @@ export default function DoctorDashboard() {
                             <p className="text-2xl font-semibold mt-1">{item.value}</p>
                           </div>
                         ))}
-                      </div>
-                      <div className="mt-6 flex justify-end">
-                        <Button className="rounded-full" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
-                          <CheckCircle className="w-4 h-4 mr-2" /> Close Visit
-                        </Button>
                       </div>
                     </TabsContent>
 
@@ -1577,59 +1544,11 @@ export default function DoctorDashboard() {
 
                     {/* Overview Tab */}
                     <TabsContent value="overview" className="p-5 mt-0">
-                      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        <div className="clinical-panel p-4">
-                          <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><Heart className="w-4 h-4 text-red-500" /> Vitals</h3>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {[
-                              { label: 'Temperature (C)', value: vitalsForm.temperature },
-                              { label: 'Blood Pressure', value: vitalsForm.bloodPressure },
-                              { label: 'Heart Rate (bpm)', value: vitalsForm.heartRate },
-                              { label: 'Resp. Rate (/min)', value: vitalsForm.respiratoryRate },
-                              { label: 'Weight (kg)', value: vitalsForm.weight },
-                              { label: 'SpO2 (%)', value: vitalsForm.oxygenSaturation },
-                            ].map((vital) => (
-                              <div key={vital.label} className="p-2 rounded-lg bg-muted/50 border min-w-0">
-                                <div className="clinical-label">{vital.label}</div>
-                                <div className="clinical-data mt-0.5 break-words">{vital.value || '-'}</div>
-                              </div>
-                            ))}
-                          </div>
-                          <p className="text-xs text-muted-foreground mt-2">Latest nursing triage vitals.</p>
-                        </div>
-                        <div className="clinical-panel p-4">
-                          <h3 className="font-semibold text-sm mb-3 flex items-center gap-2"><ClipboardList className="w-4 h-4 text-blue-500" /> Chief Complaint</h3>
-                          <p className="text-sm text-muted-foreground">{selectedVisit.chiefComplaint || 'Not specified'}</p>
-                          {selectedVisit.notes && (
-                            <>
-                              <Separator className="my-3" />
-                              <p className="text-sm text-muted-foreground">{selectedVisit.notes}</p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                      <div className="mt-6 space-y-4">
+                      <div className="space-y-4">
                         <AllergyManager patientId={selectedVisit.patientId?._id || selectedVisit.patientId} allergies={selectedVisit.patientId?.allergies || []} allergyDetails={selectedVisit.patientId?.allergyDetails || []} />
                         <ProblemList visitId={selectedVisit._id || selectedVisit.id} problems={selectedVisit.problemList || []} />
                         <VitalsTrends vitalsHistory={patientChart?.vitalsHistory || []} />
                         <FollowUpScheduler visitId={selectedVisit._id || selectedVisit.id} followUpDate={selectedVisit.followUpDate} followUpNotes={selectedVisit.followUpNotes} />
-                      </div>
-                      <div className="clinical-panel mt-6 p-4">
-                        {closureBlockers.length > 0 && (
-                          <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-                            <p className="text-xs font-semibold text-amber-800">Cannot close encounter yet</p>
-                            <ul className="mt-1 text-xs text-amber-700 space-y-1">{closureBlockers.map((blocker) => (<li key={blocker}>- {blocker}</li>))}</ul>
-                          </div>
-                        )}
-                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                          <div><h3 className="font-semibold text-sm">Clinical actions</h3><p className="text-xs text-muted-foreground mt-1 capitalize">{statusLabel(selectedVisit.status)}</p></div>
-                          <div className="flex flex-wrap gap-2">
-                            <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('soap')}><FileText className="w-4 h-4 mr-2" /> Consult</Button>
-                            <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}><ClipboardList className="w-4 h-4 mr-2" /> Orders</Button>
-                            <Button variant="outline" className="rounded-full" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}><FlaskConical className="w-4 h-4 mr-2" /> Results</Button>
-                            <Button className="rounded-full" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}><CheckCircle className="w-4 h-4 mr-2" /> Close Visit</Button>
-                          </div>
-                        </div>
                       </div>
                     </TabsContent>
 
@@ -1863,25 +1782,6 @@ export default function DoctorDashboard() {
             {/* Right Context Panel */}
             {selectedVisit && (
               <div className="w-[280px] hidden lg:flex flex-col gap-5 shrink-0">
-                {/* Triage Alert */}
-                {selectedVisit.triageAlert && selectedVisit.triageAlerts && selectedVisit.triageAlerts.length > 0 && (
-                  <div className="bg-red-50 border border-red-300 rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                    <h4 className={cn(CLINICAL_LABEL, "text-red-700 mb-2 flex items-center gap-1.5")}>
-                      <AlertCircle className="w-3.5 h-3.5" /> Nurse Triage Alert
-                    </h4>
-                    <p className="text-xs text-red-800 font-semibold mb-1.5">{selectedVisit.triageAlert}</p>
-                    {selectedVisit.triageAlerts.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {selectedVisit.triageAlerts.map((a: string, i: number) => (
-                          <span key={i} className="px-1.5 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-medium border border-red-200">
-                            {a.replace(/_/g, ' ')}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 {/* Drug-Allergy Quick Check */}
                 {selectedVisit.patientId?.allergies?.length > 0 && (
                   <div className="bg-white border border-red-200 rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
@@ -1941,20 +1841,6 @@ export default function DoctorDashboard() {
                     )}
                   </div>
                 </div>
-
-                {/* Closure Status */}
-                {closureBlockers.length > 0 && (
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                    <h4 className="text-[10px] font-bold uppercase tracking-wider text-amber-700 mb-2">Cannot close yet</h4>
-                    <ul className="space-y-1">
-                      {closureBlockers.map((b) => (
-                        <li key={b} className="text-[11px] text-amber-800 flex items-start gap-1.5">
-                          <span className="text-amber-500 mt-0.5">•</span> {b}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
               </div>
             )}
           </div>
