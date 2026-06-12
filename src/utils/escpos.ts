@@ -54,7 +54,7 @@ export interface BranchHeaderData {
 
 export const FALLBACK_BRANCH: BranchHeaderData = {
   name: 'Harbour Medical Diagnostic',
-  address: '555 Bai Bureh Road, Allen Town',
+  address: '555, Bai Bureh Road, Allen Town',
   phone: '+23275405804',
   email: 'harbourmedicaldiagnostics@gmail.com',
   footerText: 'Thank you for choosing us! | Open 6 days/week | Lab & Pharmacy under one roof',
@@ -148,7 +148,23 @@ export class EscPosBuilder {
 
   /** Append raw text bytes (UTF-8 or ASCII) */
   text(str: string): this {
-    const encoded = new TextEncoder().encode(str);
+    const sanitized = str
+      .replace(/\u2014/g, '-')   // em-dash → hyphen
+      .replace(/\u2013/g, '-')   // en-dash → hyphen
+      .replace(/\u2018/g, "'")   // left single quote → apostrophe
+      .replace(/\u2019/g, "'")   // right single quote → apostrophe
+      .replace(/\u201C/g, '"')   // left double quote → straight quote
+      .replace(/\u201D/g, '"')   // right double quote → straight quote
+      .replace(/\u2026/g, '...') // ellipsis → three dots
+      .replace(/\u00B0/g, 'deg') // degree symbol → "deg"
+      .replace(/\u00A0/g, ' ')   // non-breaking space → space
+      .replace(/\u2022/g, '*')   // bullet → asterisk
+      .replace(/\u2010/g, '-')   // hyphen → hyphen
+      .replace(/\u2011/g, '-')   // non-breaking hyphen
+      .replace(/\u2012/g, '-')   // figure dash
+      .replace(/\u00E9/g, 'e')   // e-acute → e
+      .replace(/[^\x00-\x7E]/g, '?'); // anything else → ?
+    const encoded = new TextEncoder().encode(sanitized);
     encoded.forEach(b => this.bytes.push(b));
     return this;
   }
