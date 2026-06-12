@@ -1076,6 +1076,10 @@ export const visitsAPI = {
     const response = await api.patch(`/visits/${id}/assign-doctor`, { doctorId });
     return response.data;
   },
+
+  delete: async (id: string) => {
+    await api.delete(`/visits/${id}`);
+  },
 };
 
 export const pendingOrdersAPI = {
@@ -1141,6 +1145,10 @@ export const prescriptionsAPI = {
   markAsPaid: async (id: string, paymentMethod: string) => {
     const response = await api.patch(`/prescriptions/${id}/mark-paid`, { paymentMethod });
     return response.data;
+  },
+
+  delete: async (id: string) => {
+    await api.delete(`/prescriptions/${id}`);
   },
 };
 

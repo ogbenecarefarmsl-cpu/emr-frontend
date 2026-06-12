@@ -1,4 +1,4 @@
-import { visitsAPI, pendingOrdersAPI } from '@/services/api';
+import { visitsAPI, pendingOrdersAPI, prescriptionsAPI } from '@/services/api';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -337,6 +337,38 @@ export function useMarkOrderPaid() {
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to mark order paid');
+    },
+  });
+}
+
+export function useDeleteVisit() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return await visitsAPI.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['visits'], exact: false });
+      toast.success('Visit deleted');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to delete visit');
+    },
+  });
+}
+
+export function useDeletePrescription() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      return await prescriptionsAPI.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prescriptions'], exact: false });
+      toast.success('Prescription deleted');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to delete prescription');
     },
   });
 }
