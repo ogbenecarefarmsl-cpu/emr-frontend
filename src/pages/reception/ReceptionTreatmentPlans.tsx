@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { RoleLayout } from '@/components/layout/RoleLayout';
@@ -9,14 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
-import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { useMyBranch } from '@/hooks/useBranch';
 import { buildTreatmentPlanESCPOS } from '@/utils/escpos';
 import { usbPrinterService } from '@/services/usbPrinterService';
 import { btPrinterService } from '@/services/bluetoothPrinterService';
 import type { TreatmentPlan } from '@/types/treatment-plan';
 import { Printer, Eye, Loader2, Send, DollarSign, Wallet, Banknote } from 'lucide-react';
-import { TreatmentPlanReceipt, treatmentPlanPrintStyles } from '@/components/receipts/TreatmentPlanReceipt';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'bg-gray-100 text-gray-700' },
@@ -42,14 +40,12 @@ const PAYMENT_METHODS = [
 export default function ReceptionTreatmentPlans() {
   const queryClient = useQueryClient();
   const { data: branch } = useMyBranch();
-  const { printReceipt } = useThermalPrint();
   const [viewPlan, setViewPlan] = useState<TreatmentPlan | null>(null);
   const [payPlan, setPayPlan] = useState<TreatmentPlan | null>(null);
   const [payAmount, setPayAmount] = useState('');
   const [payMethod, setPayMethod] = useState('cash');
   const [payNotes, setPayNotes] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
-  const receiptRef = useRef<HTMLDivElement>(null);
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['treatment-plans', 'reception'],
@@ -144,34 +140,46 @@ export default function ReceptionTreatmentPlans() {
         branch
       );
 
+      const isPaid = plan.paymentStatus === 'paid' || (plan.balance || 0) <= 0;
       let printed = false;
+
+      // Try USB first
       if (usbPrinterService.isConnected) {
         try { await usbPrinterService.print(bytes); printed = true; } catch {}
       }
+      // Try Bluetooth
       if (!printed && btPrinterService.isConnected) {
         try { await btPrinterService.print(bytes); printed = true; } catch {}
       }
+      // Try USB auto-connect
       if (!printed && !usbPrinterService.isConnected) {
         try { if (await usbPrinterService.autoConnect()) { await usbPrinterService.print(bytes); printed = true; } } catch {}
       }
+      // Try BT auto-connect
       if (!printed && !btPrinterService.isConnected) {
         try { if (await btPrinterService.autoConnect()) { await btPrinterService.print(bytes); printed = true; } } catch {}
       }
 
       if (printed) {
+        // If paid, print second copy
+        if (isPaid) {
+          await new Promise(r => setTimeout(r, 1000));
+          if (usbPrinterService.isConnected) {
+            try { await usbPrinterService.print(bytes); } catch {}
+          } else if (btPrinterService.isConnected) {
+            try { await btPrinterService.print(bytes); } catch {}
+          }
+          toast.success('Treatment plan printed (2 copies)');
+        } else {
+          toast.success('Treatment plan printed (1 copy)');
+        }
         markPrintedMutation.mutate(plan._id);
-        toast.success('Treatment plan printed');
         setViewPlan(null);
         return;
       }
 
-      await printReceipt(receiptRef.current, {
-        title: `Treatment Plan ${plan.planNumber}`,
-        onSuccess: () => {
-          markPrintedMutation.mutate(plan._id);
-          setViewPlan(null);
-        },
-      });
+      // No thermal printer available — skip browser print dialog (background only)
+      toast.error('No printer connected. Connect a USB or Bluetooth thermal printer.');
     } catch (err: any) {
       toast.error(`Print failed: ${err.message}`);
     } finally {
@@ -309,20 +317,6 @@ export default function ReceptionTreatmentPlans() {
               </div>
             </CardContent>
           </Card>
-        )}
-
-        {/* Hidden receipt for browser print fallback */}
-        {viewPlan && (
-          <>
-            <style>{treatmentPlanPrintStyles}</style>
-            <div
-              ref={receiptRef}
-              className="receipt bg-white p-4 rounded shadow mx-auto"
-              style={{ maxWidth: '58mm' }}
-            >
-              <TreatmentPlanReceipt plan={viewPlan} />
-            </div>
-          </>
         )}
 
         {/* View plan dialog */}

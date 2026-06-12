@@ -184,21 +184,11 @@ export default function VisitReceipt() {
         }
       }
 
-      if (!printed && receiptRef.current) {
-        console.log('Print: falling back to browser print');
-        await printReceipt(receiptRef.current, {
-          title: `Visit ${receiptData.visitNumber}`,
-          onSuccess: () => {},
-          onError: () => {},
-        });
-        printed = true;
-      }
-
       if (printed) {
         setPrinted(true);
         toast.success('Visit receipt printed');
       } else {
-        throw lastError || new Error('All print methods failed');
+        toast.error('No printer connected. Connect a USB or Bluetooth thermal printer.');
       }
     } catch (err: any) {
       console.error('Print: final error:', err);
@@ -208,12 +198,14 @@ export default function VisitReceipt() {
     }
   };
 
-  // Auto-print on mount after payment
+  // Auto-print 2 copies on mount after payment
   useEffect(() => {
     if (!receiptData || autoPrintTriggeredRef.current) return;
     autoPrintTriggeredRef.current = true;
-    const timer = setTimeout(() => {
-      handlePrint();
+    const timer = setTimeout(async () => {
+      await handlePrint();
+      // Print second copy after delay
+      setTimeout(() => handlePrint(), 1000);
     }, 500);
     return () => clearTimeout(timer);
   }, [receiptData]);

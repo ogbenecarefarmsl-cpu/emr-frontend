@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical,
-  Clock, AlertTriangle, ChevronDown, Calendar, Droplets, ExternalLink, RefreshCw, Cloud,
+  Clock, AlertTriangle, ChevronDown, Calendar, Droplets, ExternalLink, RefreshCw,
   Phone, Hash, TrendingUp, ClipboardList
 } from 'lucide-react';
 import { PatientTreatmentPlans } from './PatientTreatmentPlans';
@@ -98,6 +98,33 @@ const PatientRecord = () => {
     }
   };
 
+  const getFlagLabel = (flag: string) => {
+    switch (flag) {
+      case 'critical_high': return 'CRITICAL HIGH';
+      case 'critical_low': return 'CRITICAL LOW';
+      case 'high': return 'HIGH';
+      case 'low': return 'LOW';
+      default: return null;
+    }
+  };
+
+  const getAllFlaggedResults = () => {
+    const flagged: any[] = [];
+    orders.forEach((order: any) => {
+      if (!order.results) return;
+      order.results.forEach((result: any) => {
+        if (result.flag && result.flag !== 'normal') {
+          flagged.push({ ...result, orderNumber: order.orderNumber, orderId: order._id });
+        }
+      });
+    });
+    flagged.sort((a: any, b: any) => {
+      const priority: Record<string, number> = { critical_high: 0, critical_low: 0, high: 1, low: 1 };
+      return (priority[a.flag] ?? 2) - (priority[b.flag] ?? 2);
+    });
+    return flagged;
+  };
+
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { className: string; label: string }> = {
       completed: { className: 'bg-emerald-50 text-emerald-700 border-emerald-200', label: 'Completed' },
@@ -109,19 +136,6 @@ const PatientRecord = () => {
     };
     const config = statusMap[status] || { className: 'bg-gray-50 text-gray-700 border-gray-200', label: status };
     return <Badge variant="outline" className={`text-[10px] ${config.className}`}>{config.label}</Badge>;
-  };
-
-  const getLisBadge = (order: any) => {
-    if (!order.lisSyncStatus) return null;
-    const className =
-      order.lisSyncStatus === 'synced' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-      : order.lisSyncStatus === 'failed' ? 'bg-red-50 text-red-700 border-red-200'
-      : 'bg-muted text-muted-foreground border-border';
-    return (
-      <Badge variant="outline" className={`gap-1 text-[10px] ${className}`} title={order.lisSyncError || undefined}>
-        <Cloud className="w-3 h-3" />LIS {String(order.lisSyncStatus).replace('_', ' ')}
-      </Badge>
-    );
   };
 
   const groupResultsByPanel = (order: any) => {
@@ -335,7 +349,7 @@ const PatientRecord = () => {
           </TabsContent>
 
           {/* Lab Results Tab */}
-          <TabsContent value="lab-results" className="space-y-3">
+          <TabsContent value="lab-results" className="space-y-4">
             {orders.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-16 text-center">
                 <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
@@ -344,114 +358,153 @@ const PatientRecord = () => {
                 <p className="font-medium text-muted-foreground">No lab orders yet</p>
                 <p className="text-sm text-muted-foreground/70 mt-1">Lab results will appear here once ordered</p>
               </div>
-            ) : (
-              orders.map((order: any) => {
-                const { panels, standalone } = groupResultsByPanel(order);
-                const hasResults = order.results?.length > 0;
-
-                return (
-                  <Card key={order._id}>
-                    <CardHeader className="pb-3">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <CardTitle className="text-base">{order.orderNumber}</CardTitle>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {formatDate(order.createdAt)} &bull; Dr. {order.doctorId?.fullName || 'N/A'}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatusBadge(order.status)}
-                          {getLisBadge(order)}
-                          {order.lisSyncStatus === 'synced' && (
-                            <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
-                              onClick={() => fetchLisResults.mutate(order._id)}
-                              disabled={fetchLisResults.isPending}
-                              title={order.lisResultsFetchedAt ? `Last fetched ${formatDate(order.lisResultsFetchedAt)}` : 'Fetch LIS results'}
-                            >
-                              <RefreshCw className={`w-3 h-3 ${fetchLisResults.isPending ? 'animate-spin' : ''}`} />Sync
-                            </Button>
-                          )}
-                          {order.status === 'completed' && (
-                            <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
-                              onClick={() => {
-                                const reportPath = primaryRole === 'receptionist'
-                                  ? `/reception/reports/${order._id}`
-                                  : primaryRole === 'nurse'
-                                    ? `/nurse/reports/${order._id}`
-                                    : `/lab/reports/${order._id}`;
-                                navigate(reportPath);
-                              }}
-                            >
-                              <ExternalLink className="w-3 h-3" />Report
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      {Object.entries(panels).map(([code, panel]: [string, any]) => (
-                        <Collapsible key={code}>
-                          <CollapsibleTrigger asChild>
-                            <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
-                              <ChevronDown className="w-4 h-4 text-muted-foreground collapsible-icon" />
-                              <span className="font-medium text-sm">{panel.name}</span>
-                              <Badge variant="outline" className="ml-auto text-[10px]">{panel.tests.length} tests</Badge>
-                            </div>
-                          </CollapsibleTrigger>
-                          <CollapsibleContent className="pt-2 space-y-1 pl-6">
-                            {panel.tests.map((test: any, idx: number) => (
-                              <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0">
-                                <div className="flex-1">
-                                  <p className="text-sm font-medium">{test.testName}</p>
-                                  <p className="text-xs text-muted-foreground">{test.testCode}</p>
-                                </div>
-                                {test.result ? (
-                                  <div className="text-right">
-                                    <p className={`text-sm font-semibold px-2 py-0.5 rounded border ${getFlagColor(test.result.flag)}`}>
-                                      {test.result.value} {test.result.unit}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground mt-0.5">{test.result.referenceRange}</p>
-                                  </div>
-                                ) : (
-                                  <Badge variant="secondary" className="text-[10px]">Pending</Badge>
-                                )}
+            ) : (() => {
+              const flaggedResults = getAllFlaggedResults();
+              return (
+                <>
+                  {flaggedResults.length > 0 && (
+                    <Card className="border-amber-200 bg-amber-50/30">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2 text-amber-800">
+                          <AlertTriangle className="w-4 h-4" />
+                          Abnormal Results ({flaggedResults.length})
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                          {flaggedResults.map((r: any, idx: number) => (
+                            <div key={idx} className={`flex items-center justify-between p-2.5 rounded-lg border ${getFlagColor(r.flag)}`}>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{r.testName}</p>
+                                <p className="text-xs opacity-70">{r.panelName || r.panelCode || r.orderNumber}</p>
                               </div>
-                            ))}
-                          </CollapsibleContent>
-                        </Collapsible>
-                      ))}
-
-                      {standalone.length > 0 && (
-                        <div className="space-y-1">
-                          {standalone.map((test: any, idx: number) => (
-                            <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0">
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">{test.testName}</p>
-                                <p className="text-xs text-muted-foreground">{test.testCode}</p>
+                              <div className="text-right ml-3 shrink-0">
+                                <p className="text-sm font-bold">{r.value} {r.unit}</p>
+                                <p className="text-[10px] opacity-70">{getFlagLabel(r.flag)} &bull; Ref: {r.referenceRange}</p>
                               </div>
-                              {test.result ? (
-                                <div className="text-right">
-                                  <p className={`text-sm font-semibold px-2 py-0.5 rounded border ${getFlagColor(test.result.flag)}`}>
-                                    {test.result.value} {test.result.unit}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground mt-0.5">{test.result.referenceRange}</p>
-                                </div>
-                              ) : (
-                                <Badge variant="secondary" className="text-[10px]">Pending</Badge>
-                              )}
                             </div>
                           ))}
                         </div>
-                      )}
+                      </CardContent>
+                    </Card>
+                  )}
 
-                      {!hasResults && order.orderTests?.length === 0 && (
-                        <p className="text-sm text-muted-foreground text-center py-4">No tests recorded for this order</p>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })
-            )}
+                  {orders.map((order: any) => {
+                    const { panels, standalone } = groupResultsByPanel(order);
+                    const hasResults = order.results?.length > 0;
+                    const resultCount = order.results?.length || 0;
+
+                    return (
+                      <Card key={order._id}>
+                        <CardHeader className="pb-3">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <CardTitle className="text-base">{order.orderNumber}</CardTitle>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {formatDate(order.createdAt)} &bull; Dr. {order.doctorId?.fullName || 'N/A'}
+                                {resultCount > 0 && <span className="ml-2 text-emerald-600 font-medium">{resultCount} results</span>}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {getStatusBadge(order.status)}
+                              {order.lisSyncStatus === 'synced' && (
+                                <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
+                                  onClick={() => fetchLisResults.mutate(order._id)}
+                                  disabled={fetchLisResults.isPending}
+                                  title={order.lisResultsFetchedAt ? `Last fetched ${formatDate(order.lisResultsFetchedAt)}` : 'Fetch LIS results'}
+                                >
+                                  <RefreshCw className={`w-3 h-3 ${fetchLisResults.isPending ? 'animate-spin' : ''}`} />Sync
+                                </Button>
+                              )}
+                              {order.status === 'completed' && (
+                                <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
+                                  onClick={() => {
+                                    const reportPath = primaryRole === 'receptionist'
+                                      ? `/reception/reports/${order._id}`
+                                      : primaryRole === 'nurse'
+                                        ? `/nurse/reports/${order._id}`
+                                        : `/lab/reports/${order._id}`;
+                                    navigate(reportPath);
+                                  }}
+                                >
+                                  <ExternalLink className="w-3 h-3" />Report
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          {Object.entries(panels).map(([code, panel]: [string, any]) => {
+                            const flaggedCount = panel.tests.filter((t: any) => t.result?.flag && t.result.flag !== 'normal').length;
+                            return (
+                              <Collapsible key={code} defaultOpen={flaggedCount > 0}>
+                                <CollapsibleTrigger asChild>
+                                  <div className="flex items-center gap-2 p-3 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors">
+                                    <ChevronDown className="w-4 h-4 text-muted-foreground collapsible-icon" />
+                                    <span className="font-medium text-sm">{panel.name}</span>
+                                    <Badge variant="outline" className="ml-auto text-[10px]">{panel.tests.length} tests</Badge>
+                                    {flaggedCount > 0 && (
+                                      <Badge className="text-[10px] bg-amber-100 text-amber-800 border-amber-300">{flaggedCount} abnormal</Badge>
+                                    )}
+                                  </div>
+                                </CollapsibleTrigger>
+                                <CollapsibleContent className="pt-2 space-y-1 pl-6">
+                                  {panel.tests.map((test: any, idx: number) => (
+                                    <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                                      <div className="flex-1">
+                                        <p className="text-sm font-medium">{test.testName}</p>
+                                        <p className="text-xs text-muted-foreground">{test.testCode}</p>
+                                      </div>
+                                      {test.result ? (
+                                        <div className="text-right">
+                                          <p className={`text-sm font-semibold px-2 py-0.5 rounded border ${getFlagColor(test.result.flag)}`}>
+                                            {test.result.value} {test.result.unit}
+                                          </p>
+                                          <p className="text-xs text-muted-foreground mt-0.5">{test.result.referenceRange}</p>
+                                        </div>
+                                      ) : (
+                                        <Badge variant="secondary" className="text-[10px]">Pending</Badge>
+                                      )}
+                                    </div>
+                                  ))}
+                                </CollapsibleContent>
+                              </Collapsible>
+                            );
+                          })}
+
+                          {standalone.length > 0 && (
+                            <div className="space-y-1">
+                              {standalone.map((test: any, idx: number) => (
+                                <div key={idx} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium">{test.testName}</p>
+                                    <p className="text-xs text-muted-foreground">{test.testCode}</p>
+                                  </div>
+                                  {test.result ? (
+                                    <div className="text-right">
+                                      <p className={`text-sm font-semibold px-2 py-0.5 rounded border ${getFlagColor(test.result.flag)}`}>
+                                        {test.result.value} {test.result.unit}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground mt-0.5">{test.result.referenceRange}</p>
+                                    </div>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-[10px]">Pending</Badge>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {!hasResults && order.orderTests?.length === 0 && (
+                            <p className="text-sm text-muted-foreground text-center py-4">No tests recorded for this order</p>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </>
+              );
+            })()}
           </TabsContent>
 
           {/* Prescriptions Tab */}

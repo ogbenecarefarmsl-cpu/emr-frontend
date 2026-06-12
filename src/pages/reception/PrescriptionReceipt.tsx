@@ -42,12 +42,14 @@ export default function PrescriptionReceipt() {
     enabled: !!id,
   });
 
-  // Auto-print on mount after dispense
+  // Auto-print 2 copies on mount after dispense
   useEffect(() => {
     if (!rx || !receiptRef.current || autoPrintTriggeredRef.current) return;
     autoPrintTriggeredRef.current = true;
-    const timer = setTimeout(() => {
-      handlePrint();
+    const timer = setTimeout(async () => {
+      await handlePrint();
+      // Print second copy after delay
+      setTimeout(() => handlePrint(), 1000);
     }, 500);
     return () => clearTimeout(timer);
   }, [rx]);
@@ -131,16 +133,12 @@ export default function PrescriptionReceipt() {
         } catch { /* fall through */ }
       }
 
-      if (!printed && receiptRef.current) {
-        await printReceipt(receiptRef.current, {
-          title: `Prescription ${rx.prescriptionNumber}`,
-          onSuccess: () => {},
-          onError: () => {},
-        });
+      if (printed) {
+        setPrinted(true);
+        toast.success('Prescription receipt printed');
+      } else {
+        toast.error('No printer connected. Connect a USB or Bluetooth thermal printer.');
       }
-
-      setPrinted(true);
-      toast.success('Prescription receipt printed');
     } catch (err: any) {
       toast.error(`Print failed: ${err.message}`);
     } finally {

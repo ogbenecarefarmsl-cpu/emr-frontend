@@ -518,27 +518,25 @@ export default function PaymentsPage() {
                             Pay
                           </Button>
                         )}
-                        {paymentStatus === 'paid' && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            title="Reprint receipt"
-                            onClick={() => {
-                              if (order._isPrescriptionPayment) {
-                                navigate(`/reception/prescription-receipt/${order._prescriptionId || order.id || order._id}`);
-                                return;
-                              }
-                              if (order._isConsultationPayment && order._visitId) {
-                                navigate(`/reception/visit-receipt?visitId=${order._visitId}`);
-                                return;
-                              }
-                              navigate(`/reception/receipt/${order.id || order._id}`);
-                            }}
-                          >
-                            <Receipt className="w-3 h-3 mr-1" />
-                            Reprint
-                          </Button>
-                        )}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          title="Reprint receipt (2 copies)"
+                          onClick={() => {
+                            if (order._isPrescriptionPayment) {
+                              navigate(`/reception/prescription-receipt/${order._prescriptionId || order.id || order._id}`);
+                              return;
+                            }
+                            if (order._isConsultationPayment && order._visitId) {
+                              navigate(`/reception/visit-receipt?visitId=${order._visitId}`);
+                              return;
+                            }
+                            navigate(`/reception/receipt/${order.id || order._id}`);
+                          }}
+                        >
+                          <Receipt className="w-3 h-3 mr-1" />
+                          Reprint
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"

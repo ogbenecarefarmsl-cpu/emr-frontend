@@ -218,27 +218,18 @@ export const useThermalPrint = () => {
                 return await qzTrayService.printBothCopies(receiptData);
               }
 
-              // If all direct methods failed, throw to trigger browser fallback
+              // If all direct methods failed, throw
               throw usbError;
             }
           }
         }
 
-        // Final fallback: Browser print dialog
-        console.log('✅ Using browser print with installed driver (XPrinter)');
-        console.log('💡 Tip: Set XPrinter as default printer to skip selection');
-        return await printBothReceiptCopies(patientCopyElement, labCopyElement);
+        // No thermal printer available
+        return { success: false, printedCount: 0 };
         
       } catch (error) {
         console.error('❌ Print error:', error);
-        // Still try browser fallback even if everything else failed
-        try {
-          console.log('🔄 Final fallback: Browser print dialog');
-          return await printBothReceiptCopies(patientCopyElement, labCopyElement);
-        } catch (fallbackError) {
-          console.error('❌ All print methods failed:', fallbackError);
-          return { success: false, printedCount: 0 };
-        }
+        return { success: false, printedCount: 0 };
       }
     },
     [settings.thermal.copies, qzTrayConnected, btConnected]

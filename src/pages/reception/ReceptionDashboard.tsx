@@ -36,6 +36,7 @@ import { visitsAPI } from '@/services/api';
 import { useDoctorQueue, useVisitStats } from '@/hooks/useVisits';
 import { useExpenditureSummary } from '@/hooks/useExpenditures';
 import { cn } from '@/lib/utils';
+import { Pill } from 'lucide-react';
 
 export default function ReceptionDashboard() {
   const { profile } = useAuth();
@@ -94,6 +95,19 @@ export default function ReceptionDashboard() {
     queryFn: () => prescriptionService.findPendingPayment(),
     staleTime: 15 * 1000,
   });
+
+  const { data: readyToDispense = [] } = useQuery({
+    queryKey: ['prescriptions', 'dispensing-queue'],
+    queryFn: () => prescriptionService.findAll(),
+    refetchInterval: 15000,
+    staleTime: 10000,
+  });
+
+  const dispensingQueue = useMemo(() => {
+    return (Array.isArray(readyToDispense) ? readyToDispense : [])
+      .filter((rx: any) => rx.isPaid && rx.status !== 'dispensed')
+      .slice(0, 5);
+  }, [readyToDispense]);
 
   const { data: todayVisits = [] } = useQuery({
     queryKey: ['visits', 'reception-today'],
@@ -317,6 +331,56 @@ export default function ReceptionDashboard() {
       <div className="mb-6">
         <PendingOrders />
       </div>
+
+      {/* Dispensing Queue - Ready to Dispense */}
+      {dispensingQueue.length > 0 && (
+        <div className="mb-6 bg-card border rounded-xl shadow-sm">
+          <div className="px-5 py-4 border-b flex items-center justify-between">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <Pill className="w-4 h-4 text-purple-500" />
+              Ready to Dispense
+              <Badge variant="secondary" className="ml-1 text-xs">{dispensingQueue.length}</Badge>
+            </h3>
+            <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reception/dispensing')}>
+              View All <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+          <div className="divide-y">
+            {dispensingQueue.map((rx: any) => {
+              const pName = rx.patientId?.firstName
+                ? `${rx.patientId.firstName} ${rx.patientId.lastName || ''}`.trim()
+                : 'Unknown';
+              const itemCount = (rx.items || []).length;
+              const total = rx.actualTotalAmount || rx.totalAmount || 0;
+              return (
+                <div key={rx._id} className="px-5 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
+                  onClick={() => navigate(`/reception/dispense/${rx._id}`)}>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-1.5 bg-purple-100 rounded-lg shrink-0">
+                        <Pill className="w-3.5 h-3.5 text-purple-600" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-sm truncate">{pName}</span>
+                          <Badge variant="outline" className="text-[10px] shrink-0">{rx.prescriptionNumber}</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {itemCount} item{itemCount !== 1 ? 's' : ''} · Le {total.toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                    <Button size="sm" variant="default" className="shrink-0 gap-1 text-xs"
+                      onClick={(e) => { e.stopPropagation(); navigate(`/reception/dispense/${rx._id}`); }}>
+                      Dispense <ArrowRight className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Today's visits by service type */}
       <div className="mb-6 bg-card border rounded-xl shadow-sm">

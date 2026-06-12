@@ -145,6 +145,15 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
       if (connected) setBtDevice(btPrinterService.getSavedDevice());
     });
 
+    // Listen for BT connection state changes (auto-reconnect)
+    btPrinterService.onDisconnect(() => {
+      setBtConnected(false);
+    });
+    btPrinterService.onReconnect(() => {
+      setBtConnected(true);
+      setBtDevice(btPrinterService.getSavedDevice());
+    });
+
     // Try to connect to QZ Tray on mount
     qzTrayService.isAvailable().then(available => {
       if (available) {

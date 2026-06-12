@@ -75,7 +75,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { to: '/reception/walk-in-receipt', icon: Receipt, label: 'Walk-in Receipt' },
     { to: '/reception/treatment-plans', icon: ClipboardList, label: 'Treatment Plans' },
     { to: '/reception/orders', icon: ClipboardList, label: 'Clinical Orders' },
-    { to: '/pharmacy', icon: Pill, label: 'Dispensing' },
+    { to: '/reception/dispensing', icon: Pill, label: 'Dispensing' },
     { to: '/reception/lab-reports', icon: FileText, label: 'Lab Reports' },
     { to: '/reception/referral-letters', icon: FileCheck, label: 'Referral Letters' },
     { to: '/reception/price-list', icon: Tag, label: 'Service Pricing' },

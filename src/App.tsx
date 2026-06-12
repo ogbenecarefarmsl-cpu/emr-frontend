@@ -33,6 +33,7 @@ import VisitReceipt from "./pages/reception/VisitReceipt";
 import WalkInReceipt from "./pages/reception/WalkInReceipt";
 import VisitRegistration from "./pages/reception/VisitRegistration";
 import ReceptionDispensePage from "./pages/reception/ReceptionDispensePage";
+import ReceptionDispensingQueue from "./pages/reception/ReceptionDispensingQueue";
 import ReceptionTreatmentPlans from "./pages/reception/ReceptionTreatmentPlans";
 import ExpendituresPage from "./pages/reception/ExpendituresPage";
 import AppointmentsPage from "./pages/reception/AppointmentsPage";
@@ -221,6 +222,9 @@ function AppRoutes() {
       } />
       <Route path="/reception/dispense/:id" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><ReceptionDispensePage /></RoleGuard>
+      } />
+      <Route path="/reception/dispensing" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><ReceptionDispensingQueue /></RoleGuard>
       } />
       <Route path="/reception/prescription-receipt/:id" element={
         <RoleGuard allowedRoles={['receptionist', 'admin', 'pharmacist']}><PrescriptionReceipt /></RoleGuard>

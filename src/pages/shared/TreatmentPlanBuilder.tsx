@@ -484,43 +484,69 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
       {items.length > 0 && (
         <div className="space-y-2">
           <Label className="text-sm font-medium">Treatment Plan Items ({items.length})</Label>
-          <div className="space-y-1">
+          <div className="space-y-2">
             {items.map((item, idx) => {
               const meta = TYPE_META[item.type] || TYPE_META.other;
               const Icon = meta.icon;
+              const isDrugOrIv = item.type === 'drug' || item.type === 'iv';
+              const unitsPerDose = getUnitsPerDose(item.strengthPerDose || '');
+              const qty = isDrugOrIv ? unitsPerDose * (item.dosesPerDay || 1) * (item.durationDays || 1) : 0;
+              const med = isDrugOrIv ? allMedications.find((m: any) => m._id === item.medicationId) : null;
+              const unitPrice = med?.unitPrice || 0;
+              const lineTotal = isDrugOrIv ? unitPrice * qty : (item.type === 'lab' ? item.testPrice || 0 : item.amount || 0);
+
               return (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2 bg-muted rounded text-sm"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Badge variant="outline" className={`text-[10px] ${meta.color}`}>
-                      <Icon className="h-3 w-3 mr-0.5" />
-                      {meta.label}
-                    </Badge>
-                    <span className="truncate">
-                      {item.type === 'drug' || item.type === 'iv'
-                        ? `${item.medicationName} ${item.strengthPerDose} — ${item.dosesPerDay}x/day × ${item.durationDays}d`
-                        : item.type === 'lab'
-                        ? `${item.testCode} ${item.testName}`
-                        : item.type === 'procedure'
-                        ? item.testName
-                        : item.description}
-                    </span>
+                <div key={idx} className="p-3 bg-muted rounded-lg text-sm space-y-1.5">
+                  {/* Header row */}
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Badge variant="outline" className={`text-[10px] shrink-0 ${meta.color}`}>
+                        <Icon className="h-3 w-3 mr-0.5" />
+                        {meta.label}
+                      </Badge>
+                      <span className="font-medium truncate">
+                        {isDrugOrIv ? item.medicationName : item.type === 'lab' ? item.testName : item.testName || item.description}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="font-semibold">Le {lineTotal.toLocaleString()}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0 text-destructive"
+                        onClick={() => removeItem(idx)}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-muted-foreground">
-                      Le {((item.type === 'lab' ? item.testPrice : item.amount) || 0).toLocaleString()}
-                    </span>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-6 w-6 p-0 text-destructive"
-                      onClick={() => removeItem(idx)}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
+
+                  {/* Detail breakdown */}
+                  {isDrugOrIv && (
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-muted-foreground pl-1">
+                      <span>Strength: <span className="text-foreground">{item.strengthPerDose}</span></span>
+                      <span>Route: <span className="text-foreground capitalize">{item.route}</span></span>
+                      <span>Frequency: <span className="text-foreground">{item.dosesPerDay}x/day</span></span>
+                      <span>Duration: <span className="text-foreground">{item.durationDays} days</span></span>
+                      <span>Qty: <span className="text-foreground">{qty} units</span></span>
+                      <span>Unit price: <span className="text-foreground">Le {unitPrice.toLocaleString()}</span></span>
+                    </div>
+                  )}
+                  {item.type === 'lab' && (
+                    <div className="text-xs text-muted-foreground pl-1">
+                      Code: <span className="text-foreground font-mono">{item.testCode}</span>
+                    </div>
+                  )}
+                  {item.type === 'procedure' && item.description && (
+                    <div className="text-xs text-muted-foreground pl-1">
+                      Notes: <span className="text-foreground">{item.description}</span>
+                    </div>
+                  )}
+                  {item.type === 'other' && item.notes && (
+                    <div className="text-xs text-muted-foreground pl-1">
+                      Notes: <span className="text-foreground">{item.notes}</span>
+                    </div>
+                  )}
                 </div>
               );
             })}

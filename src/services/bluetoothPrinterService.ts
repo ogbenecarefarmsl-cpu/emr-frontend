@@ -7,10 +7,16 @@ export interface SavedBtDeviceInfo {
 
 const CHUNK_SIZE = 50;
 const CHUNK_DELAY = 30;
+const RECONNECT_DELAY = 2000;
+const MAX_RECONNECT_ATTEMPTS = 10;
 
 class BluetoothPrinterService {
   private device: BluetoothDevice | null = null;
   private characteristic: BluetoothRemoteGATTCharacteristic | null = null;
+  private reconnectAttempts = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private _onDisconnect: (() => void) | null = null;
+  private _onReconnect: (() => void) | null = null;
 
   get isSupported(): boolean {
     return typeof navigator !== 'undefined' && 'bluetooth' in navigator;
@@ -19,6 +25,10 @@ class BluetoothPrinterService {
   get isConnected(): boolean {
     return this.device !== null && this.device.gatt?.connected === true && this.characteristic !== null;
   }
+
+  /** Register callbacks for connection state changes */
+  onDisconnect(cb: () => void) { this._onDisconnect = cb; }
+  onReconnect(cb: () => void) { this._onReconnect = cb; }
 
   getSavedDevice(): SavedBtDeviceInfo | null {
     try {
@@ -54,6 +64,7 @@ class BluetoothPrinterService {
       id: device.id,
     };
     localStorage.setItem(SAVED_BT_KEY, JSON.stringify(info));
+    this.reconnectAttempts = 0;
     return info;
   }
 
@@ -68,6 +79,7 @@ class BluetoothPrinterService {
       if (!match) return false;
 
       await this._connectGatt(match);
+      this.reconnectAttempts = 0;
       return true;
     } catch (err) {
       console.warn('BT auto-connect failed:', err);
@@ -76,6 +88,11 @@ class BluetoothPrinterService {
   }
 
   async disconnect(): Promise<void> {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.reconnectAttempts = MAX_RECONNECT_ATTEMPTS; // prevent auto-reconnect
     if (this.device?.gatt?.connected) {
       try {
         this.device.gatt.disconnect();
@@ -117,6 +134,30 @@ class BluetoothPrinterService {
     console.log('BT print: complete');
   }
 
+  private _scheduleReconnect() {
+    if (this.reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+      console.log('BT: max reconnect attempts reached, giving up');
+      return;
+    }
+    this.reconnectAttempts++;
+    const delay = RECONNECT_DELAY * this.reconnectAttempts;
+    console.log(`BT: scheduling reconnect attempt ${this.reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${delay}ms`);
+    this.reconnectTimer = setTimeout(async () => {
+      try {
+        const ok = await this.autoConnect();
+        if (ok) {
+          console.log('BT: reconnected successfully');
+          this.reconnectAttempts = 0;
+          this._onReconnect?.();
+        } else {
+          this._scheduleReconnect();
+        }
+      } catch {
+        this._scheduleReconnect();
+      }
+    }, delay);
+  }
+
   private async _connectGatt(device: BluetoothDevice): Promise<void> {
     if (!device.gatt) {
       throw new Error('Device does not support GATT.');
@@ -141,8 +182,10 @@ class BluetoothPrinterService {
           this.characteristic = char;
           this.device = device;
           device.addEventListener('gattserverdisconnected', () => {
-            console.log('BT: disconnected');
+            console.log('BT: disconnected, will attempt reconnect');
             this.characteristic = null;
+            this._onDisconnect?.();
+            this._scheduleReconnect();
           });
           return;
         }

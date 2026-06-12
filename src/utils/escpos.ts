@@ -54,10 +54,10 @@ export interface BranchHeaderData {
 
 export const FALLBACK_BRANCH: BranchHeaderData = {
   name: 'Harbour Medical Diagnostic',
-  address: '114, Fourah Bay Road, Freetown, Sierra Leone',
-  phone: '+23274414434',
+  address: '555 Bai Bureh Road, Allen Town',
+  phone: '+23275405804',
   email: 'harbourmedicaldiagnostics@gmail.com',
-  footerText: 'Thank you for choosing us! | Open 24/7 | Trusted by Clinics & Hospitals',
+  footerText: 'Thank you for choosing us! | Open 6 days/week | Lab & Pharmacy under one roof',
 };
 
 /**
@@ -69,15 +69,11 @@ export function buildBranchHeaderESCPOS(b: EscPosBuilder, branch: BranchHeaderDa
   const data = branch || FALLBACK_BRANCH;
   b.init();
   b.align('center');
-  b.bold(true).fontSize(0x11);
+  b.bold(true);
   b.line(data.name.toUpperCase());
-  b.fontSize(0x00).bold(false);
-  if (data.tagline) b.line(data.tagline);
+  b.bold(false);
   if (data.address) b.line(data.address);
   if (data.phone) b.line(`Tel: ${data.phone}`);
-  if (data.email) b.line(data.email);
-  if (data.website) b.line(data.website);
-  if (data.operatingHours) b.line(data.operatingHours);
   b.separator('=');
 }
 
@@ -91,6 +87,24 @@ function padLine(label: string, value: string, width = LINE_WIDTH): string {
 function center(text: string, width = LINE_WIDTH): string {
   const pad = Math.max(0, Math.floor((width - text.length) / 2));
   return ' '.repeat(pad) + text;
+}
+
+/** Wrap text to fit within width, breaking at spaces. */
+function wrapText(text: string, width: number): string[] {
+  if (text.length <= width) return [text];
+  const words = text.split(' ');
+  const lines: string[] = [];
+  let current = '';
+  for (const word of words) {
+    if ((current + ' ' + word).trim().length > width) {
+      if (current) lines.push(current);
+      current = word;
+    } else {
+      current = current ? current + ' ' + word : word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines.length ? lines : [text.slice(0, width)];
 }
 
 /** Formats a Sierra Leone Leones currency amount. */
@@ -198,7 +212,7 @@ export function buildTestReceiptESCPOS(): Uint8Array {
   b.bold(false);
   b.line('Printer is working correctly');
 
-  b.feed(3);
+  b.feed(2);
   b.cut();
 
   return b.build();
@@ -229,28 +243,21 @@ export function buildReceiptESCPOS(
   b.bold(true);
   b.line(center(copyType === 'patient' ? '*** PATIENT COPY ***' : '*** LAB COPY ***'));
   b.bold(false);
-  b.separator('=');
 
   // ── Receipt info ─────────────────────────────────────────────────────────
   b.align('left');
-  b.line(padLine('Receipt No:', data.receiptNumber));
-  b.line(padLine('Order No:', data.orderNumber));
+  b.line(padLine('Receipt:', data.receiptNumber));
+  b.line(padLine('Order:', data.orderNumber));
   b.line(padLine('Date:', dateStr));
-  b.separator();
 
   // ── Patient info ─────────────────────────────────────────────────────────
-  b.bold(true).line('PATIENT INFORMATION').bold(false);
-  b.line(padLine('Name:', data.patientName));
-  b.line(padLine('Patient ID:', data.patientId));
+  b.line(padLine('Patient:', data.patientName));
+  b.line(padLine('ID:', data.patientId));
   if (data.patientAge) b.line(padLine('Age:', data.patientAge));
   if (data.patientGender) b.line(padLine('Sex:', data.patientGender));
-  if (data.patientPhone) b.line(padLine('Phone:', data.patientPhone));
-  b.separator();
 
   // ── Tests ────────────────────────────────────────────────────────────────
-  b.bold(true).line('TESTS ORDERED').bold(false);
   for (const test of data.tests) {
-    // Code + short name on first line
     const nameTrunc =
       test.name.length > LINE_WIDTH - test.code.length - 3
         ? test.name.slice(0, LINE_WIDTH - test.code.length - 3 - 2) + '..'
@@ -258,60 +265,22 @@ export function buildReceiptESCPOS(
     b.line(`${test.code}  ${nameTrunc}`);
     b.line(padLine('', formatCurrency(test.price)));
   }
-  b.separator();
+  b.separator('=');
 
   // ── Totals ───────────────────────────────────────────────────────────────
-  b.line(padLine('Subtotal:', formatCurrency(data.subtotal)));
-  if (data.discount > 0) {
-    const discLabel =
-      data.discountType === 'percentage'
-        ? `Discount (${data.discount}%):`
-        : 'Discount:';
-    b.line(padLine(discLabel, `-${formatCurrency(discountAmount)}`));
-  }
   b.bold(true);
   b.line(padLine('TOTAL:', formatCurrency(data.total)));
   b.bold(false);
+  b.line(padLine('Paid:', formatCurrency(data.amountPaid)));
+  b.line(padLine('Method:', data.paymentMethod.replace('-', ' ').toUpperCase()));
   b.separator('=');
 
-  // ── Payment ──────────────────────────────────────────────────────────────
-  b.line(padLine('Payment Method:', data.paymentMethod.replace('-', ' ').toUpperCase()));
-  b.line(padLine('Amount Paid:', formatCurrency(data.amountPaid)));
-  if (data.amountPaid > data.total) {
-    b.line(padLine('Change:', formatCurrency(data.amountPaid - data.total)));
-  }
-  b.line(padLine('Cashier:', data.cashier));
-  b.separator();
-
-  // ── Instructions ─────────────────────────────────────────────────────────
-  if (copyType === 'patient') {
-    b.bold(true).line('INSTRUCTIONS').bold(false);
-    b.line('* Keep this receipt for sample collection');
-    b.line('* Arrive 15 minutes before scheduled time');
-    if (data.collectionDate) b.line(`* Collection: ${data.collectionDate}`);
-    b.line('* Results ready within 24-48 hours');
-  } else {
-    b.bold(true).line('LAB TECHNICIAN NOTES').bold(false);
-    b.line('* Verify patient ID before collection');
-    b.line('* Check test requirements and prep');
-    b.line('* Label all samples with order number');
-    b.line('* Update system after collection');
-  }
-  b.separator();
-
-  // ── Footer (uses branch's footerText or a generic thank-you) ─────────────
+  // ── Footer ───────────────────────────────────────────────────────────────
   b.align('center');
-  const footer = (branch?.footerText?.trim()) || 'Thank you for choosing us! | Open 24/7 | Trusted by Clinics & Hospitals';
-  b.line(' ');
-  for (const line of footer.split('|').map((s) => s.trim()).filter(Boolean)) {
-    b.line(line);
-  }
-  b.line(' ');
   b.line(`*** ${data.orderNumber} ***`);
-  b.line(' ');
   b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
 
-  b.feed(4);
+  b.feed(2);
   b.cut();
 
   return b.build();
@@ -377,45 +346,30 @@ export function buildTreatmentPlanESCPOS(
   b.align('center');
   b.line(center('TREATMENT PLAN', w));
   b.bold(false);
-  b.separator('=');
 
-  // ── Plan info ──────────────────────────────────────────────────────────
+  // ── Plan + Patient info ────────────────────────────────────────────────
   b.align('left');
   b.line(padLine58('Plan:', data.planNumber));
   b.line(padLine58('Date:', data.printedAt || new Date().toLocaleString('en-GB')));
   if (data.visitNumber) b.line(padLine58('Visit:', data.visitNumber));
-  b.separator();
-
-  // ── Patient info ───────────────────────────────────────────────────────
-  b.bold(true);
-  b.line('PATIENT');
-  b.bold(false);
-  b.line(padLine58('Name:', data.patientName));
+  b.line(padLine58('Patient:', data.patientName));
   b.line(padLine58('ID:', data.patientId));
   if (data.patientAge || data.patientGender) {
     const ageSex = [data.patientAge, data.patientGender].filter(Boolean).join('/');
     b.line(padLine58('Age/Sex:', ageSex));
   }
-  if (data.patientPhone) b.line(padLine58('Phone:', data.patientPhone));
-  b.separator();
+  b.separator('=');
 
   // ── Items ──────────────────────────────────────────────────────────────
-  b.bold(true);
-  b.line('ITEMS');
-  b.bold(false);
   data.items.forEach((item, idx) => {
     const typeBadge = item.type.toUpperCase().padEnd(4);
     const num = `${idx + 1}.`;
-    b.line(`${num} [${typeBadge}]`);
-    // Wrap description across multiple lines if needed
     const descLines = wrapText58(item.description, w - 2);
-    for (const dl of descLines) {
-      b.line(`   ${dl}`);
+    b.line(`${num} [${typeBadge}] ${descLines[0] || ''}`);
+    for (let i = 1; i < descLines.length; i++) {
+      b.line(`   ${descLines[i]}`);
     }
     b.line(padLine58('   ', formatCurrency58(item.amount)));
-    if (idx < data.items.length - 1) {
-      b.line('   - - -');
-    }
   });
   b.separator('=');
 
@@ -430,34 +384,16 @@ export function buildTreatmentPlanESCPOS(
     b.line(padLine58('BALANCE:', formatCurrency58(data.balance)));
   }
   if (data.paymentStatus) {
-    const statusText = data.paymentStatus === 'paid' ? 'FULLY PAID' : data.paymentStatus === 'partial' ? 'PARTIALLY PAID' : 'UNPAID';
+    const statusText = data.paymentStatus === 'paid' ? 'FULLY PAID' : data.paymentStatus === 'partial' ? 'PARTIAL' : 'UNPAID';
     b.line(padLine58('STATUS:', statusText));
   }
   b.separator('=');
 
-  // ── Notes ──────────────────────────────────────────────────────────────
-  if (data.notes) {
-    b.bold(true);
-    b.line('NOTES');
-    b.bold(false);
-    const noteLines = wrapText58(data.notes, w);
-    for (const nl of noteLines) {
-      b.line(nl);
-    }
-    b.separator();
-  }
-
   // ── Footer ─────────────────────────────────────────────────────────────
   b.align('center');
-  const footer = (branch?.footerText?.trim()) || 'Thank you for choosing us!';
-  b.line(' ');
-  for (const line of footer.split('|').map((s) => s.trim()).filter(Boolean)) {
-    b.line(line);
-  }
-  b.line(' ');
   b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
 
-  b.feed(4);
+  b.feed(2);
   b.cut();
 
   return b.build();
@@ -495,40 +431,26 @@ export function buildVisitReceiptESCPOS(
   b.align('center');
   b.line(center('VISIT FEE RECEIPT'));
   b.bold(false);
-  b.separator('=');
 
   b.align('left');
-  b.line(padLine('Visit No:', data.visitNumber));
+  b.line(padLine('Visit:', data.visitNumber));
   b.line(padLine('Date:', dateStr));
-  b.separator();
-
-  b.bold(true).line('PATIENT').bold(false);
-  b.line(padLine('Name:', data.patientName));
+  b.line(padLine('Patient:', data.patientName));
   b.line(padLine('ID:', data.patientId));
-  b.separator();
-
-  b.bold(true).line('SERVICE').bold(false);
   b.line(padLine('Type:', data.serviceLabel));
   if (data.procedureType) b.line(padLine('Procedure:', data.procedureType));
-  b.separator();
+  b.separator('=');
 
   b.bold(true);
   b.line(padLine('TOTAL PAID:', formatCurrency(data.amount)));
   b.bold(false);
   b.line(padLine('Method:', data.paymentMethod.toUpperCase()));
-  b.line(padLine('Cashier:', data.cashier));
   b.separator('=');
 
   b.align('center');
-  const footer = (branch?.footerText?.trim()) || 'Thank you for choosing us!';
-  b.line(' ');
-  for (const line of footer.split('|').map((s) => s.trim()).filter(Boolean)) {
-    b.line(line);
-  }
-  b.line(' ');
   b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
 
-  b.feed(4);
+  b.feed(2);
   b.cut();
 
   return b.build();
@@ -571,61 +493,35 @@ export function buildPrescriptionReceiptESCPOS(
   b.align('center');
   b.line(center('PRESCRIPTION'));
   b.bold(false);
-  b.separator('=');
 
   b.align('left');
   b.line(padLine('Rx No:', data.prescriptionNumber));
   b.line(padLine('Date:', data.dispenseDate));
-  b.line(padLine('Status:', data.status.toUpperCase()));
-  b.separator();
-
-  b.bold(true).line('PATIENT').bold(false);
-  b.line(padLine('Name:', data.patientName));
+  b.line(padLine('Patient:', data.patientName));
   b.line(padLine('ID:', data.patientId));
-  b.separator();
 
-  b.bold(true).line('MEDICATIONS DISPENSED').bold(false);
   data.items.forEach((item, i) => {
     b.line(`${i + 1}. ${item.medicationName}`);
-    if (item.dispenseMode === 'pack' && item.dispensedPackName) {
-      b.line(`   Pack: ${item.dispensedPackName}`);
-    }
     if (item.strengthPerDose) {
       b.line(`   ${item.strengthPerDose}, ${item.dosesPerDay}x/day, ${item.durationDays}d`);
     }
-    if (item.instructions) {
-      b.line(`   ${item.instructions}`);
-    }
     if (item.lineTotalAtDispense != null) {
-      b.line(padLine('   ', `${item.dispensedSellUnits} x ${formatCurrency(item.priceAtDispense || 0)} = ${formatCurrency(item.lineTotalAtDispense)}`));
+      b.line(`   ${item.dispensedSellUnits} x ${formatCurrency(item.priceAtDispense || 0)} = ${formatCurrency(item.lineTotalAtDispense)}`);
     }
   });
-  b.separator();
+  b.separator('=');
 
   const total = data.actualTotalAmount || data.totalAmount;
-  if (data.actualTotalAmount && data.actualTotalAmount !== data.totalAmount) {
-    b.line(padLine('Prescribed:', formatCurrency(data.totalAmount)));
-    b.bold(true);
-    b.line(padLine('Dispensed:', formatCurrency(data.actualTotalAmount)));
-    b.bold(false);
-  } else {
-    b.bold(true);
-    b.line(padLine('TOTAL:', formatCurrency(total)));
-    b.bold(false);
-  }
+  b.bold(true);
+  b.line(padLine('TOTAL:', formatCurrency(total)));
+  b.bold(false);
   b.line(padLine('Payment:', data.isPaid ? 'PAID' : 'UNPAID'));
   b.separator('=');
 
   b.align('center');
-  const footer = (branch?.footerText?.trim()) || 'Thank you for choosing us!';
-  b.line(' ');
-  for (const line of footer.split('|').map((s) => s.trim()).filter(Boolean)) {
-    b.line(line);
-  }
-  b.line(' ');
   b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
 
-  b.feed(4);
+  b.feed(2);
   b.cut();
 
   return b.build();
