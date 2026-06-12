@@ -511,8 +511,58 @@ export function buildPrescriptionReceiptESCPOS(
   b.line(padLine('Payment:', data.isPaid ? 'PAID' : 'UNPAID'));
   b.separator('=');
 
+  b.feed(2);
+  b.cut();
+
+  return b.build();
+}
+
+// ── Walk-in Receipt ─────────────────────────────────────────────────────
+
+export interface WalkInReceiptEscPosData {
+  patientName: string;
+  paymentMethod: string;
+  cashier: string;
+  items: Array<{ description: string; amount: number }>;
+  total: number;
+}
+
+export function buildWalkInReceiptESCPOS(
+  data: WalkInReceiptEscPosData,
+  branch?: BranchHeaderData | null,
+): Uint8Array {
+  const b = new EscPosBuilder();
+  const w = LINE_WIDTH_58;
+
+  buildBranchHeaderESCPOS(b, branch);
+
+  b.bold(true);
   b.align('center');
-  b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
+  b.line(center('WALK-IN SALE', w));
+  b.bold(false);
+  b.separator('-');
+
+  b.align('left');
+  b.line(padLine58('Customer:', data.patientName));
+  b.line(padLine58('Date:', new Date().toLocaleString('en-GB')));
+  b.separator('-');
+
+  data.items.forEach((item, i) => {
+    const descLines = wrapText58(item.description, w - 2);
+    b.line(`${i + 1}. ${descLines[0] || ''}`);
+    for (let j = 1; j < descLines.length; j++) {
+      b.line(`   ${descLines[j]}`);
+    }
+    b.line(padLine58('   ', formatCurrency58(item.amount)));
+  });
+  b.separator('-');
+
+  b.bold(true);
+  b.line(padLine58('TOTAL:', formatCurrency58(data.total)));
+  b.bold(false);
+  b.line(padLine58('Method:', data.paymentMethod.toUpperCase()));
+  b.line(padLine58('Cashier:', data.cashier));
+  b.separator('-');
 
   b.feed(2);
   b.cut();

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,10 +9,10 @@ import { Printer, Check, ArrowLeft, Loader2, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
-import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { useMyBranch } from '@/hooks/useBranch';
-import { BranchLetterhead, BranchFooterText } from '@/components/receipts/BranchLetterhead';
-import { thermalPrintStyles } from '@/components/receipts/ThermalReceipt';
+import { usbPrinterService } from '@/services/usbPrinterService';
+import { btPrinterService } from '@/services/bluetoothPrinterService';
+import { buildWalkInReceiptESCPOS } from '@/utils/escpos';
 
 interface WalkInItem {
   description: string;
@@ -23,8 +23,6 @@ export default function WalkInReceipt() {
   const navigate = useNavigate();
   const { profile } = useAuth();
   const { data: branch } = useMyBranch();
-  const { printReceipt } = useThermalPrint();
-  const receiptRef = useRef<HTMLDivElement>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [printed, setPrinted] = useState(false);
 
@@ -44,21 +42,43 @@ export default function WalkInReceipt() {
   };
 
   const handlePrint = async () => {
-    if (!receiptRef.current || !canPrint) return;
+    if (!canPrint) return;
     setIsPrinting(true);
     try {
-      await printReceipt(receiptRef.current, {
-        title: `Walk-in ${patientName}`,
-        onSuccess: () => {
-          setPrinted(true);
-          toast.success('Walk-in receipt printed');
+      const validItems = items.filter(it => it.description.trim() && Number(it.amount) > 0);
+      const bytes = buildWalkInReceiptESCPOS(
+        {
+          patientName: patientName || 'Walk-in',
+          paymentMethod,
+          cashier: profile?.fullName || 'Cashier',
+          items: validItems.map(it => ({ description: it.description, amount: Number(it.amount) })),
+          total,
         },
-        onError: (err) => {
-          toast.error(`Print failed: ${err.message}`);
-        },
-      });
-    } catch {
-      // already toasted
+        branch
+      );
+
+      let printed = false;
+      if (usbPrinterService.isConnected) {
+        try { await usbPrinterService.print(bytes); printed = true; } catch {}
+      }
+      if (!printed && btPrinterService.isConnected) {
+        try { await btPrinterService.print(bytes); printed = true; } catch {}
+      }
+      if (!printed && !usbPrinterService.isConnected) {
+        try { if (await usbPrinterService.autoConnect()) { await usbPrinterService.print(bytes); printed = true; } } catch {}
+      }
+      if (!printed && !btPrinterService.isConnected) {
+        try { if (await btPrinterService.autoConnect()) { await btPrinterService.print(bytes); printed = true; } } catch {}
+      }
+
+      if (printed) {
+        setPrinted(true);
+        toast.success('Walk-in receipt printed');
+      } else {
+        toast.error('No printer connected. Connect a USB or Bluetooth thermal printer.');
+      }
+    } catch (err: any) {
+      toast.error(`Print failed: ${err.message}`);
     } finally {
       setIsPrinting(false);
     }
@@ -166,75 +186,6 @@ export default function WalkInReceipt() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Preview */}
-        <style>{thermalPrintStyles}</style>
-        <div ref={receiptRef} className="receipt bg-white p-4 rounded shadow mx-auto" style={{ maxWidth: '80mm' }}>
-          <div className="header">
-            <BranchLetterhead compact />
-          </div>
-
-          <div className="copy-type">🧾 WALK-IN SALE</div>
-
-          <div className="section">
-            <div className="info-row">
-              <span className="info-label">Customer:</span>
-              <span className="info-value">{patientName || 'Walk-in'}</span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Date:</span>
-              <span className="info-value">{format(new Date(), 'dd/MM/yyyy HH:mm')}</span>
-            </div>
-          </div>
-
-          <div className="separator" />
-
-          <div className="section">
-            <div className="section-title">ITEMS</div>
-            {items
-              .filter((it) => it.description.trim() && Number(it.amount) > 0)
-              .map((item, i) => (
-                <div key={i} className="mb-1">
-                  <div className="text-sm">{i + 1}. {item.description}</div>
-                  <div className="text-xs text-right">{formatCurrency(Number(item.amount))}</div>
-                </div>
-              ))}
-          </div>
-
-          <div className="separator" />
-
-          <div className="section">
-            <div className="info-row" style={{ fontWeight: 'bold' }}>
-              <span className="info-label">TOTAL:</span>
-              <span className="info-value">{formatCurrency(total)}</span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Method:</span>
-              <span className="info-value">{paymentMethod.toUpperCase()}</span>
-            </div>
-            <div className="info-row">
-              <span className="info-label">Cashier:</span>
-              <span className="info-value">{profile?.fullName || 'Cashier'}</span>
-            </div>
-          </div>
-
-          <div className="separator" />
-
-          <div className="footer">
-            <BranchFooterText />
-            <div style={{ marginTop: '10px', fontSize: '9px' }}>
-              Computer-generated receipt
-            </div>
-            <div style={{ fontSize: '9px' }}>
-              Printed: {format(new Date(), 'dd/MM/yyyy HH:mm:ss')}
-            </div>
-            {branch?._id && (
-              <div style={{ fontSize: '9px', marginTop: '4px' }}>
-                Outlet: {branch.code}
-              </div>
-            )}
-          </div>
-        </div>
       </div>
     </RoleLayout>
   );

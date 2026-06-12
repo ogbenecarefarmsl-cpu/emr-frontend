@@ -9,7 +9,6 @@ import { format } from 'date-fns';
 import { useAuth } from '@/context/AuthContext';
 import { useQuery } from '@tanstack/react-query';
 import { visitsAPI } from '@/services/api';
-import { useThermalPrint } from '@/hooks/useThermalPrint';
 import { useMyBranch } from '@/hooks/useBranch';
 import { BranchLetterhead, BranchFooterText } from '@/components/receipts/BranchLetterhead';
 import { thermalPrintStyles } from '@/components/receipts/ThermalReceipt';
@@ -38,7 +37,6 @@ export default function VisitReceipt() {
   const visitId = searchParams.get('visitId');
   const { profile } = useAuth();
   const { data: branch } = useMyBranch();
-  const { printReceipt } = useThermalPrint();
   const receiptRef = useRef<HTMLDivElement>(null);
   const [isPrinting, setIsPrinting] = useState(false);
   const [printed, setPrinted] = useState(false);
