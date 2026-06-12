@@ -119,28 +119,29 @@ export default function ReceptionTreatmentPlans() {
   const handlePrint = async (plan: TreatmentPlan) => {
     setIsPrinting(true);
     try {
-      const patient = typeof plan.patientId === 'object' ? plan.patientId : null;
-      const visit = typeof plan.visitId === 'object' ? plan.visitId : null;
+      const freshPlan = await treatmentPlanService.findById(plan._id);
+      const patient = typeof freshPlan.patientId === 'object' ? freshPlan.patientId : null;
+      const visit = typeof freshPlan.visitId === 'object' ? freshPlan.visitId : null;
       const bytes = buildTreatmentPlanESCPOS(
         {
-          planNumber: plan.planNumber,
+          planNumber: freshPlan.planNumber,
           patientName: patient ? `${patient.firstName} ${patient.lastName}` : 'Unknown',
           patientId: patient?.patientId || '',
           patientAge: patient?.age?.toString(),
           patientGender: patient?.gender,
           patientPhone: patient?.phone,
           visitNumber: visit?.visitNumber,
-          items: plan.items.map((i) => ({ type: i.type, description: i.description, amount: i.amount })),
-          totalAmount: plan.totalAmount,
-          amountPaid: plan.amountPaid,
-          balance: plan.balance,
-          paymentStatus: plan.paymentStatus,
-          notes: plan.notes,
+          items: freshPlan.items.map((i) => ({ type: i.type, description: i.description, amount: i.amount })),
+          totalAmount: freshPlan.totalAmount,
+          amountPaid: freshPlan.amountPaid,
+          balance: freshPlan.balance,
+          paymentStatus: freshPlan.paymentStatus,
+          notes: freshPlan.notes,
         },
         branch
       );
 
-      const isPaid = plan.paymentStatus === 'paid' || (plan.balance || 0) <= 0;
+      const isPaid = freshPlan.paymentStatus === 'paid' || (freshPlan.balance || 0) <= 0;
       let printed = false;
 
       // Try USB first

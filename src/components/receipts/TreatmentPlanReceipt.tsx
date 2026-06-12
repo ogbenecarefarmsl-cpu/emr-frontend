@@ -1,7 +1,7 @@
 import { forwardRef } from 'react';
 import { format } from 'date-fns';
 import type { TreatmentPlan } from '@/types/treatment-plan';
-import { BranchLetterhead, BranchFooterText } from './BranchLetterhead';
+import { BranchLetterhead } from './BranchLetterhead';
 
 interface TreatmentPlanReceiptProps {
   plan: TreatmentPlan;
@@ -55,9 +55,8 @@ export const TreatmentPlanReceipt = forwardRef<HTMLDivElement, TreatmentPlanRece
         {/* Patient Info */}
         {patient && (
           <div className="section">
-            <div className="section-title">Patient</div>
             <div className="info-row">
-              <span className="info-label">Name:</span>
+              <span className="info-label">Patient:</span>
               <span className="info-value">{patient.firstName} {patient.lastName}</span>
             </div>
             <div className="info-row">
@@ -72,18 +71,11 @@ export const TreatmentPlanReceipt = forwardRef<HTMLDivElement, TreatmentPlanRece
                 </span>
               </div>
             )}
-            {patient.phone && (
-              <div className="info-row">
-                <span className="info-label">Phone:</span>
-                <span className="info-value">{patient.phone}</span>
-              </div>
-            )}
           </div>
         )}
 
         {/* Items */}
         <div className="items-table">
-          <div className="section-title">Items</div>
           {plan.items.map((item, index) => {
             const badge = TYPE_BADGES[item.type] || TYPE_BADGES.other;
             return (
@@ -125,32 +117,6 @@ export const TreatmentPlanReceipt = forwardRef<HTMLDivElement, TreatmentPlanRece
               <span>{formatCurrency(plan.balance)}</span>
             </div>
           )}
-          <div className="total-row" style={{ fontSize: '10px', marginTop: '4px' }}>
-            <span>STATUS:</span>
-            <span style={{ fontWeight: 'bold' }}>
-              {plan.paymentStatus === 'paid' ? 'FULLY PAID' : plan.paymentStatus === 'partial' ? 'PARTIALLY PAID' : 'UNPAID'}
-            </span>
-          </div>
-        </div>
-
-        {/* Notes */}
-        {plan.notes && (
-          <div className="section">
-            <div className="section-title">Notes</div>
-            <div style={{ fontSize: '10px' }}>{plan.notes}</div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="thank-you">THANK YOU!</div>
-        <div className="footer">
-          <BranchFooterText />
-          <div style={{ marginTop: '10px', fontSize: '9px' }}>
-            This is a computer-generated treatment plan
-          </div>
-          <div style={{ fontSize: '9px' }}>
-            Printed: {format(new Date(), 'dd/MM/yyyy HH:mm:ss')}
-          </div>
         </div>
       </div>
     );

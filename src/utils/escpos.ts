@@ -346,11 +346,12 @@ export function buildTreatmentPlanESCPOS(
   b.align('center');
   b.line(center('TREATMENT PLAN', w));
   b.bold(false);
+  b.separator('-');
 
   // ── Plan + Patient info ────────────────────────────────────────────────
   b.align('left');
   b.line(padLine58('Plan:', data.planNumber));
-  b.line(padLine58('Date:', data.printedAt || new Date().toLocaleString('en-GB')));
+  b.line(padLine58('Date:', new Date().toLocaleString('en-GB')));
   if (data.visitNumber) b.line(padLine58('Visit:', data.visitNumber));
   b.line(padLine58('Patient:', data.patientName));
   b.line(padLine58('ID:', data.patientId));
@@ -358,7 +359,7 @@ export function buildTreatmentPlanESCPOS(
     const ageSex = [data.patientAge, data.patientGender].filter(Boolean).join('/');
     b.line(padLine58('Age/Sex:', ageSex));
   }
-  b.separator('=');
+  b.separator('-');
 
   // ── Items ──────────────────────────────────────────────────────────────
   data.items.forEach((item, idx) => {
@@ -371,7 +372,7 @@ export function buildTreatmentPlanESCPOS(
     }
     b.line(padLine58('   ', formatCurrency58(item.amount)));
   });
-  b.separator('=');
+  b.separator('-');
 
   // ── Total + Payment ────────────────────────────────────────────────────
   b.bold(true);
@@ -383,15 +384,7 @@ export function buildTreatmentPlanESCPOS(
   if ((data.balance || 0) > 0) {
     b.line(padLine58('BALANCE:', formatCurrency58(data.balance)));
   }
-  if (data.paymentStatus) {
-    const statusText = data.paymentStatus === 'paid' ? 'FULLY PAID' : data.paymentStatus === 'partial' ? 'PARTIAL' : 'UNPAID';
-    b.line(padLine58('STATUS:', statusText));
-  }
-  b.separator('=');
-
-  // ── Footer ─────────────────────────────────────────────────────────────
-  b.align('center');
-  b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
+  b.separator('-');
 
   b.feed(2);
   b.cut();
