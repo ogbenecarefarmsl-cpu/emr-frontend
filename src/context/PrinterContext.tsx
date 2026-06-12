@@ -133,7 +133,7 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
   const [btConnected, setBtConnected] = useState(false);
   const [btSupported] = useState(() => btPrinterService.isSupported);
 
-  // Attempt silent reconnect on mount
+  // Attempt silent reconnect on mount + start health check
   useEffect(() => {
     usbPrinterService.autoConnect().then(connected => {
       setThermalConnected(connected);
@@ -145,7 +145,6 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
       if (connected) setBtDevice(btPrinterService.getSavedDevice());
     });
 
-    // Listen for BT connection state changes (auto-reconnect)
     btPrinterService.onDisconnect(() => {
       setBtConnected(false);
     });

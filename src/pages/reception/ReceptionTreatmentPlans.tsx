@@ -169,6 +169,15 @@ export default function ReceptionTreatmentPlans() {
             try { await usbPrinterService.print(bytes); } catch {}
           } else if (btPrinterService.isConnected) {
             try { await btPrinterService.print(bytes); } catch {}
+          } else {
+            // Try reconnect and print second copy
+            try {
+              if (await btPrinterService.autoConnect()) {
+                await btPrinterService.print(bytes);
+              } else if (await usbPrinterService.autoConnect()) {
+                await usbPrinterService.print(bytes);
+              }
+            } catch {}
           }
           toast.success('Treatment plan printed (2 copies)');
         } else {
