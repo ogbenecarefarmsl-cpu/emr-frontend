@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -248,6 +248,30 @@ export default function DoctorDashboard() {
   const [globalSearch, setGlobalSearch] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
+
+  // C1: Unsaved changes tracking
+  const [isDirty, setIsDirty] = useState(false);
+  const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<{ type: 'patient' | 'tab'; value?: any } | null>(null);
+  const soapFormRef = useRef(soapForm);
+  const vitalsFormRef = useRef(vitalsForm);
+  const chiefComplaintRef = useRef(chiefComplaintForm);
+  soapFormRef.current = soapForm;
+  vitalsFormRef.current = vitalsForm;
+  chiefComplaintRef.current = chiefComplaintForm;
+
+  // C2: Allergy override modal
+  const [allergyOverrideOpen, setAllergyOverrideOpen] = useState(false);
+  const [allergyOverrideInfo, setAllergyOverrideInfo] = useState<{ med: Medication; allergy: string } | null>(null);
+  const [allergyOverrideText, setAllergyOverrideText] = useState('');
+  const allergyOverrideCallbackRef = useRef<((proceed: boolean) => void) | null>(null);
+
+  // M4: Vitals validation errors
+  const [vitalsErrors, setVitalsErrors] = useState<Record<string, string>>({});
+
+  // m8: Lab results sort
+  const [labSortField, setLabSortField] = useState<'testName' | 'value' | 'flag' | null>(null);
+  const [labSortDir, setLabSortDir] = useState<'asc' | 'desc'>('asc');
   const createAdmission = useMutation({
     mutationFn: async () => {
       if (!selectedVisit) return;
@@ -360,6 +384,43 @@ export default function DoctorDashboard() {
     selectedVisit?.consultationOrderId;
   const { data: labResults = [] } = useResults(labOrderId);
   const abnormalLabResults = labResults.filter((result: LabResult) => result.flag && result.flag !== 'normal');
+
+  // m8: Sorted lab results
+  const sortedLabResults = useMemo(() => {
+    const flagOrder = { critical_high: 0, critical_low: 1, high: 2, low: 3, normal: 4 };
+    const sorted = [...labResults];
+    if (!labSortField) {
+      // Default: flagged first, then by test name
+      sorted.sort((a, b) => {
+        const aFlag = flagOrder[a.flag as keyof typeof flagOrder] ?? 4;
+        const bFlag = flagOrder[b.flag as keyof typeof flagOrder] ?? 4;
+        if (aFlag !== bFlag) return aFlag - bFlag;
+        return (a.testName || '').localeCompare(b.testName || '');
+      });
+    } else {
+      sorted.sort((a, b) => {
+        let cmp = 0;
+        if (labSortField === 'testName') cmp = (a.testName || '').localeCompare(b.testName || '');
+        else if (labSortField === 'value') cmp = (a.value || '').localeCompare(b.value || '');
+        else if (labSortField === 'flag') {
+          const aVal = flagOrder[a.flag as keyof typeof flagOrder] ?? 4;
+          const bVal = flagOrder[b.flag as keyof typeof flagOrder] ?? 4;
+          cmp = aVal - bVal;
+        }
+        return labSortDir === 'asc' ? cmp : -cmp;
+      });
+    }
+    return sorted;
+  }, [labResults, labSortField, labSortDir]);
+
+  const toggleLabSort = (field: 'testName' | 'value' | 'flag') => {
+    if (labSortField === field) {
+      setLabSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setLabSortField(field);
+      setLabSortDir('asc');
+    }
+  };
   const selectedPatient = selectedVisit?.patientId || {};
   const selectedWalletBalance = Number(selectedPatient.walletBalance || selectedPatient.wallet?.balance || 0);
 
@@ -426,6 +487,7 @@ export default function DoctorDashboard() {
       const acceptedVisit = await acceptPatient.mutateAsync(visit._id || visit.id || '');
       setSelectedVisit((acceptedVisit as Visit) || visit);
       setActiveTab('soap');
+      setIsDirty(false);
       toast.success(`Accepted patient: ${visit.patientId?.firstName} ${visit.patientId?.lastName}`);
     } catch (error) {
       toast.error('Failed to accept patient');
@@ -457,13 +519,14 @@ export default function DoctorDashboard() {
       queryClient.invalidateQueries({ queryKey: ['patient-chart', selectedVisit.patientId?._id || selectedVisit.patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       toast.success('Notes saved');
+      setIsDirty(false);
     } catch (error) {
       toast.error('Failed to save notes');
     }
   };
 
-  const handleCompleteVisit = async () => {
-    if (!selectedVisit) return;
+  const handleCompleteVisit = async (): Promise<boolean> => {
+    if (!selectedVisit) return false;
 
     try {
       if (soapForm.subjective || soapForm.objective || soapForm.assessment || soapForm.plan || soapForm.diagnosis) {
@@ -496,15 +559,19 @@ export default function DoctorDashboard() {
       }
       await completeVisit.mutateAsync(selectedVisit._id || selectedVisit.id || '');
       toast.success('Visit completed');
+      setIsDirty(false);
       setSelectedVisit(null);
+      return true;
     } catch (error) {
       toast.error('Failed to complete visit');
+      return false;
     }
   };
 
   const handleCompleteAndNext = async () => {
     if (!selectedVisit) return;
-    await handleCompleteVisit();
+    const success = await handleCompleteVisit();
+    if (!success) return;
     const nextInQueue = waitingQueue.find((v: Visit) => v.status === 'in_queue');
     if (nextInQueue) {
       await handleAcceptPatient(nextInQueue);
@@ -667,8 +734,11 @@ export default function DoctorDashboard() {
       return false;
     });
     if (matchedAllergy) {
-      const proceed = window.confirm(`ALLERGY ALERT: Patient is allergic to "${matchedAllergy}". "${med.name}" may contain or relate to this allergen. Prescribe anyway?`);
-      if (!proceed) return;
+      // C2: Show styled allergy override modal instead of window.confirm
+      setAllergyOverrideInfo({ med, allergy: matchedAllergy });
+      setAllergyOverrideText('');
+      setAllergyOverrideOpen(true);
+      return; // Modal callback will handle adding
     }
     setPrescriptionItems([
       ...prescriptionItems,
@@ -706,6 +776,31 @@ export default function DoctorDashboard() {
   const removePrescriptionItem = (index: number) => {
     setPrescriptionItems(prescriptionItems.filter((_, i) => i !== index));
   };
+
+  // C2: Called after allergy override modal confirms
+  const addMedicationAfterAllergyCheck = useCallback((med: Medication) => {
+    setPrescriptionItems([
+      ...prescriptionItems,
+      {
+        medicationId: med._id,
+        medicationName: med.name,
+        strengthPerDose: med.strength || '1',
+        dosesPerDay: 1,
+        durationDays: 7,
+        dosage: '',
+        frequency: '',
+        duration: '',
+        quantity: 0,
+        route: 'oral',
+        unitPrice: med.unitPrice || 0,
+        sellMode: med.sellMode,
+        packSizes: med.packSizes,
+        baseUnit: med.baseUnit,
+        instructions: '',
+        pharmacistNote: '',
+      },
+    ]);
+  }, [prescriptionItems]);
 
   // Edit helpers
   const startEditOrder = (order: any) => {
@@ -810,6 +905,41 @@ export default function DoctorDashboard() {
     navigate('/login');
   };
 
+  // C1: Guard navigation when dirty
+  const guardNavigation = useCallback((action: () => void, navType: 'patient' | 'tab', navValue?: any) => {
+    if (isDirty) {
+      setPendingNavigation({ type: navType, value: navValue });
+      setDiscardConfirmOpen(true);
+    } else {
+      action();
+    }
+  }, [isDirty]);
+
+  const confirmDiscardAndProceed = useCallback(() => {
+    setIsDirty(false);
+    setDiscardConfirmOpen(false);
+    if (!pendingNavigation) return;
+    if (pendingNavigation.type === 'patient' && pendingNavigation.value) {
+      handleAcceptPatient(pendingNavigation.value);
+    } else if (pendingNavigation.type === 'tab' && pendingNavigation.value) {
+      setActiveTab(pendingNavigation.value);
+    }
+    setPendingNavigation(null);
+  }, [pendingNavigation]);
+
+  const saveAndProceed = useCallback(async () => {
+    await handleSaveVitalsAndSOAP();
+    setIsDirty(false);
+    setDiscardConfirmOpen(false);
+    if (!pendingNavigation) return;
+    if (pendingNavigation.type === 'patient' && pendingNavigation.value) {
+      handleAcceptPatient(pendingNavigation.value);
+    } else if (pendingNavigation.type === 'tab' && pendingNavigation.value) {
+      setActiveTab(pendingNavigation.value);
+    }
+    setPendingNavigation(null);
+  }, [pendingNavigation]);
+
   // Auto-select the active patient if available
   useEffect(() => {
     if (currentActiveVisit && !selectedVisit) {
@@ -829,6 +959,83 @@ export default function DoctorDashboard() {
       setSelectedVisit(refreshed);
     }
   }, [waitingQueue, activePatients, resultsReady, awaitingLabPayment, awaitingResults, awaitingPharmacy, awaitingDispensing]);
+
+  // C1: Track dirty state when forms change
+  useEffect(() => {
+    if (!selectedVisit) return;
+    const origSoap = {
+      subjective: selectedVisit.subjectiveNotes || selectedVisit.chiefComplaint || '',
+      objective: selectedVisit.objectiveNotes || '',
+      assessment: selectedVisit.assessmentNotes || '',
+      plan: selectedVisit.planNotes || '',
+      diagnosis: selectedVisit.diagnosis || '',
+    };
+    const origVitals = {
+      temperature: selectedVisit.temperature?.toString() || '',
+      bloodPressure: selectedVisit.bloodPressure || '',
+      heartRate: selectedVisit.heartRate?.toString() || '',
+      respiratoryRate: selectedVisit.respiratoryRate?.toString() || '',
+      weight: selectedVisit.weight?.toString() || '',
+      height: selectedVisit.height?.toString() || '',
+      oxygenSaturation: selectedVisit.oxygenSaturation?.toString() || '',
+    };
+    const origComplaint = selectedVisit.chiefComplaint || '';
+    const current = JSON.stringify({ soap: soapForm, vitals: vitalsForm, complaint: chiefComplaintForm });
+    const original = JSON.stringify({ soap: origSoap, vitals: origVitals, complaint: origComplaint });
+    setIsDirty(current !== original);
+  }, [soapForm, vitalsForm, chiefComplaintForm, selectedVisit?._id]);
+
+  // M4: Validate vitals ranges
+  const validateVitals = useCallback((form: typeof vitalsForm) => {
+    const errors: Record<string, string> = {};
+    const temp = parseFloat(form.temperature);
+    if (form.temperature && (isNaN(temp) || temp < 30 || temp > 42)) errors.temperature = 'Range: 30-42 C';
+    const hr = parseInt(form.heartRate);
+    if (form.heartRate && (isNaN(hr) || hr < 20 || hr > 300)) errors.heartRate = 'Range: 20-300 bpm';
+    const rr = parseInt(form.respiratoryRate);
+    if (form.respiratoryRate && (isNaN(rr) || rr < 5 || rr > 60)) errors.respiratoryRate = 'Range: 5-60 /min';
+    const wt = parseFloat(form.weight);
+    if (form.weight && (isNaN(wt) || wt < 0.5 || wt > 300)) errors.weight = 'Range: 0.5-300 kg';
+    const ht = parseFloat(form.height);
+    if (form.height && (isNaN(ht) || ht < 30 || ht > 250)) errors.height = 'Range: 30-250 cm';
+    const spo2 = parseInt(form.oxygenSaturation);
+    if (form.oxygenSaturation && (isNaN(spo2) || spo2 < 0 || spo2 > 100)) errors.oxygenSaturation = 'Range: 0-100%';
+    setVitalsErrors(errors);
+    return Object.keys(errors).length === 0;
+  }, []);
+
+  // Validate vitals whenever they change
+  useEffect(() => {
+    validateVitals(vitalsForm);
+  }, [vitalsForm, validateVitals]);
+
+  // M7: Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!selectedVisit) return;
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;
+      // Ctrl+S → Save SOAP
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        if (canContinueClinicalWork) handleSaveVitalsAndSOAP();
+        return;
+      }
+      // Ctrl+Enter → Complete & Next
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (canCloseEncounter && !completeVisit.isPending) setConfirmCompleteOpen(true);
+        return;
+      }
+      // Number keys 1-5 switch tabs (only when not in input)
+      if (!isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const tabMap: Record<string, string> = { '1': 'soap', '2': 'orders', '3': 'lab-results', '4': 'overview', '5': 'history' };
+        if (tabMap[e.key]) { e.preventDefault(); setActiveTab(tabMap[e.key]); }
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [selectedVisit, canContinueClinicalWork, canCloseEncounter, completeVisit.isPending]);
 
 
   if (isLoading) {
@@ -853,18 +1060,20 @@ export default function DoctorDashboard() {
           </div>
           <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
             {[
-              { label: 'Consult', value: 'soap' },
-              { label: 'History', value: 'history' },
-              { label: 'Labs', value: 'lab-results' },
-              { label: 'Rx', value: 'orders' },
+              { label: 'Consult', value: 'soap', shortcut: '1' },
+              { label: 'Orders', value: 'orders', shortcut: '2' },
+              { label: 'Results', value: 'lab-results', shortcut: '3' },
+              { label: 'Summary', value: 'overview', shortcut: '4' },
+              { label: 'History', value: 'history', shortcut: '5' },
             ].map((tab) => (
               <button
                 key={tab.value}
-                onClick={() => setActiveTab(tab.value)}
+                onClick={() => guardNavigation(() => setActiveTab(tab.value), 'tab', tab.value)}
                 className={cn(
                   "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
                   activeTab === tab.value ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
+                title={`Press ${tab.shortcut}`}
               >
                 {tab.label}
               </button>
@@ -967,7 +1176,7 @@ export default function DoctorDashboard() {
                           return (
                             <div
                               key={visit._id}
-                              onClick={() => setSelectedVisit(visit)}
+                              onClick={() => guardNavigation(() => setSelectedVisit(visit), 'patient', visit)}
                               className={cn(
                                 "p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0",
                                 isSelected ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-amber-500"
@@ -1035,7 +1244,7 @@ export default function DoctorDashboard() {
                         <p className="text-[11px] text-muted-foreground text-center py-3">No active encounters</p>
                       ) : (
                         activePatients.map((visit: Visit) => (
-                          <div key={visit._id} onClick={() => { setSelectedVisit(visit); if (visit.status === 'results_ready') setActiveTab('lab-results'); }} className={cn("p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0", selectedVisit?._id === visit._id ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-primary")}>
+                          <div key={visit._id} onClick={() => guardNavigation(() => { setSelectedVisit(visit); if (visit.status === 'results_ready') setActiveTab('lab-results'); }, 'patient', visit)} className={cn("p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0", selectedVisit?._id === visit._id ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-primary")}>
                             <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
                             <div className="mt-0.5 flex items-center justify-between gap-2">
                               <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
@@ -1069,7 +1278,7 @@ export default function DoctorDashboard() {
                         <p className="text-[11px] text-muted-foreground text-center py-3">No results pending</p>
                       ) : (
                         resultsReady.map((visit: Visit) => (
-                          <div key={visit._id} onClick={() => { setSelectedVisit(visit); setActiveTab('lab-results'); }} className={cn("p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0", selectedVisit?._id === visit._id ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-emerald-500")}>
+                          <div key={visit._id} onClick={() => guardNavigation(() => { setSelectedVisit(visit); setActiveTab('lab-results'); }, 'patient', visit)} className={cn("p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0", selectedVisit?._id === visit._id ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-emerald-500")}>
                             <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
                             <div className="mt-0.5 flex items-center justify-between gap-2">
                               <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
@@ -1093,9 +1302,10 @@ export default function DoctorDashboard() {
             </div>
           </div>
           <div className="p-3 border-t border-border space-y-1">
-            <button className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-muted-foreground hover:bg-muted/50 transition-colors">
-              <span className="material-symbols-outlined text-[18px]">help</span>Support
-            </button>
+            <div className="px-3 py-1.5 text-[10px] text-muted-foreground space-y-0.5">
+              <p><kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono">Ctrl+S</kbd> Save · <kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono">Ctrl+Enter</kbd> Complete</p>
+              <p><kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono">1-5</kbd> Switch tabs</p>
+            </div>
             <button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors">
               <span className="material-symbols-outlined text-[18px]">logout</span>Logout
             </button>
@@ -1178,8 +1388,24 @@ export default function DoctorDashboard() {
                     </div>
                   </div>
 
+                  {/* C1: Unsaved changes banner */}
+                  {isDirty && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs text-amber-800">
+                        <AlertTriangle className="w-3.5 h-3.5" />
+                        <span className="font-medium">You have unsaved changes</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setIsDirty(false); toast.info('Changes discarded'); }}>Discard</Button>
+                        <Button size="sm" className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
+                          {updateVisit.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Draft
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Tabs */}
-                  <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full flex flex-col flex-1">
+                    <Tabs value={activeTab} onValueChange={(val) => guardNavigation(() => setActiveTab(val), 'tab', val)} className="w-full flex flex-col flex-1">
                     <div className="border-b border-border bg-white rounded-t-xl overflow-x-auto">
                       <TabsList className="bg-transparent h-auto p-0 min-w-max px-4">
                         <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-sm">Consult</TabsTrigger>
@@ -1294,17 +1520,22 @@ export default function DoctorDashboard() {
                             <div className="p-4 flex flex-col gap-3">
                               <div className="grid grid-cols-2 gap-2">
                                 {[
-                                  { key: 'temperature', label: 'Temp (C)', placeholder: '36.5', type: 'number' },
+                                  { key: 'temperature', label: 'Temp (C)', placeholder: '36.5', type: 'number', hint: '30-42' },
                                   { key: 'bloodPressure', label: 'BP (mmHg)', placeholder: '120/80', type: 'text' },
-                                  { key: 'heartRate', label: 'HR (bpm)', placeholder: '72', type: 'number' },
-                                  { key: 'respiratoryRate', label: 'RR (/min)', placeholder: '16', type: 'number' },
-                                  { key: 'weight', label: 'Weight (kg)', placeholder: '70', type: 'number' },
-                                  { key: 'height', label: 'Height (cm)', placeholder: '170', type: 'number' },
-                                  { key: 'oxygenSaturation', label: 'SpO2 (%)', placeholder: '98', type: 'number' },
+                                  { key: 'heartRate', label: 'HR (bpm)', placeholder: '72', type: 'number', hint: '20-300' },
+                                  { key: 'respiratoryRate', label: 'RR (/min)', placeholder: '16', type: 'number', hint: '5-60' },
+                                  { key: 'weight', label: 'Weight (kg)', placeholder: '70', type: 'number', hint: '0.5-300' },
+                                  { key: 'height', label: 'Height (cm)', placeholder: '170', type: 'number', hint: '30-250' },
+                                  { key: 'oxygenSaturation', label: 'SpO2 (%)', placeholder: '98', type: 'number', hint: '0-100' },
                                 ].map((field) => (
                                   <div key={field.key}>
                                     <Label className="text-[10px] text-muted-foreground">{field.label}</Label>
-                                    <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(e) => setVitalsForm({ ...vitalsForm, [field.key]: e.target.value })} placeholder={field.placeholder} className="mt-1 h-8 text-xs font-mono" />
+                                    <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(e) => setVitalsForm({ ...vitalsForm, [field.key]: e.target.value })} placeholder={field.placeholder} className={cn("mt-1 h-8 text-xs font-mono", vitalsErrors[field.key] && "border-red-400 focus-visible:ring-red-400")} />
+                                    {vitalsErrors[field.key] ? (
+                                      <p className="text-[10px] text-red-500 mt-0.5">{vitalsErrors[field.key]}</p>
+                                    ) : field.hint ? (
+                                      <p className="text-[10px] text-muted-foreground mt-0.5">{field.hint}</p>
+                                    ) : null}
                                   </div>
                                 ))}
                               </div>
@@ -1512,14 +1743,20 @@ export default function DoctorDashboard() {
                             <table className="w-full min-w-[640px] text-sm">
                               <thead className="bg-muted/50">
                                 <tr>
-                                  <th className="text-left p-3 font-medium">Test</th>
-                                  <th className="text-center p-3 font-medium">Result</th>
-                                  <th className="text-center p-3 font-medium">Flag</th>
+                                  <th className="text-left p-3 font-medium cursor-pointer hover:bg-muted/80 select-none" onClick={() => toggleLabSort('testName')}>
+                                    Test {labSortField === 'testName' ? (labSortDir === 'asc' ? '\u2191' : '\u2193') : ''}
+                                  </th>
+                                  <th className="text-center p-3 font-medium cursor-pointer hover:bg-muted/80 select-none" onClick={() => toggleLabSort('value')}>
+                                    Result {labSortField === 'value' ? (labSortDir === 'asc' ? '\u2191' : '\u2193') : ''}
+                                  </th>
+                                  <th className="text-center p-3 font-medium cursor-pointer hover:bg-muted/80 select-none" onClick={() => toggleLabSort('flag')}>
+                                    Flag {labSortField === 'flag' ? (labSortDir === 'asc' ? '\u2191' : '\u2193') : ''}
+                                  </th>
                                   <th className="text-center p-3 font-medium">Reference</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y">
-                                {labResults.map((result: LabResult) => (
+                                {sortedLabResults.map((result: LabResult) => (
                                   <tr key={result._id} className="hover:bg-muted/30">
                                     <td className="p-3">
                                       <p className="font-medium">{result.testName}</p>
@@ -1725,15 +1962,16 @@ export default function DoctorDashboard() {
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         <span className="font-medium text-foreground">{statusLabel(selectedVisit.status)}</span>
                         {selectedVisit.room && <span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">Room: {selectedVisit.room}</span>}
+                        {isDirty && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium">Unsaved</span>}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Button variant="outline" size="sm" className="rounded-full" onClick={() => setActiveTab('soap')}>
+                        <Button variant="outline" size="sm" className="rounded-full" onClick={() => guardNavigation(() => setActiveTab('soap'), 'tab', 'soap')}>
                           <FileText className="w-3.5 h-3.5 mr-1.5" /> SOAP
                         </Button>
-                        <Button variant="outline" size="sm" className="rounded-full" onClick={() => setActiveTab('orders')} disabled={!canContinueClinicalWork}>
+                        <Button variant="outline" size="sm" className="rounded-full" onClick={() => guardNavigation(() => setActiveTab('orders'), 'tab', 'orders')} disabled={!canContinueClinicalWork}>
                           <ClipboardList className="w-3.5 h-3.5 mr-1.5" /> Orders
                         </Button>
-                        <Button variant="outline" size="sm" className="rounded-full" onClick={() => setActiveTab('lab-results')} disabled={labResults.length === 0}>
+                        <Button variant="outline" size="sm" className="rounded-full" onClick={() => guardNavigation(() => setActiveTab('lab-results'), 'tab', 'lab-results')} disabled={labResults.length === 0}>
                           <FlaskConical className="w-3.5 h-3.5 mr-1.5" /> Results
                         </Button>
                         <div className="hidden sm:block w-px h-5 bg-border mx-1" />
@@ -1750,29 +1988,34 @@ export default function DoctorDashboard() {
                 <div className="flex-1 flex items-center justify-center">
                   <div className="max-w-md text-center">
                     <User className="w-14 h-14 mx-auto mb-4 text-muted-foreground/30" />
-                    <h2 className="text-xl font-semibold">No patient open</h2>
-                    <p className="text-sm text-muted-foreground mt-2">Select a patient from the sidebar roster to begin consultation.</p>
-                    {waitingQueue.length > 0 && (
-                      <Button
-                        size="lg"
-                        className="mt-5 gap-2"
-                        onClick={() => handleAcceptPatient(waitingQueue[0])}
-                        disabled={acceptPatient.isPending}
-                      >
-                        {acceptPatient.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
-                        Accept next patient ({patientDisplayName(waitingQueue[0])})
-                      </Button>
-                    )}
-                    {resultsReady.length > 0 && (
-                      <Button
-                        size="lg"
-                        variant="outline"
-                        className="mt-3 gap-2"
-                        onClick={() => { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); }}
-                      >
-                        <FlaskConical className="h-4 w-4" />
-                        Review {resultsReady.length} result{resultsReady.length === 1 ? '' : 's'} ready
-                      </Button>
+                    <h2 className="text-xl font-semibold">Ready to consult</h2>
+                    <p className="text-sm text-muted-foreground mt-2">Select a patient from the sidebar roster or accept the next patient in queue to begin consultation.</p>
+                    <div className="flex flex-col items-center gap-2 mt-5">
+                      {waitingQueue.length > 0 && (
+                        <Button
+                          size="lg"
+                          className="gap-2"
+                          onClick={() => handleAcceptPatient(waitingQueue[0])}
+                          disabled={acceptPatient.isPending}
+                        >
+                          {acceptPatient.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
+                          Accept next patient ({patientDisplayName(waitingQueue[0])})
+                        </Button>
+                      )}
+                      {resultsReady.length > 0 && (
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          className="gap-2"
+                          onClick={() => { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); }}
+                        >
+                          <FlaskConical className="h-4 w-4" />
+                          Review {resultsReady.length} result{resultsReady.length === 1 ? '' : 's'} ready
+                        </Button>
+                      )}
+                    </div>
+                    {(waitingQueue.length > 0 || resultsReady.length > 0) && (
+                      <p className="text-[11px] text-muted-foreground mt-3">or press <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">1-5</kbd> to switch tabs</p>
                     )}
                   </div>
                 </div>
@@ -2310,6 +2553,75 @@ export default function DoctorDashboard() {
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* C1: Discard Changes Confirmation */}
+      <Dialog open={discardConfirmOpen} onOpenChange={setDiscardConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Unsaved Changes
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            You have unsaved changes to SOAP notes or vitals. What would you like to do?
+          </p>
+          <DialogFooter className="flex-row gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => { setDiscardConfirmOpen(false); setPendingNavigation(null); }}>Stay</Button>
+            <Button variant="outline" className="text-red-600 hover:text-red-700" onClick={confirmDiscardAndProceed}>Discard & Switch</Button>
+            <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={saveAndProceed} disabled={updateVisit.isPending}>
+              {updateVisit.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save & Switch
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* C2: Allergy Override Confirmation */}
+      <Dialog open={allergyOverrideOpen} onOpenChange={(open) => { setAllergyOverrideOpen(open); if (!open) allergyOverrideCallbackRef.current?.(false); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="w-5 h-5" />
+              Allergy Alert
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="rounded-lg border border-red-300 bg-red-50 p-4">
+              <p className="text-sm text-red-800">
+                Patient is allergic to <span className="font-bold">{allergyOverrideInfo?.allergy}</span>.
+              </p>
+              <p className="text-sm text-red-700 mt-1">
+                <span className="font-semibold">{allergyOverrideInfo?.med?.name}</span> may contain or relate to this allergen.
+              </p>
+            </div>
+            <p className="text-xs text-muted-foreground">Type <span className="font-mono font-bold">PROCEED</span> to override this alert and prescribe anyway.</p>
+            <Input
+              value={allergyOverrideText}
+              onChange={(e) => setAllergyOverrideText(e.target.value)}
+              placeholder="Type PROCEED to override"
+              className={cn("font-mono", allergyOverrideText === 'PROCEED' ? "border-green-500" : allergyOverrideText.length > 0 && "border-red-400")}
+              autoFocus
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAllergyOverrideOpen(false); setAllergyOverrideInfo(null); setAllergyOverrideText(''); }}>Cancel</Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={allergyOverrideText !== 'PROCEED' || !allergyOverrideInfo}
+              onClick={() => {
+                if (allergyOverrideInfo) {
+                  addMedicationAfterAllergyCheck(allergyOverrideInfo.med);
+                }
+                setAllergyOverrideOpen(false);
+                setAllergyOverrideInfo(null);
+                setAllergyOverrideText('');
+              }}
+            >
+              Override & Prescribe
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
