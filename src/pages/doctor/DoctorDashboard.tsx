@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+﻿import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -253,18 +253,11 @@ export default function DoctorDashboard() {
   const [isDirty, setIsDirty] = useState(false);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<{ type: 'patient' | 'tab'; value?: any } | null>(null);
-  const soapFormRef = useRef(soapForm);
-  const vitalsFormRef = useRef(vitalsForm);
-  const chiefComplaintRef = useRef(chiefComplaintForm);
-  soapFormRef.current = soapForm;
-  vitalsFormRef.current = vitalsForm;
-  chiefComplaintRef.current = chiefComplaintForm;
 
   // C2: Allergy override modal
   const [allergyOverrideOpen, setAllergyOverrideOpen] = useState(false);
   const [allergyOverrideInfo, setAllergyOverrideInfo] = useState<{ med: Medication; allergy: string } | null>(null);
   const [allergyOverrideText, setAllergyOverrideText] = useState('');
-  const allergyOverrideCallbackRef = useRef<((proceed: boolean) => void) | null>(null);
 
   // M4: Vitals validation errors
   const [vitalsErrors, setVitalsErrors] = useState<Record<string, string>>({});
@@ -2579,7 +2572,7 @@ export default function DoctorDashboard() {
       </Dialog>
 
       {/* C2: Allergy Override Confirmation */}
-      <Dialog open={allergyOverrideOpen} onOpenChange={(open) => { setAllergyOverrideOpen(open); if (!open) allergyOverrideCallbackRef.current?.(false); }}>
+      <Dialog open={allergyOverrideOpen} onOpenChange={(open) => { setAllergyOverrideOpen(open); if (!open) { setAllergyOverrideInfo(null); setAllergyOverrideText(''); } }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-700">
