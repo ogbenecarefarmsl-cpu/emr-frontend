@@ -26,11 +26,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 // Dashboard components
-import { AllergyManager } from '@/components/doctor/AllergyManager';
-import { ProblemList } from '@/components/doctor/ProblemList';
-import { VitalsTrends } from '@/components/doctor/VitalsTrends';
-import { FollowUpScheduler } from '@/components/doctor/FollowUpScheduler';
 import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
+import { PatientTimeline } from '@/components/doctor/PatientTimeline';
 
 // Icons
 import {
@@ -183,13 +180,10 @@ export default function DoctorDashboard() {
   // State for active patient panel
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [activeTab, setActiveTab] = useState('soap');
-  const [historyTab, setHistoryTab] = useState('visits');
-  const [queueSectionsOpen, setQueueSectionsOpen] = useState({
-    waiting: true,
-    active: true,
-    results: true,
-    referrals: true,
-  });
+
+  // Doctor triage override
+  const [triageOverride, setTriageOverride] = useState('');
+  const [doctorTriageNotes, setDoctorTriageNotes] = useState('');
 
   // Lab order modal state
   const [labOrderModalOpen, setLabOrderModalOpen] = useState(false);
@@ -470,6 +464,8 @@ export default function DoctorDashboard() {
         plan: selectedVisit.planNotes || '',
         diagnosis: selectedVisit.diagnosis || '',
       });
+      setTriageOverride(selectedVisit.triageOverride_priority || selectedVisit.triageOverridePriority || '');
+      setDoctorTriageNotes(selectedVisit.doctorTriageNotes || '');
       setActiveTab(selectedVisit.status === 'results_ready' ? 'lab-results' : 'soap');
     }
   }, [selectedVisit?._id]);
@@ -507,6 +503,8 @@ export default function DoctorDashboard() {
           assessmentNotes: soapForm.assessment || undefined,
           planNotes: soapForm.plan || undefined,
           diagnosis: soapForm.diagnosis || undefined,
+          triageOverride_priority: triageOverride || undefined,
+          doctorTriageNotes: doctorTriageNotes.trim() || undefined,
         },
       });
       queryClient.invalidateQueries({ queryKey: ['patient-chart', selectedVisit.patientId?._id || selectedVisit.patientId] });
@@ -889,10 +887,6 @@ export default function DoctorDashboard() {
     if (hasUndispensedPharmacy) blockers.push('One or more pharmacy orders are not dispensed yet.');
     return Array.from(new Set(blockers));
   }, [selectedVisit?._id, selectedVisit?.status, currentVisitOrders]);
-  const toggleQueueSection = (section: keyof typeof queueSectionsOpen) => {
-    setQueueSectionsOpen((current) => ({ ...current, [section]: !current[section] }));
-  };
-
   const handleLogout = async () => {
     await signOut();
     navigate('/login');
@@ -973,10 +967,12 @@ export default function DoctorDashboard() {
       oxygenSaturation: selectedVisit.oxygenSaturation?.toString() || '',
     };
     const origComplaint = selectedVisit.chiefComplaint || '';
-    const current = JSON.stringify({ soap: soapForm, vitals: vitalsForm, complaint: chiefComplaintForm });
-    const original = JSON.stringify({ soap: origSoap, vitals: origVitals, complaint: origComplaint });
+    const origTriageOverride = selectedVisit.triageOverride_priority || selectedVisit.triageOverridePriority || '';
+    const origDoctorTriageNotes = selectedVisit.doctorTriageNotes || '';
+    const current = JSON.stringify({ soap: soapForm, vitals: vitalsForm, complaint: chiefComplaintForm, triageOverride, doctorTriageNotes });
+    const original = JSON.stringify({ soap: origSoap, vitals: origVitals, complaint: origComplaint, triageOverride: origTriageOverride, doctorTriageNotes: origDoctorTriageNotes });
     setIsDirty(current !== original);
-  }, [soapForm, vitalsForm, chiefComplaintForm, selectedVisit?._id]);
+  }, [soapForm, vitalsForm, chiefComplaintForm, triageOverride, doctorTriageNotes, selectedVisit?._id]);
 
   // M4: Validate vitals ranges
   const validateVitals = useCallback((form: typeof vitalsForm) => {
@@ -1022,7 +1018,7 @@ export default function DoctorDashboard() {
       }
       // Number keys 1-5 switch tabs (only when not in input)
       if (!isInput && !e.ctrlKey && !e.metaKey && !e.altKey) {
-        const tabMap: Record<string, string> = { '1': 'soap', '2': 'orders', '3': 'lab-results', '4': 'overview', '5': 'history' };
+        const tabMap: Record<string, string> = { '1': 'soap', '2': 'lab-results', '3': 'timeline' };
         if (tabMap[e.key]) { e.preventDefault(); setActiveTab(tabMap[e.key]); }
       }
     };
@@ -1054,10 +1050,8 @@ export default function DoctorDashboard() {
           <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
             {[
               { label: 'Consult', value: 'soap', shortcut: '1' },
-              { label: 'Orders', value: 'orders', shortcut: '2' },
-              { label: 'Results', value: 'lab-results', shortcut: '3' },
-              { label: 'Summary', value: 'overview', shortcut: '4' },
-              { label: 'History', value: 'history', shortcut: '5' },
+              { label: 'Results', value: 'lab-results', shortcut: '2' },
+              { label: 'Timeline', value: 'timeline', shortcut: '3' },
             ].map((tab) => (
               <button
                 key={tab.value}
@@ -1066,7 +1060,7 @@ export default function DoctorDashboard() {
                   "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
                   activeTab === tab.value ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                 )}
-                title={`Press ${tab.shortcut}`}
+                title={`${tab.label} (${tab.shortcut})`}
               >
                 {tab.label}
               </button>
@@ -1084,7 +1078,7 @@ export default function DoctorDashboard() {
               onFocus={() => setSearchOpen(true)}
               onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
               placeholder="Search patients…"
-              className="h-8 w-72 pl-8 pr-3 rounded-full border border-border bg-muted/30 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
+              className="h-8 w-48 lg:w-72 pl-8 pr-3 rounded-full border border-border bg-muted/30 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
             />
             {searchOpen && globalSearch.trim().length >= 2 && (
               <div className="absolute top-9 right-0 w-72 max-h-80 overflow-y-auto bg-white border border-border rounded-lg shadow-lg z-50">
@@ -1106,18 +1100,39 @@ export default function DoctorDashboard() {
               </div>
             )}
           </div>
-          <button
-            type="button"
-            onClick={() => { if (resultsReady.length > 0) { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); } }}
-            disabled={resultsReady.length === 0}
-            className="relative p-2 rounded-lg hover:bg-muted/50 transition-colors disabled:opacity-50"
-            title="Results ready"
-          >
-            <FlaskConical className="w-4 h-4 text-muted-foreground" />
-            {resultsReady.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-primary text-[9px] font-bold text-white flex items-center justify-center px-1">{resultsReady.length}</span>
-            )}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-8 gap-1.5 text-xs rounded-full"
+              onClick={() => { if (waitingQueue.length > 0) handleAcceptPatient(waitingQueue[0]); else toast.info('No waiting patients'); }}
+              disabled={waitingQueue.length === 0 || acceptPatient.isPending}
+              title={`${waitingQueue.length} waiting`}
+            >
+              {acceptPatient.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
+              Accept {waitingQueue.length > 0 ? `(${waitingQueue.length})` : ''}
+            </Button>
+            <button
+              type="button"
+              onClick={() => { if (resultsReady.length > 0) { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); } }}
+              disabled={resultsReady.length === 0}
+              className="relative p-2 rounded-lg hover:bg-muted/50 transition-colors disabled:opacity-50"
+              title={`${resultsReady.length} results ready`}
+            >
+              <FlaskConical className="w-4 h-4 text-muted-foreground" />
+              {resultsReady.length > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-primary text-[9px] font-bold text-white flex items-center justify-center px-1">{resultsReady.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setAllPatientsOpen(true); setAllPatientsPage(1); setAllPatientsSearch(''); setAllPatientsDaysBack(undefined); }}
+              className="relative p-2 rounded-lg hover:bg-muted/50 transition-colors"
+              title="All My Patients"
+            >
+              <UserCheck className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
           <div className="w-px h-6 bg-border" />
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
@@ -1129,184 +1144,8 @@ export default function DoctorDashboard() {
       </header>
 
       <div className="flex flex-1 pt-14 h-full">
-        {/* Sidebar */}
-        <nav className="fixed left-0 top-14 bottom-0 w-64 z-40 bg-[#fafbfc] border-r border-border hidden md:flex flex-col">
-          <div className="p-4 border-b border-border">
-            <p className="text-sm font-semibold leading-tight">Doctor Workbench</p>
-            <p className="text-[10px] text-muted-foreground truncate">{profile?.fullName || 'Harbour EMR'}</p>
-          </div>
-          <div className="flex-1 overflow-y-auto">
-            <div className="px-3 py-4">
-              <div className="flex items-center justify-between mb-2 px-1">
-                <p className={CLINICAL_LABEL}>Roster</p>
-                <span className="text-[10px] font-medium text-muted-foreground">
-                  {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-                </span>
-              </div>
-              <div className="space-y-2">
-                <div className="rounded-lg border bg-white overflow-hidden">
-                  <button
-                    type="button"
-                    className="w-full px-3 py-2.5 flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
-                    onClick={() => toggleQueueSection('waiting')}
-                  >
-                    <span className="text-xs font-semibold flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[17px] text-amber-500">schedule</span>
-                      Waiting
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Badge variant="secondary" className="h-5 text-[10px]">{waitingQueue.length}</Badge>
-                      <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", !queueSectionsOpen.waiting && "-rotate-90")} />
-                    </span>
-                  </button>
-                  {queueSectionsOpen.waiting && (
-                    <div className="border-t">
-                      {waitingQueue.length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground text-center py-3">No waiting patients</p>
-                      ) : (
-                        waitingQueue.map((visit: Visit) => {
-                          const isSelected = selectedVisit?._id === visit._id;
-                          return (
-                            <div
-                              key={visit._id}
-                              onClick={() => guardNavigation(() => setSelectedVisit(visit), 'patient', visit)}
-                              className={cn(
-                                "p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0",
-                                isSelected ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-amber-500"
-                              )}
-                            >
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="min-w-0">
-                                  <div className="flex items-center gap-1">
-                                    <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
-                                    {visit.triageAlert && (
-                                      <AlertCircle className="w-3 h-3 text-red-500 flex-shrink-0" aria-label="Nurse triage alert" />
-                                    )}
-                                  </div>
-                                  <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
-                                  {visit.triageAlerts && visit.triageAlerts.length > 0 && (
-                                    <p className="text-[10px] text-red-600 truncate font-medium mt-0.5">
-                                      {visit.triageAlerts[0]}{visit.triageAlerts.length > 1 ? ` +${visit.triageAlerts.length - 1}` : ''}
-                                    </p>
-                                  )}
-                                </div>
-                                <Button
-                                  size="sm"
-                                  variant="default"
-                                  className="h-7 rounded-full text-[11px] px-3 shrink-0 gap-1 font-semibold"
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    handleAcceptPatient(visit);
-                                  }}
-                                  disabled={acceptPatient.isPending}
-                                >
-                                  {acceptPatient.isPending ? (
-                                    <Loader2 className="h-3 w-3 animate-spin" />
-                                  ) : (
-                                    <UserCheck className="h-3 w-3" />
-                                  )}
-                                  Accept
-                                </Button>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-lg border bg-white overflow-hidden">
-                  <button
-                    type="button"
-                    className="w-full px-3 py-2.5 flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
-                    onClick={() => toggleQueueSection('active')}
-                  >
-                    <span className="text-xs font-semibold flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[17px] text-primary">stethoscope</span>
-                      Patients I'm Seeing
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Badge variant="secondary" className="h-5 text-[10px]">{activePatients.length}</Badge>
-                      <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", !queueSectionsOpen.active && "-rotate-90")} />
-                    </span>
-                  </button>
-                  {queueSectionsOpen.active && (
-                    <div className="border-t">
-                      {activePatients.length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground text-center py-3">No active encounters</p>
-                      ) : (
-                        activePatients.map((visit: Visit) => (
-                          <div key={visit._id} onClick={() => guardNavigation(() => { setSelectedVisit(visit); if (visit.status === 'results_ready') setActiveTab('lab-results'); }, 'patient', visit)} className={cn("p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0", selectedVisit?._id === visit._id ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-primary")}>
-                            <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
-                            <div className="mt-0.5 flex items-center justify-between gap-2">
-                              <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
-                              <Badge variant="outline" className="text-[9px] capitalize shrink-0">{statusLabel(visit.status)}</Badge>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-lg border bg-white overflow-hidden">
-                  <button
-                    type="button"
-                    className="w-full px-3 py-2.5 flex items-center justify-between text-left hover:bg-muted/40 transition-colors"
-                    onClick={() => toggleQueueSection('results')}
-                  >
-                    <span className="text-xs font-semibold flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[17px] text-emerald-600">science</span>
-                      Results Ready
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      <Badge variant="secondary" className="h-5 text-[10px]">{resultsReady.length}</Badge>
-                      <ChevronDown className={cn("w-3.5 h-3.5 text-muted-foreground transition-transform", !queueSectionsOpen.results && "-rotate-90")} />
-                    </span>
-                  </button>
-                  {queueSectionsOpen.results && (
-                    <div className="border-t">
-                      {resultsReady.length === 0 ? (
-                        <p className="text-[11px] text-muted-foreground text-center py-3">No results pending</p>
-                      ) : (
-                        resultsReady.map((visit: Visit) => (
-                          <div key={visit._id} onClick={() => guardNavigation(() => { setSelectedVisit(visit); setActiveTab('lab-results'); }, 'patient', visit)} className={cn("p-2.5 cursor-pointer transition-colors border-l-2 border-b last:border-b-0", selectedVisit?._id === visit._id ? "bg-primary/10 border-l-primary" : "hover:bg-muted/50 border-l-emerald-500")}>
-                            <p className="text-xs font-medium truncate">{patientDisplayName(visit)}</p>
-                            <div className="mt-0.5 flex items-center justify-between gap-2">
-                              <p className="text-[10px] text-muted-foreground truncate">{visit.visitNumber}</p>
-                              <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[9px] shrink-0">Review</Badge>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setAllPatientsOpen(true); setAllPatientsPage(1); setAllPatientsSearch(''); setAllPatientsDaysBack(undefined); }}
-                className="mt-3 w-full px-3 py-2 rounded-lg border border-dashed border-primary/30 bg-primary/5 hover:bg-primary/10 text-xs font-medium text-primary flex items-center justify-center gap-1.5 transition-colors"
-              >
-                <UserCheck className="w-3.5 h-3.5" />
-                All My Patients
-              </button>
-            </div>
-          </div>
-          <div className="p-3 border-t border-border space-y-1">
-            <div className="px-3 py-1.5 text-[10px] text-muted-foreground space-y-0.5">
-              <p><kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono">Ctrl+S</kbd> Save · <kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono">Ctrl+Enter</kbd> Complete</p>
-              <p><kbd className="px-1 py-0.5 rounded bg-muted border text-[9px] font-mono">1-5</kbd> Switch tabs</p>
-            </div>
-            <button onClick={handleLogout} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-red-600 hover:bg-red-50 transition-colors">
-              <span className="material-symbols-outlined text-[18px]">logout</span>Logout
-            </button>
-          </div>
-        </nav>
-
         {/* Main Workspace */}
-        <main className="md:ml-64 flex-1 h-[calc(100vh-56px)] flex flex-col overflow-hidden">
+        <main className="flex-1 h-[calc(100vh-56px)] flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row gap-6 p-4 md:p-6">
             {/* Left Editor Area */}
             <div className="flex-1 flex flex-col gap-5 min-w-0">
@@ -1398,19 +1237,17 @@ export default function DoctorDashboard() {
                   )}
 
                   {/* Tabs */}
-                    <Tabs value={activeTab} onValueChange={(val) => guardNavigation(() => setActiveTab(val), 'tab', val)} className="w-full flex flex-col flex-1">
+                  <Tabs value={activeTab} onValueChange={(val) => guardNavigation(() => setActiveTab(val), 'tab', val)} className="w-full flex flex-col flex-1">
                     <div className="border-b border-border bg-white rounded-t-xl overflow-x-auto">
                       <TabsList className="bg-transparent h-auto p-0 min-w-max px-4">
                         <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-sm">Consult</TabsTrigger>
-                        <TabsTrigger value="orders" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-sm">Orders</TabsTrigger>
                         <TabsTrigger value="lab-results" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none relative text-sm">
                           Results
                           {labResults.length > 0 && (
                             <Badge className="ml-1.5 h-4 min-w-4 text-[10px]">{labResults.length}</Badge>
                           )}
                         </TabsTrigger>
-                        <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-sm">Summary</TabsTrigger>
-                        <TabsTrigger value="history" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-sm">History</TabsTrigger>
+                        <TabsTrigger value="timeline" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-sm">Timeline</TabsTrigger>
                       </TabsList>
                     </div>
 
@@ -1501,16 +1338,14 @@ export default function DoctorDashboard() {
                           </div>
                         </div>
 
-                        {/* Objective + Assessment — 2-column row */}
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
-                          {/* Objective Card */}
-                          <div className="bg-white border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+                        {/* Objective Card */}
+                        <div className="bg-white border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
                           <div className="bg-muted/30 px-4 py-2.5 border-b border-border flex justify-between items-center">
                             <h3 className="text-sm font-semibold flex items-center gap-2">
                               <span className="material-symbols-outlined text-[18px] text-primary">monitor_heart</span> Objective
                             </h3>
                           </div>
-                            <div className="p-4 flex flex-col gap-3">
+                          <div className="p-4 flex flex-col gap-3">
                               <div className="grid grid-cols-2 gap-2">
                                 {[
                                   { key: 'temperature', label: 'Temp (C)', placeholder: '36.5', type: 'number', hint: '30-42' },
@@ -1532,80 +1367,47 @@ export default function DoctorDashboard() {
                                   </div>
                                 ))}
                               </div>
+                              {/* Triage Priority Override */}
+                              <div>
+                                <Label className="text-[10px] text-muted-foreground">Triage Priority (Override)</Label>
+                                <Select value={triageOverride || selectedVisit.triagePriority || ''} onValueChange={setTriageOverride}>
+                                  <SelectTrigger className="mt-1 h-8 text-xs">
+                                    <SelectValue placeholder="Set priority" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="esi_1_emergency">ESI 1 - Emergency</SelectItem>
+                                    <SelectItem value="esi_2_urgent">ESI 2 - Urgent</SelectItem>
+                                    <SelectItem value="esi_3_urgent">ESI 3 - Urgent</SelectItem>
+                                    <SelectItem value="esi_4_less_urgent">ESI 4 - Less Urgent</SelectItem>
+                                    <SelectItem value="esi_5_non_urgent">ESI 5 - Non Urgent</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <Label className="text-[11px] text-muted-foreground font-semibold">Doctor Triage Notes</Label>
+                              <Textarea
+                                value={doctorTriageNotes}
+                                onChange={(e) => setDoctorTriageNotes(e.target.value)}
+                                placeholder="Doctor's triage addendum or override rationale..."
+                                rows={2}
+                                className="resize-y text-sm"
+                              />
                               <Label className="text-[11px] text-muted-foreground font-semibold">Exam Notes</Label>
                               <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})} placeholder="Physical exam findings, vitals, observations..." rows={3} className="resize-y text-sm" />
                             </div>
-                          </div>
-
-                          {/* Assessment Card */}
-                          <div className="bg-white border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                          <div className="bg-muted/30 px-4 py-2.5 border-b border-border flex justify-between items-center">
-                            <h3 className="text-sm font-semibold flex items-center gap-2">
-                              <span className="material-symbols-outlined text-[18px] text-primary">fact_check</span> Assessment
-                            </h3>
-                          </div>
-                            <div className="p-4 flex flex-col gap-3">
-                              <Label className="text-[11px] text-muted-foreground font-semibold">Diagnosis</Label>
-                              <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})} placeholder="Primary diagnosis" className="h-8 text-sm" />
-                              <Label className="text-[11px] text-muted-foreground font-semibold">Clinical Assessment</Label>
-                              <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})} placeholder="Clinical impression, differential diagnosis..." rows={4} className="resize-y text-sm" />
-                            </div>
-                          </div>
                         </div>
 
-                        {/* Plan Card */}
+                        {/* Assessment & Plan Card */}
                         <div className="bg-white border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
                           <div className="bg-muted/30 px-4 py-2.5 border-b border-border flex justify-between items-center">
                             <h3 className="text-sm font-semibold flex items-center gap-2">
-                              <span className="material-symbols-outlined text-[18px] text-primary">assignment_turned_in</span> Plan
+                              <span className="material-symbols-outlined text-[18px] text-primary">fact_check</span> Assessment & Plan
                             </h3>
-                            <Button size="sm" className="rounded-full h-7 text-xs gap-1" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
-                              <Save className="w-3 h-3" /> Save
-                            </Button>
                           </div>
-                          <div className="p-4 flex flex-col gap-4">
-                            {/* Action Buttons Row */}
-                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-                              <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!canContinueClinicalWork}>
-                                <span className="material-symbols-outlined text-primary text-[18px]">science</span> Order Labs
-                              </Button>
-                              <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }} disabled={!canContinueClinicalWork}>
-                                <span className="material-symbols-outlined text-primary text-[18px]">prescriptions</span> Prescribe
-                              </Button>
-                              <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => setTreatmentPlanOpen(true)} disabled={!canContinueClinicalWork}>
-                                <span className="material-symbols-outlined text-primary text-[18px]">assignment</span> Treatment Plan
-                              </Button>
-                              <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => setReferralOpen(true)} disabled={!canContinueClinicalWork}>
-                                <span className="material-symbols-outlined text-primary text-[18px]">forward</span> Refer
-                              </Button>
-                              <Button variant="outline" className="h-11 justify-center gap-2" onClick={() => setAdmitOpen(true)} disabled={!canContinueClinicalWork}>
-                                <span className="material-symbols-outlined text-primary text-[18px]">bed</span> Admit
-                              </Button>
-                            </div>
-                            {/* Pending Orders */}
-                            {(currentVisitOrders.length > 0 || currentVisitPrescriptions.length > 0) && (
-                              <div className="border border-border border-dashed rounded-lg p-3 bg-muted/20">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Pending Orders for Visit</p>
-                                {currentVisitOrders.map((order: any) => (
-                                  <div key={order._id || order.id} className="flex items-center justify-between gap-3 p-2 bg-white border border-border rounded mb-1.5 last:mb-0 min-w-0">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className="material-symbols-outlined text-primary text-[16px]">science</span>
-                                      <span className="text-xs font-medium truncate">{(order.order_tests || order.tests || []).map((t: any) => t.testName || t.testCode).join(', ')}</span>
-                                    </div>
-                                    <Badge variant={(order.paymentStatus || order.payment_status) === 'paid' ? 'default' : 'outline'} className="text-[9px] shrink-0">{(order.paymentStatus || order.payment_status || 'pending')}</Badge>
-                                  </div>
-                                ))}
-                                {currentVisitPrescriptions.map((rx: any) => (
-                                  <div key={rx._id} className="flex items-center justify-between gap-3 p-2 bg-white border border-border rounded mb-1.5 last:mb-0 min-w-0">
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <span className="material-symbols-outlined text-primary text-[16px]">medication</span>
-                                      <span className="text-xs font-medium truncate">{(rx.items || []).map((i: any) => `${i.medicationName} ${i.dosage}`).join(', ')}</span>
-                                    </div>
-                                    <Badge variant={rx.isPaid ? 'default' : 'secondary'} className="text-[9px] shrink-0">{rx.isPaid ? 'Paid' : 'Pending'}</Badge>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                          <div className="p-4 flex flex-col gap-3">
+                            <Label className="text-[11px] text-muted-foreground font-semibold">Diagnosis</Label>
+                            <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})} placeholder="Primary diagnosis" className="h-8 text-sm" />
+                            <Label className="text-[11px] text-muted-foreground font-semibold">Clinical Assessment</Label>
+                            <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})} placeholder="Clinical impression, differential diagnosis..." rows={3} className="resize-y text-sm" />
                             <Label className="text-[11px] text-muted-foreground font-semibold">Treatment Plan Notes</Label>
                             <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})} placeholder="Treatment plan, medications, follow-up..." rows={3} className="resize-y text-sm" />
                             {selectedVisit.roomType === 'emergency' && (
@@ -1616,331 +1418,69 @@ export default function DoctorDashboard() {
                             )}
                           </div>
                         </div>
-                      </div>
-                    </TabsContent>
 
-                    {/* Orders Tab */}
-                    <TabsContent value="orders" className="p-5 md:p-6 mt-0">
-                      {currentVisitOrders.length > 0 && (
-                        <div className="mb-6">
-                          <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Existing Orders</h4>
-                          <div className="space-y-2">
-                            {currentVisitOrders.map((order: any) => {
-                              const orderTests = order.order_tests || order.tests || [];
-                              const orderType = order.orderType || order.order_type;
-                              const canEdit = (order.paymentStatus || order.payment_status) === 'pending' && (order.status === 'awaiting_payment');
-                              return (
-                                <div key={order._id || order.id} className="clinical-panel p-4">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="text-sm font-semibold">{order.orderNumber}</p>
-                                        <Badge variant="outline" className="capitalize text-[10px]">{orderType}</Badge>
-                                        <Badge variant={(order.status === 'completed') ? 'default' : (order.status === 'cancelled') ? 'destructive' : 'secondary'} className="text-[10px] capitalize">{(order.status || '').replace(/_/g, ' ')}</Badge>
-                                        <Badge variant={(order.paymentStatus || order.payment_status) === 'paid' ? 'default' : 'outline'} className="text-[10px]">{(order.paymentStatus || order.payment_status || 'pending').replace(/_/g, ' ')}</Badge>
-                                      </div>
-                                      <div className="mt-2 space-y-1">
-                                        {orderTests.map((test: any, idx: number) => (
-                                          <p key={idx} className="text-xs text-muted-foreground">
-                                            {test.testName || test.test_name || test.testCode || test.test_code}
-                                            {test.panelName || test.panel_name ? ` (${test.panelName || test.panel_name})` : ''}
-                                            {test.price ? ` - Le ${test.price.toLocaleString()}` : ''}
-                                          </p>
-                                        ))}
-                                      </div>
-                                      <p className="text-xs text-muted-foreground mt-1">Total: Le {(order.total || 0).toLocaleString()} | Priority: {order.priority || 'routine'}</p>
-                                    </div>
-                                    {canEdit && orderType === 'lab' && (
-                                      <Button variant="outline" size="sm" className="rounded-full" onClick={() => startEditOrder(order)} disabled={!canContinueClinicalWork}>
-                                        <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
+                        {/* Compact Action Buttons Row */}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!canContinueClinicalWork}>
+                            <FlaskConical className="w-3.5 h-3.5" /> Order Labs
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }} disabled={!canContinueClinicalWork}>
+                            <Pill className="w-3.5 h-3.5" /> Prescribe
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setTreatmentPlanOpen(true)} disabled={!canContinueClinicalWork}>
+                            <ClipboardList className="w-3.5 h-3.5" /> Treatment Plan
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setReferralOpen(true)} disabled={!canContinueClinicalWork}>
+                            <Send className="w-3.5 h-3.5" /> Refer
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setAdmitOpen(true)} disabled={!canContinueClinicalWork}>
+                            <BedDouble className="w-3.5 h-3.5" /> Admit
+                          </Button>
                         </div>
-                      )}
-                      {currentVisitPrescriptions.length > 0 && (
-                        <div className="mb-6">
-                          <h4 className="text-sm font-semibold mb-3 text-muted-foreground">Existing Prescriptions</h4>
-                          <div className="space-y-2">
-                            {currentVisitPrescriptions.map((rx: any) => {
-                              const canEdit = !rx.isPaid && rx.status === 'pending';
-                              return (
-                                <div key={rx._id} className="clinical-panel p-4">
-                                  <div className="flex items-start justify-between gap-3">
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="text-sm font-semibold">{rx.prescriptionNumber}</p>
-                                        <Badge variant={rx.isPaid ? 'default' : 'secondary'} className="text-[10px]">{rx.isPaid ? 'Paid' : 'Awaiting payment'}</Badge>
-                                        <Badge variant="outline" className="text-[10px] capitalize">{rx.status}</Badge>
-                                      </div>
-                                      <div className="mt-2 space-y-1">
-                                        {(rx.items || []).map((item: any, idx: number) => (
-                                          <p key={idx} className="text-xs text-muted-foreground">
-                                            {item.medicationName} - {item.dosage}, {item.frequency}, {item.duration}
-                                            {item.quantity ? ` (Qty: ${item.quantity})` : ''}
-                                          </p>
-                                        ))}
-                                      </div>
-                                      <p className="text-xs text-muted-foreground mt-1">Total: Le {(rx.totalAmount || 0).toLocaleString()}</p>
-                                    </div>
-                                    {canEdit && (
-                                      <Button variant="outline" size="sm" className="rounded-full" onClick={() => startEditPrescription(rx)} disabled={!canContinueClinicalWork}>
-                                        <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-6">
-                        {[
-                          { label: 'Awaiting lab payment', value: awaitingLabPayment.length },
-                          { label: 'Awaiting results', value: awaitingResults.length },
-                          { label: 'Pharmacy workflow', value: awaitingPharmacy.length + awaitingDispensing.length },
-                        ].map((item) => (
-                          <div key={item.label} className="clinical-panel p-4">
-                            <p className="clinical-label">{item.label}</p>
-                            <p className="text-2xl font-semibold mt-1">{item.value}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </TabsContent>
 
-                    {/* Lab Results Tab */}
-                    <TabsContent value="lab-results" className="p-6 mt-0">
-                      {labResults.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                          <FlaskConical className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                          <p className="text-sm">No lab results available yet</p>
-                          <p className="text-xs mt-1">Results will appear here once verified by the lab</p>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div>
-                              <h3 className="font-semibold text-sm">Lab Results</h3>
-                              <p className="text-xs text-muted-foreground mt-1">{labResults.length} result{labResults.length === 1 ? '' : 's'} released, {abnormalLabResults.length} flagged.</p>
+                        {/* Pending Orders Inline */}
+                        {(currentVisitOrders.length > 0 || currentVisitPrescriptions.length > 0) && (
+                          <div className="border border-border border-dashed rounded-lg p-3 bg-muted/20">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Pending Orders</p>
+                            <div className="space-y-1.5">
+                              {currentVisitOrders.map((order: any) => (
+                                <div key={order._id || order.id} className="flex items-center justify-between gap-3 p-2 bg-white border border-border rounded min-w-0">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <FlaskConical className="w-3.5 h-3.5 text-primary shrink-0" />
+                                    <span className="text-xs font-medium truncate">{(order.order_tests || order.tests || []).map((t: any) => t.testName || t.testCode).join(', ')}</span>
+                                  </div>
+                                  <Badge variant={(order.paymentStatus || order.payment_status) === 'paid' ? 'default' : 'outline'} className="text-[9px] shrink-0">{(order.paymentStatus || order.payment_status || 'pending')}</Badge>
+                                </div>
+                              ))}
+                              {currentVisitPrescriptions.map((rx: any) => (
+                                <div key={rx._id} className="flex items-center justify-between gap-3 p-2 bg-white border border-border rounded min-w-0">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <Pill className="w-3.5 h-3.5 text-primary shrink-0" />
+                                    <span className="text-xs font-medium truncate">{(rx.items || []).map((i: any) => `${i.medicationName} ${i.dosage || ''}`).join(', ')}</span>
+                                  </div>
+                                  <Badge variant={rx.isPaid ? 'default' : 'secondary'} className="text-[9px] shrink-0">{rx.isPaid ? 'Paid' : 'Pending'}</Badge>
+                                </div>
+                              ))}
                             </div>
-                            <Button variant="outline" size="sm" className="gap-1" onClick={() => { const reportPath = `/lab/reports/${labOrderId}`; navigate(reportPath); }}>
-                              <ExternalLink className="w-3 h-3" /> View Full Report
-                            </Button>
                           </div>
-                          <div className="clinical-panel overflow-x-auto">
-                            <table className="w-full min-w-[640px] text-sm">
-                              <thead className="bg-muted/50">
-                                <tr>
-                                  <th className="text-left p-3 font-medium cursor-pointer hover:bg-muted/80 select-none" onClick={() => toggleLabSort('testName')}>
-                                    Test {labSortField === 'testName' ? (labSortDir === 'asc' ? '\u2191' : '\u2193') : ''}
-                                  </th>
-                                  <th className="text-center p-3 font-medium cursor-pointer hover:bg-muted/80 select-none" onClick={() => toggleLabSort('value')}>
-                                    Result {labSortField === 'value' ? (labSortDir === 'asc' ? '\u2191' : '\u2193') : ''}
-                                  </th>
-                                  <th className="text-center p-3 font-medium cursor-pointer hover:bg-muted/80 select-none" onClick={() => toggleLabSort('flag')}>
-                                    Flag {labSortField === 'flag' ? (labSortDir === 'asc' ? '\u2191' : '\u2193') : ''}
-                                  </th>
-                                  <th className="text-center p-3 font-medium">Reference</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y">
-                                {sortedLabResults.map((result: LabResult) => (
-                                  <tr key={result._id} className="hover:bg-muted/30">
-                                    <td className="p-3">
-                                      <p className="font-medium">{result.testName}</p>
-                                      <p className="text-xs text-muted-foreground">{result.testCode}</p>
-                                    </td>
-                                    <td className="p-3 text-center">
-                                      <span className="font-semibold text-lg">{result.value}</span>
-                                      {result.unit && <span className="text-muted-foreground ml-1">{result.unit}</span>}
-                                    </td>
-                                    <td className="p-3 text-center">
-                                      <span className={cn("px-2 py-1 rounded text-xs font-medium", getFlagColor(result.flag))}>{getFlagLabel(result.flag)}</span>
-                                    </td>
-                                    <td className="p-3 text-center text-muted-foreground text-xs">{result.referenceRange || result.reference_range || '-'}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      )}
-                    </TabsContent>
-
-                    {/* Overview Tab */}
-                    <TabsContent value="overview" className="p-5 mt-0">
-                      <div className="space-y-4">
-                        <AllergyManager patientId={selectedVisit.patientId?._id || selectedVisit.patientId} allergies={selectedVisit.patientId?.allergies || []} allergyDetails={selectedVisit.patientId?.allergyDetails || []} />
-                        <ProblemList visitId={selectedVisit._id || selectedVisit.id} problems={selectedVisit.problemList || []} />
-                        <VitalsTrends vitalsHistory={patientChart?.vitalsHistory || []} />
-                        <FollowUpScheduler visitId={selectedVisit._id || selectedVisit.id} followUpDate={selectedVisit.followUpDate} followUpNotes={selectedVisit.followUpNotes} />
+                        )}
                       </div>
                     </TabsContent>
 
-                    {/* History Tab */}
-                    <TabsContent value="history" className="mt-0">
-                      <Tabs value={historyTab} onValueChange={setHistoryTab} className="w-full">
-                        <div className="px-5 py-3 border-b bg-muted/10">
-                          <div className="flex items-center justify-between gap-3 mb-3">
-                            <div><h3 className="font-semibold text-sm">Patient History</h3><p className="text-xs text-muted-foreground mt-1">Longitudinal record for this patient. Pick a section and it opens in this workspace.</p></div>
-                            {chartLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
-                          </div>
-                          <div className="overflow-x-auto">
-                            <TabsList className="bg-transparent h-auto p-0 min-w-max">
-                              <TabsTrigger value="visits" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Visits</TabsTrigger>
-                              <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">SOAP Notes</TabsTrigger>
-                              <TabsTrigger value="labs" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Labs</TabsTrigger>
-                              <TabsTrigger value="meds" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Medications</TabsTrigger>
-                              <TabsTrigger value="admissions" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Admissions</TabsTrigger>
-                              <TabsTrigger value="vitals" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">Vitals</TabsTrigger>
-                            </TabsList>
-                          </div>
-                        </div>
-                        <ScrollArea className="h-[560px]">
-                          <div className="p-5">
-                            <TabsContent value="visits" className="mt-0">
-                              {patientVisits.length <= 1 ? (
-                                <div className="text-center py-10 text-muted-foreground text-sm">No previous visits found</div>
-                              ) : (
-                                <div className="space-y-3">
-                                  {patientVisits.filter((v: Visit) => v._id !== selectedVisit._id).map((visit: Visit) => (
-                                    <div key={visit._id} className="clinical-panel p-4">
-                                      <div className="flex items-start justify-between gap-4">
-                                        <div><p className="text-sm font-semibold">{visit.visitNumber}</p><p className="text-xs text-muted-foreground mt-1">{new Date(visit.createdAt).toLocaleDateString()} - {visit.visitType}</p></div>
-                                        <Badge variant="outline" className="capitalize">{visit.status?.replace(/_/g, ' ')}</Badge>
-                                      </div>
-                                      {visit.chiefComplaint && <p className="text-sm mt-3"><span className="font-medium">Complaint:</span> {visit.chiefComplaint}</p>}
-                                      {visit.diagnosis && <p className="text-sm mt-2"><span className="font-medium">Diagnosis:</span> {visit.diagnosis}</p>}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </TabsContent>
-                            <TabsContent value="soap" className="mt-0">
-                              {(patientChart?.soapNotes || []).length === 0 ? (
-                                <div className="text-center py-10 text-muted-foreground text-sm">No SOAP notes found</div>
-                              ) : (
-                                <div className="space-y-3">
-                                  {patientChart.soapNotes.map((note: any) => (
-                                    <div key={note._id} className="clinical-panel p-4">
-                                      <div className="flex items-start justify-between gap-3 mb-3">
-                                        <div><p className="text-sm font-semibold capitalize">{note.noteType?.replace(/_/g, ' ') || 'Clinical note'}</p><p className="text-xs text-muted-foreground">{note.doctorId?.fullName || note.nurseId?.fullName || 'Clinical staff'} - {new Date(note.createdAt).toLocaleDateString()}</p></div>
-                                        {note.isSigned && <Badge>Signed</Badge>}
-                                      </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                                        {note.chiefComplaint && <div><span className="font-semibold text-blue-600">S:</span> {note.chiefComplaint}</div>}
-                                        {note.physicalExamination && <div><span className="font-semibold text-green-600">O:</span> {note.physicalExamination}</div>}
-                                        {note.diagnosis && <div><span className="font-semibold text-purple-600">A:</span> {note.diagnosis}</div>}
-                                        {note.treatmentPlan && <div><span className="font-semibold text-orange-600">P:</span> {note.treatmentPlan}</div>}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </TabsContent>
-                            <TabsContent value="labs" className="mt-0">
-                              {(patientChart?.orders || []).length === 0 ? (
-                                <div className="text-center py-10 text-muted-foreground text-sm">No lab history found</div>
-                              ) : (
-                                <div className="space-y-3">
-                                  {patientChart.orders.map((order: any) => (
-                                    <div key={order._id} className="clinical-panel p-4">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div><p className="text-sm font-semibold">{order.orderNumber}</p><p className="text-xs text-muted-foreground">{new Date(order.createdAt).toLocaleDateString()}</p></div>
-                                        <Badge variant="outline" className="capitalize">{order.status?.replace(/_/g, ' ')}</Badge>
-                                      </div>
-                                      <div className="mt-3 space-y-2">
-                                        {(order.orderTests || []).map((test: any, index: number) => {
-                                          const result = order.results?.find((r: any) => r.orderTestId?.toString() === test._id?.toString());
-                                          return (
-                                            <div key={`${order._id}-${index}`} className="flex items-center justify-between gap-3 text-sm border-l-2 pl-3">
-                                              <span>{test.testName || test.testCode}</span>
-                                              {result ? <span className="font-medium">{result.value} {result.unit || ''}</span> : <span className="text-muted-foreground">Pending</span>}
-                                            </div>
-                                          );
-                                        })}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </TabsContent>
-                            <TabsContent value="meds" className="mt-0">
-                              {(patientChart?.prescriptions || []).length === 0 ? (
-                                <div className="text-center py-10 text-muted-foreground text-sm">No medication history found</div>
-                              ) : (
-                                <div className="space-y-3">
-                                  {patientChart.prescriptions.map((prescription: any) => (
-                                    <div key={prescription._id} className="clinical-panel p-4">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div><p className="text-sm font-semibold">{prescription.prescriptionNumber}</p><p className="text-xs text-muted-foreground">{new Date(prescription.createdAt).toLocaleDateString()}</p></div>
-                                        <Badge variant={prescription.isPaid ? 'default' : 'secondary'}>{prescription.isPaid ? 'Paid' : 'Awaiting payment'}</Badge>
-                                      </div>
-                                      <div className="mt-3 space-y-2">
-                                        {(prescription.items || []).map((item: any, index: number) => (
-                                          <div key={`${prescription._id}-${index}`} className="text-sm border-l-2 pl-3"><span className="font-medium">{item.medicationName}</span><span className="text-muted-foreground"> - {item.dosage}, {item.frequency}, {item.duration}</span></div>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </TabsContent>
-                            <TabsContent value="admissions" className="mt-0">
-                              {(patientChart?.admissions || []).length === 0 ? (
-                                <div className="text-center py-10 text-muted-foreground text-sm">No admissions found</div>
-                              ) : (
-                                <div className="space-y-3">
-                                  {patientChart.admissions.map((admission: any) => (
-                                    <div key={admission._id} className="clinical-panel p-4">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div><p className="text-sm font-semibold">{admission.admissionNumber}</p><p className="text-xs text-muted-foreground">{admission.wardType}{admission.bedNumber ? ` - ${admission.bedNumber}` : ''} - {new Date(admission.createdAt).toLocaleDateString()}</p></div>
-                                        <Badge className="capitalize">{admission.status}</Badge>
-                                      </div>
-                                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm mt-3">
-                                        <div><span className="font-medium">Reason:</span> {admission.admissionReason || 'N/A'}</div>
-                                        <div><span className="font-medium">Diagnosis:</span> {admission.diagnosis || admission.dischargeDiagnosis || 'N/A'}</div>
-                                        <div><span className="font-medium">MAR entries:</span> {admission.medicationLog?.length || 0}</div>
-                                        <div><span className="font-medium">Nursing notes:</span> {admission.nursingNotes?.length || 0}</div>
-                                      </div>
-                                      {admission.dischargeInstructions && <p className="text-sm mt-3"><span className="font-medium">Discharge/follow-up:</span> {admission.dischargeInstructions}</p>}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </TabsContent>
-                            <TabsContent value="vitals" className="mt-0">
-                              {(patientChart?.vitalsHistory || []).length === 0 ? (
-                                <div className="text-center py-10 text-muted-foreground text-sm">No vitals history found</div>
-                              ) : (
-                                <div className="space-y-3">
-                                  {patientChart.vitalsHistory.map((vital: any, index: number) => (
-                                    <div key={index} className="clinical-panel p-4">
-                                      <div className="flex items-center justify-between mb-3">
-                                        <p className="text-sm font-semibold">{new Date(vital.date).toLocaleDateString()}</p>
-                                        <p className="text-xs text-muted-foreground">{vital.recordedBy?.fullName || 'Clinical staff'}</p>
-                                      </div>
-                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                                        {vital.vitalSigns?.bloodPressure && <div>BP: <span className="font-medium">{vital.vitalSigns.bloodPressure}</span></div>}
-                                        {vital.vitalSigns?.temperature && <div>Temp: <span className="font-medium">{vital.vitalSigns.temperature}</span></div>}
-                                        {vital.vitalSigns?.heartRate && <div>HR: <span className="font-medium">{vital.vitalSigns.heartRate}</span></div>}
-                                        {vital.vitalSigns?.respiratoryRate && <div>RR: <span className="font-medium">{vital.vitalSigns.respiratoryRate}</span></div>}
-                                        {vital.vitalSigns?.weight && <div>Weight: <span className="font-medium">{vital.vitalSigns.weight}</span></div>}
-                                        {vital.vitalSigns?.height && <div>Height: <span className="font-medium">{vital.vitalSigns.height}</span></div>}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </TabsContent>
-                          </div>
-                        </ScrollArea>
-                      </Tabs>
+                    {/* Timeline Tab */}
+                    <TabsContent value="timeline" className="p-0 mt-0">
+                      {patientId ? (
+                        <PatientTimeline
+                          patientId={patientId}
+                          patientChart={patientChart}
+                          patientVisits={patientVisits}
+                          patientOrders={currentVisitOrders}
+                          patientPrescriptions={currentVisitPrescriptions}
+                          chartLoading={chartLoading}
+                        />
+                      ) : (
+                        <div className="text-center py-12 text-muted-foreground text-sm">Select a patient to view timeline</div>
+                      )}
                     </TabsContent>
                   </Tabs>
 
@@ -1958,16 +1498,10 @@ export default function DoctorDashboard() {
                         {isDirty && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium">Unsaved</span>}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Button variant="outline" size="sm" className="rounded-full" onClick={() => guardNavigation(() => setActiveTab('soap'), 'tab', 'soap')}>
-                          <FileText className="w-3.5 h-3.5 mr-1.5" /> SOAP
+                        <Button size="sm" className="rounded-full" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending || !canContinueClinicalWork}>
+                          {updateVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
+                          {isDirty ? 'Save (Ctrl+S)' : 'Save'}
                         </Button>
-                        <Button variant="outline" size="sm" className="rounded-full" onClick={() => guardNavigation(() => setActiveTab('orders'), 'tab', 'orders')} disabled={!canContinueClinicalWork}>
-                          <ClipboardList className="w-3.5 h-3.5 mr-1.5" /> Orders
-                        </Button>
-                        <Button variant="outline" size="sm" className="rounded-full" onClick={() => guardNavigation(() => setActiveTab('lab-results'), 'tab', 'lab-results')} disabled={labResults.length === 0}>
-                          <FlaskConical className="w-3.5 h-3.5 mr-1.5" /> Results
-                        </Button>
-                        <div className="hidden sm:block w-px h-5 bg-border mx-1" />
                         <Button size="sm" className="rounded-full bg-[#0d9488] hover:bg-[#0f766e] text-white" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
                           {completeVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />}
                           Complete & Next
@@ -1982,7 +1516,7 @@ export default function DoctorDashboard() {
                   <div className="max-w-md text-center">
                     <User className="w-14 h-14 mx-auto mb-4 text-muted-foreground/30" />
                     <h2 className="text-xl font-semibold">Ready to consult</h2>
-                    <p className="text-sm text-muted-foreground mt-2">Select a patient from the sidebar roster or accept the next patient in queue to begin consultation.</p>
+                    <p className="text-sm text-muted-foreground mt-2">Accept a patient from the header to begin consultation.</p>
                     <div className="flex flex-col items-center gap-2 mt-5">
                       {waitingQueue.length > 0 && (
                         <Button
@@ -2008,77 +1542,14 @@ export default function DoctorDashboard() {
                       )}
                     </div>
                     {(waitingQueue.length > 0 || resultsReady.length > 0) && (
-                      <p className="text-[11px] text-muted-foreground mt-3">or press <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">1-5</kbd> to switch tabs</p>
+                      <p className="text-[11px] text-muted-foreground mt-3">
+                        <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">1-3</kbd> Switch tabs · <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">Ctrl+S</kbd> Save · <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">Ctrl+Enter</kbd> Complete
+                      </p>
                     )}
                   </div>
                 </div>
               )}
             </div>
-
-            {/* Right Context Panel */}
-            {selectedVisit && (
-              <div className="w-[280px] hidden lg:flex flex-col gap-5 shrink-0">
-                {/* Drug-Allergy Quick Check */}
-                {selectedVisit.patientId?.allergies?.length > 0 && (
-                  <div className="bg-white border border-red-200 rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                    <h4 className={cn(CLINICAL_LABEL, "text-red-700 mb-2 flex items-center gap-1.5")}>
-                      <AlertTriangle className="w-3.5 h-3.5" /> Allergies on file
-                    </h4>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedVisit.patientId.allergies.map((a: string) => (
-                        <span key={a} className="px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 text-[11px] font-medium">{a}</span>
-                      ))}
-                    </div>
-                    <p className="text-[10px] text-muted-foreground mt-2">Auto-checked when prescribing</p>
-                  </div>
-                )}
-
-                {/* Chronic Conditions */}
-                {selectedVisit.patientId?.chronicConditions?.length > 0 && (
-                  <div className="bg-white border border-amber-200 rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                    <h4 className={cn(CLINICAL_LABEL, "text-amber-700 mb-2 flex items-center gap-1.5")}>
-                      <Activity className="w-3.5 h-3.5" /> Chronic Conditions
-                    </h4>
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedVisit.patientId.chronicConditions.map((c: string) => (
-                        <span key={c} className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-medium">{c}</span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Wallet + Quick Stats */}
-                <div className="bg-white border border-border rounded-xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                  <h4 className={cn(CLINICAL_LABEL, "mb-2 flex items-center gap-1.5")}>
-                    <Stethoscope className="w-3.5 h-3.5" /> Visit Snapshot
-                  </h4>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">Wallet</span>
-                      <span className="text-sm font-mono font-semibold">Le {selectedWalletBalance.toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">Orders</span>
-                      <span className="text-sm font-semibold">{currentVisitOrders.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">Prescriptions</span>
-                      <span className="text-sm font-semibold">{currentVisitPrescriptions.length}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-muted-foreground">Lab results</span>
-                      <span className="text-sm font-semibold">{labResults.length}</span>
-                    </div>
-                    {abnormalLabResults.length > 0 && (
-                      <div className="flex items-center justify-between pt-1 border-t">
-                        <span className="text-[11px] text-red-600">Abnormal flags</span>
-                        <span className="text-sm font-semibold text-red-600">{abnormalLabResults.length}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </main>
       </div>
@@ -2480,7 +1951,7 @@ export default function DoctorDashboard() {
                           if (visits && visits.length > 0) {
                             const last = visits.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
                             setSelectedVisit(last);
-                            setActiveTab('history');
+                            setActiveTab('timeline');
                           } else {
                             toast.info(`${fullName} has no visits on file`);
                           }
