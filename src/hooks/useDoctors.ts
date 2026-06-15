@@ -10,6 +10,7 @@ export interface Doctor {
   specialty?: string;
   department?: string;
   isActive: boolean;
+  userId?: string;
 }
 
 export function useDoctors(search?: string) {
@@ -25,7 +26,7 @@ export function useDoctors(search?: string) {
 export function useCreateDoctor() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { fullName: string; phone?: string; facility?: string }) => {
+    mutationFn: async (payload: { fullName: string; phone?: string; facility?: string; userId?: string }) => {
       return await doctorsAPI.create(payload);
     },
     onSuccess: () => {

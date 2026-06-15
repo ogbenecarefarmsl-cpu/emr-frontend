@@ -3,12 +3,20 @@ import { useLocation } from 'react-router-dom';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useCreateDoctor, useDoctors } from '@/hooks/useDoctors';
+import { useUsers } from '@/hooks/useUsers';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Plus, Printer, Search, Stethoscope } from 'lucide-react';
+import { Loader2, Plus, Printer, Search, Stethoscope, User } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export default function DoctorsPage() {
   const { profile } = useAuth();
@@ -19,9 +27,15 @@ export default function DoctorsPage() {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [facility, setFacility] = useState('');
+  const [userId, setUserId] = useState('');
 
   const { data: doctors = [], isLoading } = useDoctors(search || undefined);
+  const { data: users = [] } = useUsers();
   const createDoctor = useCreateDoctor();
+
+  const doctorUsers = users.filter((u: any) =>
+    u.user_roles?.some((r: any) => r.role === 'doctor' || r.role === 'specialist')
+  );
 
   const doctorCount = useMemo(() => (Array.isArray(doctors) ? doctors.length : 0), [doctors]);
 
@@ -35,13 +49,15 @@ export default function DoctorsPage() {
         fullName: name.trim(),
         phone: phone.trim() || undefined,
         facility: facility.trim() || undefined,
+        userId: userId || undefined,
       });
       setName('');
       setPhone('');
       setFacility('');
+      setUserId('');
       toast.success('Doctor added');
-    } catch {
-      toast.error('Failed to add doctor');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Failed to add doctor');
     }
   };
 
@@ -74,6 +90,29 @@ export default function DoctorsPage() {
           <div className="space-y-2">
             <Label>Facility (optional)</Label>
             <Input value={facility} onChange={(e) => setFacility(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label>Linked login user (optional)</Label>
+            <Select value={userId} onValueChange={setUserId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select doctor login account" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="">None (external/referral only)</SelectItem>
+                {doctorUsers.map((u: any) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    <div className="flex items-center gap-2">
+                      <User className="w-3 h-3" />
+                      <span>{u.full_name}</span>
+                      <span className="text-muted-foreground text-xs">({u.email})</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground">
+              Linking a user lets that doctor log in and see patients assigned to this doctor from triage.
+            </p>
           </div>
           <Button className="w-full" onClick={onAddDoctor} disabled={createDoctor.isPending}>
             {createDoctor.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -118,6 +157,7 @@ export default function DoctorsPage() {
                     <th className="text-left px-3 py-2 font-medium">Name</th>
                     <th className="text-left px-3 py-2 font-medium">Phone</th>
                     <th className="text-left px-3 py-2 font-medium">Facility</th>
+                    <th className="text-left px-3 py-2 font-medium">Linked user</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -126,6 +166,15 @@ export default function DoctorsPage() {
                       <td className="px-3 py-2 font-medium">{doctor.fullName}</td>
                       <td className="px-3 py-2">{doctor.phone || '—'}</td>
                       <td className="px-3 py-2">{doctor.facility || '—'}</td>
+                      <td className="px-3 py-2">
+                        {doctor.userId ? (
+                          <Badge variant="outline" className="text-[10px]">
+                            {users.find((u: any) => u.id === doctor.userId)?.full_name || doctor.userId}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-xs">—</span>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
