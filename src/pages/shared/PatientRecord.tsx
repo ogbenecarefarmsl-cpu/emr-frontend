@@ -51,6 +51,24 @@ const PatientRecord = () => {
     onError: () => toast.error('Could not fetch LIS results'),
   });
 
+  const syncLisPayment = useMutation({
+    mutationFn: (orderId: string) => ordersAPI.syncLisPayment(orderId),
+    onSuccess: (data) => {
+      toast.success('Payment synced to LIS');
+      queryClient.invalidateQueries({ queryKey: ['patient-chart', patientId] });
+    },
+    onError: () => toast.error('Could not sync payment to LIS'),
+  });
+
+  const syncToLis = useMutation({
+    mutationFn: (orderId: string) => ordersAPI.syncToLis(orderId),
+    onSuccess: () => {
+      toast.success('Order synced to LIS');
+      queryClient.invalidateQueries({ queryKey: ['patient-chart', patientId] });
+    },
+    onError: () => toast.error('Could not sync order to LIS'),
+  });
+
   if (chartLoading) {
     return (
       <RoleLayout title="Patient Record" subtitle="Loading clinical history..." role={layoutRole} userName={profile?.fullName}>
@@ -407,6 +425,36 @@ const PatientRecord = () => {
                             </div>
                             <div className="flex items-center gap-2">
                               {getStatusBadge(order.status)}
+                              {order.lisSyncStatus === 'synced' && order.lisPaymentSyncStatus !== 'synced' && order.paymentStatus === 'paid' && (
+                                <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">
+                                  Payment not synced to LIS
+                                </Badge>
+                              )}
+                              {order.lisSyncStatus === 'synced' && order.lisPaymentSyncStatus === 'synced' && (
+                                <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-700 border-emerald-200">
+                                  LIS synced
+                                </Badge>
+                              )}
+                              {order.lisSyncStatus === 'failed' && (
+                                <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-red-300 text-red-700"
+                                  onClick={() => syncToLis.mutate(order._id)}
+                                  disabled={syncToLis.isPending}
+                                  title={order.lisSyncError || 'Retry LIS sync'}
+                                >
+                                  {syncToLis.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                                  Retry LIS
+                                </Button>
+                              )}
+                              {order.lisPaymentSyncStatus === 'failed' && (
+                                <Button variant="outline" size="sm" className="h-7 text-xs gap-1 border-amber-300 text-amber-700"
+                                  onClick={() => syncLisPayment.mutate(order._id)}
+                                  disabled={syncLisPayment.isPending}
+                                  title={order.lisPaymentSyncError || 'Retry payment sync'}
+                                >
+                                  {syncLisPayment.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <RefreshCw className="w-3 h-3" />}
+                                  Retry Payment
+                                </Button>
+                              )}
                               {order.lisSyncStatus === 'synced' && (
                                 <Button variant="outline" size="sm" className="h-7 text-xs gap-1"
                                   onClick={() => fetchLisResults.mutate(order._id)}
