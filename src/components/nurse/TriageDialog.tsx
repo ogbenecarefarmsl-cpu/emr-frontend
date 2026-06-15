@@ -49,6 +49,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
   }, [visit, open]);
 
   const availableDoctors = doctors.filter((d: any) => d.isActive !== false);
+  const alerts = checkAbnormalVitals(vitals);
 
   const submitTriage = async () => {
     if (!visit) return;
@@ -82,8 +83,6 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
       toast.error('Failed to complete triage');
     }
   };
-
-  const alerts = checkAbnormalVitals(vitals);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

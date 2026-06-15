@@ -85,27 +85,36 @@ export default function NurseDashboard() {
   const lastSeenTriageIds = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!triageQueue.length) return;
+    const criticalIds = triageQueue
+      .filter((v: any) => {
+        const p = (v.triagePriority || '').toLowerCase();
+        return p === 'emergency' || p === 'urgent';
+      })
+      .map((v: any) => v._id);
     const newCritical = triageQueue.filter((v: any) => {
       const p = (v.triagePriority || '').toLowerCase();
       return (p === 'emergency' || p === 'urgent') && !lastSeenTriageIds.current.has(v._id);
     });
-    if (newCritical.length > 0 && lastSeenTriageIds.current.size > 0) {
+    if (newCritical.length > 0) {
       toast.warning(`${newCritical.length} critical patient${newCritical.length === 1 ? '' : 's'} awaiting triage`, {
         description: newCritical.map((v: any) => `${v.visitNumber} (${v.triagePriority})`).join(', '),
         duration: 8000,
         icon: <AlertTriangle className="w-4 h-4 text-red-500" />,
       });
     }
-    lastSeenTriageIds.current = new Set(triageQueue.map((v: any) => v._id));
+    lastSeenTriageIds.current = new Set(criticalIds);
   }, [triageQueue]);
 
   // Calculate dueMeds count from active admissions' medicationLog
+  // TODO: once medicationOrders/marOrders include scheduled administration times, compare against current time.
   const dueMedsCount = useMemo(() => {
     let count = 0;
     for (const adm of activeAdmissions) {
       const orders = adm.medicationOrders || adm.marOrders || [];
+      if (!orders.length) continue;
       const lastLog = (adm.medicationLog || []).slice(-1)[0];
-      if (orders.length > 0 && !lastLog) count += orders.length;
+      // Without scheduled times we cannot accurately determine dues; avoid false positives.
+      if (!lastLog) count += orders.length;
     }
     return count;
   }, [activeAdmissions]);

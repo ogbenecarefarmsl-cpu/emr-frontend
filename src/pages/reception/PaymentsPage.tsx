@@ -475,16 +475,21 @@ export default function PaymentsPage() {
                       </div>
                     </td>
                     <td>
-                      <Badge variant="outline" className={cn(
-                        'text-[10px]',
-                        order._isConsultationPayment ? 'bg-orange-500/10 text-orange-600' :
-                        order._isPrescriptionPayment ? 'bg-purple-500/10 text-purple-600' :
-                        orderType === 'lab' ? 'bg-blue-500/10 text-blue-600' :
-                        orderType === 'pharmacy' ? 'bg-emerald-500/10 text-emerald-600' :
-                        'bg-muted'
-                      )}>
-                        {order._isConsultationPayment ? 'Consultation' : order._isPrescriptionPayment ? 'Prescription' : orderType === 'lab' ? 'Lab' : orderType === 'pharmacy' ? 'Pharmacy Order' : orderType || '-'}
-                      </Badge>
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="outline" className={cn(
+                          'text-[10px] w-fit',
+                          order._isConsultationPayment ? 'bg-orange-500/10 text-orange-600' :
+                          order._isPrescriptionPayment ? 'bg-purple-500/10 text-purple-600' :
+                          orderType === 'lab' ? 'bg-blue-500/10 text-blue-600' :
+                          orderType === 'pharmacy' ? 'bg-emerald-500/10 text-emerald-600' :
+                          'bg-muted'
+                        )}>
+                          {order._isConsultationPayment ? 'Consultation' : order._isPrescriptionPayment ? 'Prescription' : orderType === 'lab' ? 'Lab' : orderType === 'pharmacy' ? 'Pharmacy Order' : orderType || '-'}
+                        </Badge>
+                        {!order.visitId && !order._visitId && (
+                          <Badge variant="outline" className="text-[10px] w-fit bg-amber-50 text-amber-700 border-amber-200">No visit</Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="font-bold">Le {Number(total).toLocaleString()}</td>
                     <td className="text-status-normal font-medium">Le {amountPaid.toLocaleString()}</td>

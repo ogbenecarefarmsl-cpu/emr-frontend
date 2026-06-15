@@ -117,6 +117,9 @@ export function PendingOrders() {
                   <div className="font-medium truncate">{patientName}</div>
                   <div className="text-sm text-muted-foreground">
                     {patient?.patientId} - {isPrescription ? 'Prescription' : 'Order'}: {isPrescription ? item.prescriptionNumber : item.orderNumber}
+                    {!item.visitId && (
+                      <Badge variant="outline" className="ml-2 text-[10px] h-4 px-1 bg-amber-50 text-amber-700 border-amber-200">No visit</Badge>
+                    )}
                   </div>
                   <div className="text-sm text-muted-foreground">
                     Ordered by: {item.orderedBy?.fullName || item.prescribedBy?.fullName || item.doctorId?.fullName || 'Unknown'}

@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils';
 import type { Medication, Prescription, PrescriptionItem } from '@/types/prescription';
 
 interface DispenseLine {
+  lineId: string;
   medicationId: string;
   medicationName: string;
   /** What the doctor prescribed (in base units) */
@@ -75,9 +76,10 @@ export default function ReceptionDispensePage() {
     if (!rx) return;
     setPrescription(rx);
     // Build initial lines from prescription items
-    const initialLines: DispenseLine[] = (rx.items || []).map((item: any) => {
+    const initialLines: DispenseLine[] = (rx.items || []).map((item: any, idx: number) => {
       const medId = typeof item.medicationId === 'object' ? item.medicationId._id : item.medicationId;
       return {
+        lineId: `${medId}-${idx}`,
         medicationId: medId,
         medicationName: item.medicationName,
         prescribedBaseUnits: item.quantity,
@@ -115,7 +117,7 @@ export default function ReceptionDispensePage() {
   const updateLineInState = (updated: DispenseLine, recompute: boolean = true) => {
     setLines((current) => {
       const next = current.map((l) => {
-        if (l.medicationId !== updated.medicationId) return l;
+        if (l.lineId !== updated.lineId) return l;
         if (recompute) {
           return computeLineTotals({ ...l, ...updated });
         }
@@ -143,10 +145,10 @@ export default function ReceptionDispensePage() {
     };
   };
 
-  const setDispenseMode = (medId: string, mode: 'individual' | 'pack') => {
+  const setDispenseMode = (lineId: string, mode: 'individual' | 'pack') => {
     setLines((current) =>
       current.map((l) => {
-        if (l.medicationId !== medId) return l;
+        if (l.lineId !== lineId) return l;
         return computeLineTotals({
           ...l,
           dispenseMode: mode,
@@ -156,30 +158,30 @@ export default function ReceptionDispensePage() {
     );
   };
 
-  const setPackSize = (medId: string, index: number) => {
+  const setPackSize = (lineId: string, index: number) => {
     setLines((current) =>
       current.map((l) => {
-        if (l.medicationId !== medId) return l;
+        if (l.lineId !== lineId) return l;
         return computeLineTotals({ ...l, packSizeIndex: index });
       }),
     );
   };
 
-  const setSellUnits = (medId: string, units: number) => {
+  const setSellUnits = (lineId: string, units: number) => {
     setLines((current) =>
       current.map((l) => {
-        if (l.medicationId !== medId) return l;
+        if (l.lineId !== lineId) return l;
         return computeLineTotals({ ...l, sellUnits: Math.max(0, units) });
       }),
     );
   };
 
-  const removeLine = (medId: string) => {
-    setLines((current) => current.filter((l) => l.medicationId !== medId));
+  const removeLine = (lineId: string) => {
+    setLines((current) => current.filter((l) => l.lineId !== lineId));
   };
 
-  const startSubstitute = (medId: string) => {
-    setSubstituteFor(medId);
+  const startSubstitute = (lineId: string) => {
+    setSubstituteFor(lineId);
     setSearchTerm('');
   };
 
@@ -187,12 +189,12 @@ export default function ReceptionDispensePage() {
     if (!substituteFor) return;
     setLines((current) =>
       current.map((l) => {
-        if (l.medicationId !== substituteFor) return l;
+        if (l.lineId !== substituteFor) return l;
         // Replace this line with a substitute
         return computeLineTotals({
+          ...l,
           medicationId: med._id,
           medicationName: med.name,
-          prescribedBaseUnits: l.prescribedBaseUnits,
           sellUnits: 1,
           baseUnits: 1,
           dispenseMode: med.packSizes && med.packSizes.length > 0 ? 'pack' : 'individual',
@@ -338,7 +340,7 @@ export default function ReceptionDispensePage() {
             const med = line.medication;
             const packSizes = med?.packSizes || [];
             return (
-              <Card key={line.medicationId}>
+              <Card key={line.lineId}>
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div>
@@ -356,10 +358,10 @@ export default function ReceptionDispensePage() {
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => startSubstitute(line.medicationId)}>
+                      <Button size="sm" variant="outline" onClick={() => startSubstitute(line.lineId)}>
                         Substitute
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => removeLine(line.medicationId)}>
+                      <Button size="sm" variant="ghost" onClick={() => removeLine(line.lineId)}>
                         Remove
                       </Button>
                     </div>
@@ -372,7 +374,7 @@ export default function ReceptionDispensePage() {
                       <Label className="text-xs">Sell mode</Label>
                       <Select
                         value={line.dispenseMode}
-                        onValueChange={(v: 'individual' | 'pack') => setDispenseMode(line.medicationId, v)}
+                        onValueChange={(v: 'individual' | 'pack') => setDispenseMode(line.lineId, v)}
                       >
                         <SelectTrigger className="h-9">
                           <SelectValue />
@@ -392,7 +394,7 @@ export default function ReceptionDispensePage() {
                         <Label className="text-xs">Pack size</Label>
                         <Select
                           value={String(line.packSizeIndex ?? 0)}
-                          onValueChange={(v) => setPackSize(line.medicationId, Number(v))}
+                          onValueChange={(v) => setPackSize(line.lineId, Number(v))}
                         >
                           <SelectTrigger className="h-9">
                             <SelectValue />
@@ -419,7 +421,7 @@ export default function ReceptionDispensePage() {
                         type="number"
                         min={0}
                         value={line.sellUnits}
-                        onChange={(e) => setSellUnits(line.medicationId, Number(e.target.value))}
+                        onChange={(e) => setSellUnits(line.lineId, Number(e.target.value))}
                         className="h-9"
                       />
                     </div>
@@ -541,8 +543,8 @@ export default function ReceptionDispensePage() {
               <strong>{rx.patientId?.firstName} {rx.patientId?.lastName}</strong>.
             </p>
             <div className="border rounded-lg p-3 space-y-1 text-sm">
-              {lines.map((l) => (
-                <div key={l.medicationId} className="flex justify-between">
+              {lines.map((l, idx) => (
+                <div key={idx} className="flex justify-between">
                   <span>
                     {l.medicationName} <span className="text-muted-foreground">× {l.sellUnits}</span>
                   </span>
@@ -555,7 +557,8 @@ export default function ReceptionDispensePage() {
               </div>
             </div>
             <p className="text-xs text-muted-foreground">
-              Stock will be deducted, the bill will be saved as the actual dispensed total, and the visit will move to doctor's review.
+              Stock will be deducted and the bill will be saved as the actual dispensed total.
+              {rx.visitId ? ' The visit will move to doctor\'s review.' : ''}
             </p>
           </div>
           <DialogFooter>
