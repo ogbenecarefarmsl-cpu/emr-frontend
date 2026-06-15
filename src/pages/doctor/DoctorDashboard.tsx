@@ -36,7 +36,7 @@ import {
   Loader2, CheckCircle, User, FileText, FlaskConical, Pill,
   ChevronDown, AlertTriangle, Search, Plus, Trash2, Save,
   Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
-  Pencil, AlertCircle, TestTube, Stethoscope, Calendar
+  Pencil, AlertCircle, TestTube, Stethoscope, Calendar, LogOut
 } from 'lucide-react';
 
 // Types
@@ -1127,6 +1127,9 @@ export default function DoctorDashboard() {
               <span className="text-xs font-bold text-primary">{profile?.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
             </div>
             <span className="text-sm font-medium hidden lg:block truncate max-w-40">{profile?.fullName}</span>
+            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleLogout} title="Logout">
+              <LogOut className="w-4 h-4 text-muted-foreground" />
+            </Button>
           </div>
         </div>
       </header>
