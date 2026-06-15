@@ -495,6 +495,10 @@ export default function DoctorDashboard() {
 
   const handleSaveVitalsAndSOAP = async () => {
     if (!selectedVisit) return;
+    if (!canWriteConsultation) {
+      toast.error('Consultation fee must be paid before saving clinical notes');
+      return;
+    }
 
     try {
       await updateVisit.mutateAsync({
@@ -528,6 +532,10 @@ export default function DoctorDashboard() {
 
   const handleCompleteVisit = async (): Promise<boolean> => {
     if (!selectedVisit) return false;
+    if (!canWriteConsultation) {
+      toast.error('Consultation fee must be paid before completing the encounter');
+      return false;
+    }
 
     try {
       if (soapForm.subjective || soapForm.objective || soapForm.assessment || soapForm.plan || soapForm.diagnosis) {
@@ -871,6 +879,8 @@ export default function DoctorDashboard() {
   const currentActiveVisit = activePatients.find((v: Visit) => v.status === 'in_consultation') || activePatients[0];
   const canContinueClinicalWork = !!selectedVisit && ['in_consultation', 'results_ready', 'awaiting_doctor_review'].includes(selectedVisit.status);
   const isReadOnly = !canContinueClinicalWork;
+  const canWriteConsultation = canContinueClinicalWork && selectedVisit?.consultationPaid === true;
+  const consultationPaymentBlocksWriting = canContinueClinicalWork && selectedVisit?.consultationPaid === false;
   const canCloseEncounter = !!selectedVisit && !['awaiting_lab', 'awaiting_results', 'awaiting_pharmacy', 'awaiting_dispensing'].includes(selectedVisit.status);
   const closureBlockers = useMemo(() => {
     if (!selectedVisit) return [];
@@ -1214,6 +1224,7 @@ export default function DoctorDashboard() {
                   </div>
 
                   {/* Read-only banner */}
+                  {/* Read-only banner */}
                   {isReadOnly && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-xs text-amber-800">
@@ -1232,8 +1243,19 @@ export default function DoctorDashboard() {
                     </div>
                   )}
 
+                  {consultationPaymentBlocksWriting && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs text-red-800">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          Consultation fee has not been paid. You can view the chart and order labs/prescriptions, but clinical notes cannot be saved until payment is received.
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* C1: Unsaved changes banner */}
-                  {isDirty && !isReadOnly && (
+                  {isDirty && canWriteConsultation && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-xs text-amber-800">
                         <AlertTriangle className="w-3.5 h-3.5" />
@@ -1344,10 +1366,10 @@ export default function DoctorDashboard() {
                               onChange={(e) => setChiefComplaintForm(e.target.value)}
                               placeholder="e.g., Fever and chills x 3 days"
                               className="mt-1"
-                              disabled={isReadOnly}
+                              disabled={isReadOnly || !canWriteConsultation}
                             />
                             <Label className="text-[11px] text-muted-foreground font-semibold mt-3 block">Patient History (HPI)</Label>
-                            <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})} placeholder="Patient's description of symptoms, history of present illness..." rows={4} className="mt-1 resize-y text-sm" disabled={isReadOnly} />
+                            <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})} placeholder="Patient's description of symptoms, history of present illness..." rows={4} className="mt-1 resize-y text-sm" disabled={isReadOnly || !canWriteConsultation} />
                           </div>
                         </div>
 
@@ -1371,7 +1393,7 @@ export default function DoctorDashboard() {
                                 ].map((field) => (
                                   <div key={field.key}>
                                     <Label className="text-[10px] text-muted-foreground">{field.label}</Label>
-                                    <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(e) => setVitalsForm({ ...vitalsForm, [field.key]: e.target.value })} placeholder={field.placeholder} className={cn("mt-1 h-8 text-xs font-mono", vitalsErrors[field.key] && "border-red-400 focus-visible:ring-red-400")} disabled={isReadOnly} />
+                                    <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(e) => setVitalsForm({ ...vitalsForm, [field.key]: e.target.value })} placeholder={field.placeholder} className={cn("mt-1 h-8 text-xs font-mono", vitalsErrors[field.key] && "border-red-400 focus-visible:ring-red-400")} disabled={isReadOnly || !canWriteConsultation} />
                                     {vitalsErrors[field.key] ? (
                                       <p className="text-[10px] text-red-500 mt-0.5">{vitalsErrors[field.key]}</p>
                                     ) : field.hint ? (
@@ -1383,7 +1405,7 @@ export default function DoctorDashboard() {
                               {/* Triage Priority Override */}
                               <div>
                                 <Label className="text-[10px] text-muted-foreground">Triage Priority (Override)</Label>
-                                <Select value={triageOverride || selectedVisit?.triagePriority || ''} onValueChange={setTriageOverride} disabled={isReadOnly}>
+                                <Select value={triageOverride || selectedVisit?.triagePriority || ''} onValueChange={setTriageOverride} disabled={isReadOnly || !canWriteConsultation}>
                                   <SelectTrigger className="mt-1 h-8 text-xs">
                                     <SelectValue placeholder="Set priority" />
                                   </SelectTrigger>
@@ -1403,10 +1425,10 @@ export default function DoctorDashboard() {
                                 placeholder="Doctor's triage addendum or override rationale..."
                                 rows={2}
                                 className="resize-y text-sm"
-                                disabled={isReadOnly}
+                                disabled={isReadOnly || !canWriteConsultation}
                               />
                               <Label className="text-[11px] text-muted-foreground font-semibold">Exam Notes</Label>
-                              <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})} placeholder="Physical exam findings, vitals, observations..." rows={3} className="resize-y text-sm" disabled={isReadOnly} />
+                              <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})} placeholder="Physical exam findings, vitals, observations..." rows={3} className="resize-y text-sm" disabled={isReadOnly || !canWriteConsultation} />
                             </div>
                         </div>
 
@@ -1419,11 +1441,11 @@ export default function DoctorDashboard() {
                           </div>
                           <div className="p-4 flex flex-col gap-3">
                             <Label className="text-[11px] text-muted-foreground font-semibold">Diagnosis</Label>
-                            <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})} placeholder="Primary diagnosis" className="h-8 text-sm" disabled={isReadOnly} />
+                            <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})} placeholder="Primary diagnosis" className="h-8 text-sm" disabled={isReadOnly || !canWriteConsultation} />
                             <Label className="text-[11px] text-muted-foreground font-semibold">Clinical Assessment</Label>
-                            <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})} placeholder="Clinical impression, differential diagnosis..." rows={3} className="resize-y text-sm" disabled={isReadOnly} />
+                            <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})} placeholder="Clinical impression, differential diagnosis..." rows={3} className="resize-y text-sm" disabled={isReadOnly || !canWriteConsultation} />
                             <Label className="text-[11px] text-muted-foreground font-semibold">Treatment Plan Notes</Label>
-                            <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})} placeholder="Treatment plan, medications, follow-up..." rows={3} className="resize-y text-sm" disabled={isReadOnly} />
+                            <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})} placeholder="Treatment plan, medications, follow-up..." rows={3} className="resize-y text-sm" disabled={isReadOnly || !canWriteConsultation} />
                             {selectedVisit?.roomType === 'emergency' && (
                               <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2">
                                 <AlertTriangle className="w-4 h-4 text-red-600" />
@@ -1526,11 +1548,11 @@ export default function DoctorDashboard() {
                         )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Button size="sm" className="rounded-full" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending || isReadOnly}>
+                        <Button size="sm" className="rounded-full" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending || isReadOnly || !canWriteConsultation}>
                           {updateVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
                           {isDirty ? 'Save (Ctrl+S)' : 'Save'}
                         </Button>
-                        <Button size="sm" className="rounded-full bg-[#0d9488] hover:bg-[#0f766e] text-white" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
+                        <Button size="sm" className="rounded-full bg-[#0d9488] hover:bg-[#0f766e] text-white" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
                           {completeVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />}
                           Complete & Next
                         </Button>
