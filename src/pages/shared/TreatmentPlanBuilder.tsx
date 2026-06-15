@@ -53,13 +53,17 @@ const patientIdStr = (visit: any) => {
 interface TreatmentPlanBuilderProps {
   /** Pre-selected visit ID (optional — if not provided, user selects from list) */
   preselectedVisitId?: string;
+  /** Pre-selected patient ID for plans not tied to a visit */
+  preselectedPatientId?: string;
+  /** Pre-selected patient name for display */
+  preselectedPatientName?: string;
   /** Called after plan is created successfully */
   onPlanCreated?: () => void;
   /** Show as inline form (no Card wrapper) */
   inline?: boolean;
 }
 
-export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline }: TreatmentPlanBuilderProps) {
+export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId, preselectedPatientName, onPlanCreated, inline }: TreatmentPlanBuilderProps) {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [visitId, setVisitId] = useState(preselectedVisitId || '');
@@ -84,11 +88,12 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
   const [procAmount, setProcAmount] = useState(0);
   const [procNotes, setProcNotes] = useState('');
 
-  // Fetch visits
+  // Fetch visits (only when no preselected patient)
   const { data: visits = [], isLoading: visitsLoading } = useQuery({
     queryKey: ['visits', 'tp-candidates'],
     queryFn: () => visitsAPI.getAll({ limit: 200 }),
     staleTime: 15_000,
+    enabled: !preselectedPatientId,
   });
 
   // Fetch all medications for dropdown
@@ -113,7 +118,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
   }, [visits]);
 
   const selectedVisit = activeVisits.find((v: any) => (v._id || v.id) === visitId);
-  const selectedPatientId = patientIdStr(selectedVisit);
+  const selectedPatientId = preselectedPatientId || patientIdStr(selectedVisit);
 
   // Filter lab tests by search
   const filteredLabs = useMemo(() => {
@@ -268,7 +273,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
   const content = (
     <div className="space-y-4">
       {/* Visit selector */}
-      {!preselectedVisitId && (
+      {!preselectedVisitId && !preselectedPatientId && (
         <div>
           <Label className="text-sm font-medium">Select Visit</Label>
           <Select value={visitId} onValueChange={setVisitId}>
@@ -287,12 +292,14 @@ export function TreatmentPlanBuilder({ preselectedVisitId, onPlanCreated, inline
       )}
 
       {/* Selected patient info */}
-      {selectedVisit && (
+      {(selectedVisit || preselectedPatientId) && (
         <div className="flex items-center gap-2 p-2 bg-muted rounded text-sm">
-          <span className="font-medium">{patientName(selectedVisit)}</span>
-          <Badge variant="outline" className="text-xs">
-            {(selectedVisit as any).patientId?.patientId || (selectedVisit as any).patient?.patientId}
-          </Badge>
+          <span className="font-medium">{preselectedPatientName || patientName(selectedVisit)}</span>
+          {selectedVisit && (
+            <Badge variant="outline" className="text-xs">
+              {(selectedVisit as any).patientId?.patientId || (selectedVisit as any).patient?.patientId}
+            </Badge>
+          )}
         </div>
       )}
 

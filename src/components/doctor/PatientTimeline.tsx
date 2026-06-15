@@ -1,11 +1,13 @@
 import { useState, useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Loader2, FileText, FlaskConical, Pill, BedDouble,
-  AlertTriangle, Activity, CreditCard, UserCheck, Stethoscope, Wallet
+  AlertTriangle, Activity, CreditCard, UserCheck, Stethoscope, Wallet, ClipboardList
 } from 'lucide-react';
+import { treatmentPlanService } from '@/services/treatmentPlanService';
 
 interface TimelineEvent {
   id: string;
@@ -30,6 +32,7 @@ const EVENT_CONFIG: Record<string, { icon: any; color: string; bgColor: string; 
   admission: { icon: BedDouble, color: 'text-rose-600', bgColor: 'bg-rose-50', borderColor: 'border-rose-200' },
   wallet: { icon: Wallet, color: 'text-teal-600', bgColor: 'bg-teal-50', borderColor: 'border-teal-200' },
   triage_override: { icon: AlertTriangle, color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' },
+  treatment_plan: { icon: ClipboardList, color: 'text-cyan-600', bgColor: 'bg-cyan-50', borderColor: 'border-cyan-200' },
 };
 
 function groupByDate(events: TimelineEvent[]) {
@@ -81,6 +84,13 @@ export function PatientTimeline({
   chartLoading,
   onNavigate,
 }: PatientTimelineProps) {
+  const { data: treatmentPlans = [] } = useQuery({
+    queryKey: ['treatment-plans', 'patient', patientId],
+    queryFn: () => treatmentPlanService.getForPatient(patientId),
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
+
   const events = useMemo<TimelineEvent[]>(() => {
     const result: TimelineEvent[] = [];
 
@@ -219,6 +229,20 @@ export function PatientTimeline({
       });
     }
 
+    // Treatment plans
+    for (const plan of treatmentPlans) {
+      const cfg = EVENT_CONFIG.treatment_plan;
+      result.push({
+        id: `tp-${plan._id}`,
+        type: 'treatment_plan',
+        date: plan.createdAt,
+        ...cfg,
+        title: `Treatment Plan ${plan.planNumber}`,
+        summary: `${plan.createdByName} (${plan.createdByRole}) · ${plan.status.replace(/_/g, ' ')} · ${(plan.items || []).length} item(s)`,
+        detail: (plan.items || []).map((i: any) => `${i.description} — Le ${i.amount?.toLocaleString()}`).join('\n') || 'No items',
+      });
+    }
+
     // Triage overrides
     for (const v of (patientVisits || [])) {
       if (v.triageOverride_priority || v.triageOverridePriority) {
@@ -236,7 +260,7 @@ export function PatientTimeline({
     }
 
     return result;
-  }, [patientChart, patientVisits, patientOrders, patientPrescriptions, onNavigate]);
+  }, [patientChart, patientVisits, patientOrders, patientPrescriptions, treatmentPlans, onNavigate]);
 
   const grouped = useMemo(() => groupByDate(events), [events]);
 

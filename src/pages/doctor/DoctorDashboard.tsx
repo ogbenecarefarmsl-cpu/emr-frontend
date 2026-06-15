@@ -28,6 +28,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 // Dashboard components
 import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
 import { PatientTimeline } from '@/components/doctor/PatientTimeline';
+import { DoctorTopBar } from '@/components/doctor/DoctorTopBar';
+import { DoctorTreatmentPlanCard } from '@/components/doctor/DoctorTreatmentPlanCard';
 
 // Icons
 import {
@@ -179,7 +181,9 @@ export default function DoctorDashboard() {
 
   // State for active patient panel
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+  const [searchedPatient, setSearchedPatient] = useState<any | null>(null);
   const [activeTab, setActiveTab] = useState('soap');
+  const contextPatient = selectedVisit?.patientId || searchedPatient;
 
   // Doctor triage override
   const [triageOverride, setTriageOverride] = useState('');
@@ -239,8 +243,6 @@ export default function DoctorDashboard() {
   // Edit mode state
   const [editingOrder, setEditingOrder] = useState<any>(null);
   const [editingPrescription, setEditingPrescription] = useState<any>(null);
-  const [globalSearch, setGlobalSearch] = useState('');
-  const [searchOpen, setSearchOpen] = useState(false);
   const [confirmCompleteOpen, setConfirmCompleteOpen] = useState(false);
 
   // C1: Unsaved changes tracking
@@ -322,7 +324,7 @@ export default function DoctorDashboard() {
   });
 
   // Fetch patient's previous visits when a patient is selected
-  const patientId = selectedVisit?.patientId?._id || selectedVisit?.patientId || '';
+  const patientId = selectedVisit?.patientId?._id || selectedVisit?.patientId || searchedPatient?._id || '';
   const { data: patientVisits = [] } = usePatientVisits(patientId);
   const { data: patientOrders = [] } = useQuery({
     queryKey: ['orders', 'patient', patientId],
@@ -408,7 +410,7 @@ export default function DoctorDashboard() {
       setLabSortDir('asc');
     }
   };
-  const selectedPatient = selectedVisit?.patientId || {};
+  const selectedPatient = contextPatient || {};
   const selectedWalletBalance = Number(selectedPatient.walletBalance || selectedPatient.wallet?.balance || 0);
 
   // Filter tests based on search
@@ -471,10 +473,18 @@ export default function DoctorDashboard() {
   }, [selectedVisit?._id]);
 
   // Handlers
+  const handleSelectSearchPatient = (patient: any) => {
+    setSearchedPatient(patient);
+    setSelectedVisit(null);
+    setActiveTab('timeline');
+    toast.info(`Viewing ${[patient?.firstName, patient?.lastName].filter(Boolean).join(' ') || 'patient'} — read-only until triaged`);
+  };
+
   const handleAcceptPatient = async (visit: Visit) => {
     try {
       const acceptedVisit = await acceptPatient.mutateAsync(visit._id || visit.id || '');
       setSelectedVisit((acceptedVisit as Visit) || visit);
+      setSearchedPatient(null);
       setActiveTab('soap');
       setIsDirty(false);
       toast.success(`Accepted patient: ${visit.patientId?.firstName} ${visit.patientId?.lastName}`);
@@ -572,14 +582,11 @@ export default function DoctorDashboard() {
   // Lab order creation
   const createLabOrder = useMutation({
     mutationFn: async () => {
-      if (!selectedVisit || selectedTests.length === 0) return;
+      const patientId = contextPatient?._id;
+      if (!patientId || selectedTests.length === 0) return;
 
-      // doctorId on an order is the *referring* doctor (external), not the treating doctor.
-      // The treating doctor is captured via orderedBy from the JWT on the backend.
-      // Passing profile.id here would fail because it's a Profile ID, not a Doctor document ID.
-      const orderData = {
-        patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
-        visitId: selectedVisit._id || selectedVisit.id,
+      const orderData: any = {
+        patientId,
         orderType: 'lab',
         tests: selectedTests.map(t => ({
           testId: t._id,
@@ -589,6 +596,9 @@ export default function DoctorDashboard() {
         })),
         priority: 'routine',
       };
+      if (selectedVisit) {
+        orderData.visitId = selectedVisit._id || selectedVisit.id;
+      }
 
       return await ordersAPI.create(orderData);
     },
@@ -597,7 +607,9 @@ export default function DoctorDashboard() {
       setLabOrderModalOpen(false);
       setSelectedTests([]);
       setEditingOrder(null);
-      setSelectedVisit(prev => prev ? { ...prev, status: 'awaiting_lab' } : prev);
+      if (selectedVisit) {
+        setSelectedVisit(prev => prev ? { ...prev, status: 'awaiting_lab' } : prev);
+      }
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
@@ -610,11 +622,11 @@ export default function DoctorDashboard() {
   // Prescription creation
   const createPrescription = useMutation({
     mutationFn: async () => {
-      if (!selectedVisit || prescriptionItems.length === 0) return;
+      const patientId = contextPatient?._id;
+      if (!patientId || prescriptionItems.length === 0) return;
 
-      return await prescriptionService.create({
-        patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
-        visitId: selectedVisit._id || selectedVisit.id,
+      const payload: any = {
+        patientId,
         items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, ...item }) => ({
           ...item,
           // The frontend no longer sends dosage/frequency/duration (legacy) — backend
@@ -623,14 +635,21 @@ export default function DoctorDashboard() {
           pharmacistNote: item.pharmacistNote?.trim() || undefined,
         })),
         // totalAmount is now auto-computed on the backend
-      });
+      };
+      if (selectedVisit) {
+        payload.visitId = selectedVisit._id || selectedVisit.id;
+      }
+
+      return await prescriptionService.create(payload);
     },
     onSuccess: () => {
       toast.success('Prescription created. Patient should pay at reception.');
       setPrescriptionModalOpen(false);
       setPrescriptionItems([]);
       setEditingPrescription(null);
-      setSelectedVisit(prev => prev ? { ...prev, status: 'awaiting_pharmacy' } : prev);
+      if (selectedVisit) {
+        setSelectedVisit(prev => prev ? { ...prev, status: 'awaiting_pharmacy' } : prev);
+      }
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
     },
@@ -705,7 +724,7 @@ export default function DoctorDashboard() {
   };
 
   const addMedicationToPrescription = (med: Medication) => {
-    const allergies: string[] = selectedVisit?.patientId?.allergies || [];
+    const allergies: string[] = contextPatient?.allergies || [];
     const medText = `${med.name} ${med.genericName || ''}`.toLowerCase();
     const matchedAllergy = allergies.find((a) => {
       const allergen = a.toLowerCase().trim();
@@ -846,24 +865,12 @@ export default function DoctorDashboard() {
   const openEncounterCount = activePatients.length;
 
   // Global search across all visit queues
-  const searchHits = useMemo(() => {
-    if (globalSearch.trim().length < 2) return [];
-    const q = globalSearch.trim().toLowerCase();
-    const allVisits = [...waitingQueue, ...activePatients, ...resultsReady, ...awaitingLabPayment, ...awaitingResults, ...awaitingPharmacy, ...awaitingDispensing];
-    const seen = new Set<string>();
-    return allVisits.filter((v) => {
-      if (seen.has(v._id)) return false;
-      seen.add(v._id);
-      const name = patientDisplayName(v).toLowerCase();
-      const id = (v.visitNumber || '').toLowerCase();
-      const patientIdStr = (v.patientId?.patientId || '').toLowerCase();
-      return name.includes(q) || id.includes(q) || patientIdStr.includes(q);
-    });
-  }, [globalSearch, waitingQueue, activePatients, resultsReady, awaitingLabPayment, awaitingResults, awaitingPharmacy, awaitingDispensing]);
+  const searchHits: Visit[] = []; // Replaced by DoctorTopBar patient search
 
   // Get the active visit for the doctor (if any)
   const currentActiveVisit = activePatients.find((v: Visit) => v.status === 'in_consultation') || activePatients[0];
   const canContinueClinicalWork = !!selectedVisit && ['in_consultation', 'results_ready', 'awaiting_doctor_review'].includes(selectedVisit.status);
+  const isReadOnly = !canContinueClinicalWork;
   const canCloseEncounter = !!selectedVisit && !['awaiting_lab', 'awaiting_results', 'awaiting_pharmacy', 'awaiting_dispensing'].includes(selectedVisit.status);
   const closureBlockers = useMemo(() => {
     if (!selectedVisit) return [];
@@ -1040,10 +1047,24 @@ export default function DoctorDashboard() {
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
+      {/* Top Command Bar */}
+      <DoctorTopBar
+        profile={profile}
+        activePatients={activePatients}
+        waitingQueue={waitingQueue}
+        resultsReady={resultsReady}
+        selectedVisitId={selectedVisit?._id}
+        onSelectVisit={(visit) => { setSearchedPatient(null); setSelectedVisit(visit); setActiveTab(visit.status === 'results_ready' ? 'lab-results' : 'soap'); }}
+        onAcceptVisit={handleAcceptPatient}
+        onSelectPatient={handleSelectSearchPatient}
+        onAcceptNext={() => { if (waitingQueue.length > 0) handleAcceptPatient(waitingQueue[0]); }}
+        acceptPending={acceptPatient.isPending}
+      />
+
       {/* Header */}
-      <header className="fixed top-0 left-0 right-0 h-14 bg-white border-b border-border z-50 flex items-center justify-between gap-3 px-4">
+      <header className="fixed top-12 left-0 right-0 h-14 bg-white border-b border-border z-50 flex items-center justify-between gap-3 px-4">
         <div className="flex items-center gap-4 min-w-0">
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 md:hidden">
             <img src="/harbour-emr-logo.svg" alt="Harbour EMR Logo" className="h-8 w-auto object-contain" />
             <span className="font-bold text-primary text-lg">Harbour EMR</span>
           </div>
@@ -1068,50 +1089,7 @@ export default function DoctorDashboard() {
           </nav>
         </div>
         <div className="flex items-center gap-3 min-w-0">
-          <div className="relative hidden md:block">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <input
-              type="text"
-              value={globalSearch}
-              onChange={(e) => setGlobalSearch(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && searchHits.length > 0) { setSelectedVisit(searchHits[0]); setActiveTab('soap'); setGlobalSearch(''); setSearchOpen(false); } }}
-              onFocus={() => setSearchOpen(true)}
-              onBlur={() => setTimeout(() => setSearchOpen(false), 200)}
-              placeholder="Search patients…"
-              className="h-8 w-48 lg:w-72 pl-8 pr-3 rounded-full border border-border bg-muted/30 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-            {searchOpen && globalSearch.trim().length >= 2 && (
-              <div className="absolute top-9 right-0 w-72 max-h-80 overflow-y-auto bg-white border border-border rounded-lg shadow-lg z-50">
-                {searchHits.length === 0 ? (
-                  <p className="p-3 text-xs text-muted-foreground">No matches</p>
-                ) : (
-                  searchHits.slice(0, 8).map((v) => (
-                    <button
-                      key={v._id}
-                      type="button"
-                      className="w-full px-3 py-2 text-left hover:bg-muted/40 border-b last:border-b-0"
-                      onMouseDown={() => { setSelectedVisit(v); setActiveTab('soap'); setGlobalSearch(''); setSearchOpen(false); }}
-                    >
-                      <p className="text-xs font-medium truncate">{patientDisplayName(v)}</p>
-                      <p className="text-[10px] text-muted-foreground truncate">{v.visitNumber} - {statusLabel(v.status)}</p>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
           <div className="flex items-center gap-1.5">
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-8 gap-1.5 text-xs rounded-full"
-              onClick={() => { if (waitingQueue.length > 0) handleAcceptPatient(waitingQueue[0]); else toast.info('No waiting patients'); }}
-              disabled={waitingQueue.length === 0 || acceptPatient.isPending}
-              title={`${waitingQueue.length} waiting`}
-            >
-              {acceptPatient.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <UserCheck className="w-3.5 h-3.5" />}
-              Accept {waitingQueue.length > 0 ? `(${waitingQueue.length})` : ''}
-            </Button>
             <button
               type="button"
               onClick={() => { if (resultsReady.length > 0) { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); } }}
@@ -1143,13 +1121,13 @@ export default function DoctorDashboard() {
         </div>
       </header>
 
-      <div className="flex flex-1 pt-14 h-full">
+      <div className="flex flex-1 pt-[104px] h-full">
         {/* Main Workspace */}
-        <main className="flex-1 h-[calc(100vh-56px)] flex flex-col overflow-hidden">
+        <main className="flex-1 h-[calc(100vh-104px)] flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row gap-6 p-4 md:p-6">
             {/* Left Editor Area */}
             <div className="flex-1 flex flex-col gap-5 min-w-0">
-              {selectedVisit ? (
+              {selectedVisit || searchedPatient ? (
                 <>
                   {selectedVisit.triageAlert && selectedVisit.triageAlerts && selectedVisit.triageAlerts.length > 0 && (
                     <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 flex items-start gap-2.5 shadow-[0_1px_3px_rgba(220,38,38,0.08)]">
@@ -1177,51 +1155,85 @@ export default function DoctorDashboard() {
                     <div className="flex flex-wrap items-center gap-3 min-w-0">
                       <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                         <span className="text-sm font-bold text-primary">
-                          {selectedVisit.patientId?.firstName?.[0]}{selectedVisit.patientId?.lastName?.[0]}
+                          {contextPatient?.firstName?.[0]}{contextPatient?.lastName?.[0]}
                         </span>
                       </div>
                       <div className="min-w-0">
-                        <h2 className="text-sm font-semibold">{patientDisplayName(selectedVisit)}</h2>
-                        <p className="text-[11px] text-muted-foreground font-mono">{selectedVisit.patientId?.patientId || 'N/A'}</p>
+                        <h2 className="text-sm font-semibold">{[contextPatient?.firstName, contextPatient?.lastName].filter(Boolean).join(' ').trim() || 'Unnamed patient'}</h2>
+                        <p className="text-[11px] text-muted-foreground font-mono">{contextPatient?.patientId || 'N/A'}</p>
                       </div>
                       <div className="hidden sm:block h-8 w-px bg-border mx-1" />
-                      <span className="text-xs text-muted-foreground">{patientAgeLabel(selectedVisit.patientId)} · {selectedVisit.patientId?.gender || 'N/A'}</span>
-                      <div className="hidden sm:block h-8 w-px bg-border mx-1" />
-                      <div className="flex items-center gap-1.5">
-                        {selectedVisit.triagePriority && (
-                          <span className={cn("w-2 h-2 rounded-full", selectedVisit.triagePriority.includes('emergency') || selectedVisit.triagePriority.includes('urgent') ? "bg-red-500" : "bg-amber-500")} />
-                        )}
-                        <span className="text-[11px] text-muted-foreground">{selectedVisit.triagePriority ? statusLabel(selectedVisit.triagePriority) : 'Triage'}</span>
-                      </div>
-                      <span className="text-[11px] text-muted-foreground truncate max-w-full md:max-w-[180px]">{chiefComplaintForm || selectedVisit.chiefComplaint || 'No complaint'}</span>
+                      <span className="text-xs text-muted-foreground">{patientAgeLabel(contextPatient)} · {contextPatient?.gender || 'N/A'}</span>
+                      {selectedVisit && (
+                        <>
+                          <div className="hidden sm:block h-8 w-px bg-border mx-1" />
+                          <div className="flex items-center gap-1.5">
+                            {selectedVisit.triagePriority && (
+                              <span className={cn("w-2 h-2 rounded-full", selectedVisit.triagePriority.includes('emergency') || selectedVisit.triagePriority.includes('urgent') ? "bg-red-500" : "bg-amber-500")} />
+                            )}
+                            <span className="text-[11px] text-muted-foreground">{selectedVisit.triagePriority ? statusLabel(selectedVisit.triagePriority) : 'Triage'}</span>
+                          </div>
+                        </>
+                      )}
+                      {selectedVisit && (
+                        <span className="text-[11px] text-muted-foreground truncate max-w-full md:max-w-[180px]">{chiefComplaintForm || selectedVisit.chiefComplaint || 'No complaint'}</span>
+                      )}
                       <div className="flex items-center gap-1 flex-wrap">
-                        {selectedVisit.patientId?.allergies?.length > 0 ? (
+                        {contextPatient?.allergies?.length > 0 ? (
                           <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-medium border border-red-200 flex items-center gap-1">
                             <AlertTriangle className="w-2.5 h-2.5" />
-                            {selectedVisit.patientId.allergies.length} allerg{selectedVisit.patientId.allergies.length === 1 ? 'y' : 'ies'}
+                            {contextPatient.allergies.length} allerg{contextPatient.allergies.length === 1 ? 'y' : 'ies'}
                           </span>
                         ) : (
                           <span className="text-[10px] text-muted-foreground">NKDA</span>
                         )}
-                        {selectedVisit.patientId?.chronicConditions?.slice(0, 2).map((c: string) => (
+                        {contextPatient?.chronicConditions?.slice(0, 2).map((c: string) => (
                           <span key={c} className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-medium border border-amber-200">
                             {c}
                           </span>
                         ))}
-                        {selectedVisit.patientId?.chronicConditions?.length > 2 && (
-                          <span className="text-[10px] text-muted-foreground">+{selectedVisit.patientId.chronicConditions.length - 2}</span>
+                        {contextPatient?.chronicConditions?.length > 2 && (
+                          <span className="text-[10px] text-muted-foreground">+{contextPatient.chronicConditions.length - 2}</span>
                         )}
                       </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 shrink-0">
                       <span className="text-xs font-mono text-muted-foreground">Le {selectedWalletBalance.toLocaleString()}</span>
-                      <Badge variant="outline" className="text-[10px]">{selectedVisit.visitNumber}</Badge>
-                      <Badge className={cn("text-[10px]", visitStatusTone(selectedVisit.status))}>{statusLabel(selectedVisit.status)}</Badge>
+                      {selectedVisit ? (
+                        <>
+                          <Badge variant="outline" className="text-[10px]">{selectedVisit.visitNumber}</Badge>
+                          <Badge className={cn("text-[10px]", visitStatusTone(selectedVisit.status))}>{statusLabel(selectedVisit.status)}</Badge>
+                        </>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px]">No active visit</Badge>
+                      )}
+                      {isReadOnly && (
+                        <Badge className="text-[10px] bg-amber-500 hover:bg-amber-500 text-white">View-only</Badge>
+                      )}
                     </div>
                   </div>
 
+                  {/* Read-only banner */}
+                  {isReadOnly && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2 text-xs text-amber-800">
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                        <span>
+                          {searchedPatient
+                            ? 'View-only mode — no active visit from triage. You can order labs/prescriptions and view history, but clinical notes cannot be saved.'
+                            : 'View-only mode — accept this patient from the queue to enable clinical documentation.'}
+                        </span>
+                      </div>
+                      {searchedPatient && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setSearchedPatient(null); setSelectedVisit(null); }}>
+                          Close
+                        </Button>
+                      )}
+                    </div>
+                  )}
+
                   {/* C1: Unsaved changes banner */}
-                  {isDirty && (
+                  {isDirty && !isReadOnly && (
                     <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2 text-xs text-amber-800">
                         <AlertTriangle className="w-3.5 h-3.5" />
@@ -1255,7 +1267,7 @@ export default function DoctorDashboard() {
                     <TabsContent value="soap" className="p-6 mt-0">
                       <div className="flex flex-col gap-5">
                         {/* Triage Vitals - Auto-populated from nurse triage */}
-                        {(selectedVisit.temperature || selectedVisit.bloodPressure || selectedVisit.heartRate || selectedVisit.triagePriority) && (
+                        {(selectedVisit?.temperature || selectedVisit?.bloodPressure || selectedVisit?.heartRate || selectedVisit?.triagePriority) && (
                           <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                             <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
                               <Activity className="w-4 h-4" />
@@ -1287,7 +1299,7 @@ export default function DoctorDashboard() {
                         )}
 
                         {/* Rapid Test Results (malaria/typhoid) */}
-                        {selectedVisit.rapidTestResults && selectedVisit.rapidTestResults.length > 0 && (
+                        {selectedVisit?.rapidTestResults && selectedVisit.rapidTestResults.length > 0 && (
                           <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-lg p-4">
                             <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-300 mb-2 flex items-center gap-2">
                               <TestTube className="w-4 h-4" />
@@ -1332,9 +1344,10 @@ export default function DoctorDashboard() {
                               onChange={(e) => setChiefComplaintForm(e.target.value)}
                               placeholder="e.g., Fever and chills x 3 days"
                               className="mt-1"
+                              disabled={isReadOnly}
                             />
                             <Label className="text-[11px] text-muted-foreground font-semibold mt-3 block">Patient History (HPI)</Label>
-                            <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})} placeholder="Patient's description of symptoms, history of present illness..." rows={4} className="mt-1 resize-y text-sm" />
+                            <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})} placeholder="Patient's description of symptoms, history of present illness..." rows={4} className="mt-1 resize-y text-sm" disabled={isReadOnly} />
                           </div>
                         </div>
 
@@ -1358,7 +1371,7 @@ export default function DoctorDashboard() {
                                 ].map((field) => (
                                   <div key={field.key}>
                                     <Label className="text-[10px] text-muted-foreground">{field.label}</Label>
-                                    <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(e) => setVitalsForm({ ...vitalsForm, [field.key]: e.target.value })} placeholder={field.placeholder} className={cn("mt-1 h-8 text-xs font-mono", vitalsErrors[field.key] && "border-red-400 focus-visible:ring-red-400")} />
+                                    <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(e) => setVitalsForm({ ...vitalsForm, [field.key]: e.target.value })} placeholder={field.placeholder} className={cn("mt-1 h-8 text-xs font-mono", vitalsErrors[field.key] && "border-red-400 focus-visible:ring-red-400")} disabled={isReadOnly} />
                                     {vitalsErrors[field.key] ? (
                                       <p className="text-[10px] text-red-500 mt-0.5">{vitalsErrors[field.key]}</p>
                                     ) : field.hint ? (
@@ -1370,7 +1383,7 @@ export default function DoctorDashboard() {
                               {/* Triage Priority Override */}
                               <div>
                                 <Label className="text-[10px] text-muted-foreground">Triage Priority (Override)</Label>
-                                <Select value={triageOverride || selectedVisit.triagePriority || ''} onValueChange={setTriageOverride}>
+                                <Select value={triageOverride || selectedVisit?.triagePriority || ''} onValueChange={setTriageOverride} disabled={isReadOnly}>
                                   <SelectTrigger className="mt-1 h-8 text-xs">
                                     <SelectValue placeholder="Set priority" />
                                   </SelectTrigger>
@@ -1390,9 +1403,10 @@ export default function DoctorDashboard() {
                                 placeholder="Doctor's triage addendum or override rationale..."
                                 rows={2}
                                 className="resize-y text-sm"
+                                disabled={isReadOnly}
                               />
                               <Label className="text-[11px] text-muted-foreground font-semibold">Exam Notes</Label>
-                              <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})} placeholder="Physical exam findings, vitals, observations..." rows={3} className="resize-y text-sm" />
+                              <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})} placeholder="Physical exam findings, vitals, observations..." rows={3} className="resize-y text-sm" disabled={isReadOnly} />
                             </div>
                         </div>
 
@@ -1405,12 +1419,12 @@ export default function DoctorDashboard() {
                           </div>
                           <div className="p-4 flex flex-col gap-3">
                             <Label className="text-[11px] text-muted-foreground font-semibold">Diagnosis</Label>
-                            <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})} placeholder="Primary diagnosis" className="h-8 text-sm" />
+                            <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})} placeholder="Primary diagnosis" className="h-8 text-sm" disabled={isReadOnly} />
                             <Label className="text-[11px] text-muted-foreground font-semibold">Clinical Assessment</Label>
-                            <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})} placeholder="Clinical impression, differential diagnosis..." rows={3} className="resize-y text-sm" />
+                            <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})} placeholder="Clinical impression, differential diagnosis..." rows={3} className="resize-y text-sm" disabled={isReadOnly} />
                             <Label className="text-[11px] text-muted-foreground font-semibold">Treatment Plan Notes</Label>
-                            <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})} placeholder="Treatment plan, medications, follow-up..." rows={3} className="resize-y text-sm" />
-                            {selectedVisit.roomType === 'emergency' && (
+                            <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})} placeholder="Treatment plan, medications, follow-up..." rows={3} className="resize-y text-sm" disabled={isReadOnly} />
+                            {selectedVisit?.roomType === 'emergency' && (
                               <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2">
                                 <AlertTriangle className="w-4 h-4 text-red-600" />
                                 <span className="text-sm font-semibold text-red-700 dark:text-red-300">Emergency - {selectedVisit.room || 'Treatment Room'}</span>
@@ -1419,21 +1433,29 @@ export default function DoctorDashboard() {
                           </div>
                         </div>
 
+                        {/* Treatment Plans */}
+                        <DoctorTreatmentPlanCard
+                          visitId={selectedVisit?._id || selectedVisit?.id}
+                          patientId={!selectedVisit ? contextPatient?._id : undefined}
+                          patientName={!selectedVisit ? [contextPatient?.firstName, contextPatient?.lastName].filter(Boolean).join(' ').trim() : undefined}
+                          canEdit={true}
+                        />
+
                         {/* Compact Action Buttons Row */}
                         <div className="flex flex-wrap items-center gap-2">
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!canContinueClinicalWork}>
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}>
                             <FlaskConical className="w-3.5 h-3.5" /> Order Labs
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }} disabled={!canContinueClinicalWork}>
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }}>
                             <Pill className="w-3.5 h-3.5" /> Prescribe
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setTreatmentPlanOpen(true)} disabled={!canContinueClinicalWork}>
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setTreatmentPlanOpen(true)}>
                             <ClipboardList className="w-3.5 h-3.5" /> Treatment Plan
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setReferralOpen(true)} disabled={!canContinueClinicalWork}>
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setReferralOpen(true)} disabled={!selectedVisit}>
                             <Send className="w-3.5 h-3.5" /> Refer
                           </Button>
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setAdmitOpen(true)} disabled={!canContinueClinicalWork}>
+                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setAdmitOpen(true)} disabled={!selectedVisit}>
                             <BedDouble className="w-3.5 h-3.5" /> Admit
                           </Button>
                         </div>
@@ -1493,16 +1515,22 @@ export default function DoctorDashboard() {
                     )}
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">{statusLabel(selectedVisit.status)}</span>
-                        {selectedVisit.room && <span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">Room: {selectedVisit.room}</span>}
-                        {isDirty && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium">Unsaved</span>}
+                        {selectedVisit ? (
+                          <>
+                            <span className="font-medium text-foreground">{statusLabel(selectedVisit.status)}</span>
+                            {selectedVisit.room && <span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">Room: {selectedVisit.room}</span>}
+                            {isDirty && !isReadOnly && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium">Unsaved</span>}
+                          </>
+                        ) : (
+                          <span className="font-medium text-amber-700">View-only patient chart</span>
+                        )}
                       </div>
                       <div className="flex flex-wrap items-center gap-2">
-                        <Button size="sm" className="rounded-full" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending || !canContinueClinicalWork}>
+                        <Button size="sm" className="rounded-full" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending || isReadOnly}>
                           {updateVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
                           {isDirty ? 'Save (Ctrl+S)' : 'Save'}
                         </Button>
-                        <Button size="sm" className="rounded-full bg-[#0d9488] hover:bg-[#0f766e] text-white" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
+                        <Button size="sm" className="rounded-full bg-[#0d9488] hover:bg-[#0f766e] text-white" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
                           {completeVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />}
                           Complete & Next
                         </Button>
@@ -1516,7 +1544,7 @@ export default function DoctorDashboard() {
                   <div className="max-w-md text-center">
                     <User className="w-14 h-14 mx-auto mb-4 text-muted-foreground/30" />
                     <h2 className="text-xl font-semibold">Ready to consult</h2>
-                    <p className="text-sm text-muted-foreground mt-2">Accept a patient from the header to begin consultation.</p>
+                    <p className="text-sm text-muted-foreground mt-2">Accept a patient from the top bar or use the search box to view any patient's chart.</p>
                     <div className="flex flex-col items-center gap-2 mt-5">
                       {waitingQueue.length > 0 && (
                         <Button
@@ -1648,12 +1676,12 @@ export default function DoctorDashboard() {
           <DialogHeader>
             <DialogTitle>{editingPrescription ? 'Edit Prescription' : 'Prescribe Medication'}</DialogTitle>
           </DialogHeader>
-          {selectedVisit?.patientId?.allergies?.length > 0 && (
+          {contextPatient?.allergies?.length > 0 && (
             <div className="rounded-lg border border-red-300 bg-red-50 p-3 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs font-semibold text-red-800">Allergy alert</p>
-                <p className="text-[11px] text-red-700">Patient allergies: <span className="font-medium">{selectedVisit.patientId.allergies.join(', ')}</span>. Verify each medication before prescribing.</p>
+                <p className="text-[11px] text-red-700">Patient allergies: <span className="font-medium">{contextPatient.allergies.join(', ')}</span>. Verify each medication before prescribing.</p>
               </div>
             </div>
           )}
@@ -1855,6 +1883,8 @@ export default function DoctorDashboard() {
           <div className="py-4">
             <TreatmentPlanBuilder
               preselectedVisitId={selectedVisit?._id || selectedVisit?.id}
+              preselectedPatientId={!selectedVisit ? contextPatient?._id : undefined}
+              preselectedPatientName={!selectedVisit ? [contextPatient?.firstName, contextPatient?.lastName].filter(Boolean).join(' ').trim() : undefined}
               onPlanCreated={() => {
                 setTreatmentPlanOpen(false);
                 queryClient.invalidateQueries({ queryKey: ['visits'] });
