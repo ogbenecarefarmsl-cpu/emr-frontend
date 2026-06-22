@@ -9,8 +9,6 @@ import api, { adminAPI } from '@/services/api';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
@@ -96,8 +94,8 @@ export default function AdminDashboard() {
   const { data: recentAuditLogs = [] } = useQuery({
     queryKey: ['audit-logs', 'recent'],
     queryFn: async () => {
-      const res = await api.get('/audit-logs?limit=5');
-      return res.data || [];
+      const res = await api.get('/audit/logs', { params: { limit: 5 } });
+      return res.data?.logs || [];
     },
     refetchInterval: 60 * 1000,
   });
@@ -105,7 +103,15 @@ export default function AdminDashboard() {
   const { data: weeklyRevenue = [] } = useQuery({
     queryKey: ['revenue', 'weekly'],
     queryFn: async () => {
-      const res = await api.get('/orders/daily-income?days=7');
+      const end = new Date();
+      const start = new Date(end);
+      start.setDate(start.getDate() - 6);
+      const res = await api.get('/orders/stats/daily-income', {
+        params: {
+          startDate: start.toISOString().slice(0, 10),
+          endDate: end.toISOString().slice(0, 10),
+        },
+      });
       return res.data || [];
     },
     refetchInterval: 5 * 60 * 1000,
@@ -702,7 +708,6 @@ function AdminTool({
 function DangerZone() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
-  const [confirmText, setConfirmText] = useState('');
   const [result, setResult] = useState<{ deleted: Record<string, number>; preserved: string[]; timestamp: string } | null>(null);
 
   const { data: preview, isLoading: previewLoading } = useQuery({
@@ -713,10 +718,9 @@ function DangerZone() {
   });
 
   const clearMutation = useMutation({
-    mutationFn: () => adminAPI.clearTestData(confirmText),
+    mutationFn: () => adminAPI.clearTestData('DISABLED'),
     onSuccess: (data) => {
       setResult(data);
-      setConfirmText('');
       toast.success(`Cleared ${Object.values(data.deleted).reduce((s, n) => s + n, 0)} records`);
       queryClient.invalidateQueries();
     },
@@ -726,12 +730,10 @@ function DangerZone() {
   });
 
   const totalToDelete = preview ? Object.values(preview).reduce((s, n) => s + (n as number), 0) : 0;
-  const typedCorrectly = confirmText === 'DELETE ALL TEST DATA';
-  const canSubmit = typedCorrectly && !clearMutation.isPending;
+  const canSubmit = false;
 
   const reset = () => {
     setOpen(false);
-    setConfirmText('');
     setResult(null);
   };
 
@@ -758,18 +760,15 @@ function DangerZone() {
             Clear all test data
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            Permanently deletes every patient, visit, order, prescription, payment, lab result, admission, appointment, and audit log.
-            Reference data (users, branches, medications, rooms, LIS catalog) is preserved.
+            Bulk deletion is disabled. Use this preview to audit counts before creating a targeted cleanup request.
           </p>
           <p className="text-[11px] text-amber-700 mt-2 leading-relaxed">
-            Policy: this action requires a manual review of the affected records with your assistant (Claude) before
-            clicking Clear. Take a screenshot of the preview counts, share them, and only proceed after Claude
-            has signed off on the specific records to be removed.
+            Policy: cleanup must list explicit record IDs and receive per-category approval before anything is deleted.
           </p>
         </div>
         <Button variant="destructive" onClick={() => setOpen(true)}>
           <Trash2 className="w-4 h-4 mr-2" />
-          Clear test data
+            Preview data counts
         </Button>
       </div>
 
@@ -778,21 +777,21 @@ function DangerZone() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-destructive">
               <Skull className="w-5 h-5" />
-              Clear all test data
+              Clear all test data disabled
             </DialogTitle>
             <DialogDescription>
-              This permanently deletes transactional records. The action cannot be undone.
+              Broad transactional data deletion is disabled. Review counts here, then use a targeted cleanup workflow.
             </DialogDescription>
           </DialogHeader>
 
           <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 flex items-start gap-2">
             <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold">Before clicking Clear:</p>
+              <p className="font-semibold">Cleanup policy:</p>
               <ol className="list-decimal pl-4 mt-1 space-y-0.5">
-                <li>Screenshot the record counts below.</li>
-                <li>Share them with Claude and confirm the specific records to delete.</li>
-                <li>Only then type the confirmation phrase and click Clear.</li>
+                <li>List the exact record IDs to remove.</li>
+                <li>Confirm each affected category.</li>
+                <li>Run only targeted deletion after approval.</li>
               </ol>
             </div>
           </div>
@@ -827,7 +826,7 @@ function DangerZone() {
             <div className="space-y-4">
               <div className="rounded-lg border p-3 max-h-72 overflow-y-auto">
                 <p className="text-xs font-semibold uppercase text-muted-foreground mb-2">
-                  {previewLoading ? 'Counting records...' : `${totalToDelete.toLocaleString()} records will be deleted`}
+                  {previewLoading ? 'Counting records...' : `${totalToDelete.toLocaleString()} transactional records found`}
                 </p>
                 {preview && (
                   <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
@@ -854,18 +853,11 @@ function DangerZone() {
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirm-phrase">
-                  Type <span className="font-mono font-bold text-destructive">DELETE ALL TEST DATA</span> to confirm
-                </Label>
-                <Input
-                  id="confirm-phrase"
-                  value={confirmText}
-                  onChange={(e) => setConfirmText(e.target.value)}
-                  placeholder="DELETE ALL TEST DATA"
-                  className="font-mono"
-                  autoComplete="off"
-                />
+              <div className="rounded-lg border border-muted bg-muted/30 p-3">
+                <p className="text-xs font-medium">Bulk clear is disabled.</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Create a targeted cleanup with explicit IDs instead of deleting whole collections.
+                </p>
               </div>
             </div>
           )}
@@ -886,7 +878,7 @@ function DangerZone() {
                   ) : (
                     <Trash2 className="w-4 h-4 mr-2" />
                   )}
-                  Clear {totalToDelete.toLocaleString()} records
+                  Bulk clear disabled
                 </Button>
               </>
             )}

@@ -146,6 +146,7 @@ export function useCompleteTriage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to complete triage');
@@ -164,6 +165,10 @@ export function useAddRapidTestResult() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-income'] });
+      queryClient.invalidateQueries({ queryKey: ['revenue'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to record rapid test result');
@@ -219,7 +224,8 @@ export function useCreateVisit() {
       return await visitsAPI.create(data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['visits'] });
+      queryClient.invalidateQueries({ queryKey: ['visits'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to create visit');
@@ -235,7 +241,13 @@ export function useMarkConsultationPaid() {
       return await visitsAPI.markConsultationPaid(visitId, paymentMethod);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['visits'] });
+      queryClient.invalidateQueries({ queryKey: ['visits'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['payments'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['payment-stats'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['outstanding-balances'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['daily-income'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['revenue'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'] });
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to mark consultation paid');

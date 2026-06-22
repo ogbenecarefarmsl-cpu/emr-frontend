@@ -46,8 +46,8 @@ export interface TestOrder {
   discount: number;
   discountType: 'percentage' | 'fixed';
   total: number;
-  paymentMethod?: 'cash' | 'card' | 'orange_money' | 'bank_transfer';
-  paymentStatus: 'pending' | 'paid' | 'partial';
+  paymentMethod?: 'cash' | 'orange_money' | 'afrimoney' | 'wallet';
+  paymentStatus: 'pending' | 'paid' | 'partial' | 'refunded';
   orderedAt: string;
   orderedBy: string;
   collectedAt?: string;
@@ -62,7 +62,7 @@ export interface OrderedTest {
   testCode: string;
   testName: string;
   price: number;
-  status: 'pending' | 'collected' | 'processing' | 'completed';
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   sampleId?: string;
   machineId?: string;
 }
@@ -95,7 +95,7 @@ export interface TestResult {
   resultedBy: string;
   verifiedBy?: string;
   verifiedAt?: string;
-  status: 'preliminary' | 'final' | 'amended';
+  status: 'preliminary' | 'verified' | 'amended';
 }
 
 export interface LabMachine {
@@ -104,7 +104,7 @@ export interface LabMachine {
   model: string;
   manufacturer: string;
   serialNumber: string;
-  protocol: 'HL7' | 'ASTM' | 'FHIR' | 'LIS2-A2';
+  protocol: 'HL7' | 'ASTM' | 'FHIR' | 'LIS2_A2';
   ipAddress?: string;
   port?: number;
   status: 'online' | 'offline' | 'error' | 'processing';

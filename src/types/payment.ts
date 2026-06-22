@@ -2,6 +2,7 @@ export enum PaymentTypeEnum {
   LAB_ORDER = 'lab_order',
   CONSULTATION = 'consultation',
   PRESCRIPTION = 'prescription',
+  PHARMACY_ORDER = 'pharmacy_order',
   OTHER = 'other',
 }
 

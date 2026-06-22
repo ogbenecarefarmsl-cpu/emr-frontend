@@ -54,6 +54,16 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['results'], exact: false });
     };
 
+    const invalidateRevenueFlow = () => {
+      queryClient.invalidateQueries({ queryKey: ['payments'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['payment-stats'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['payment-history'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['outstanding-balances'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['daily-income'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['revenue'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'], exact: false });
+    };
+
     // Get backend URL from environment or use LAN IP
     const backendUrl = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || 'http://localhost:3000');
     const token = localStorage.getItem('access_token'); // Use same key as in api.ts
@@ -298,11 +308,10 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     newSocket.on('order:updated', (order: any) => {
       queryClient.invalidateQueries({ queryKey: ['orders'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['payment-stats'], exact: false });
-      queryClient.invalidateQueries({ queryKey: ['payment-history'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['reception-dashboard'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['visits'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['doctor-dashboard'], exact: false });
+      invalidateRevenueFlow();
 
       const patientName = getPatientName(order);
       const orderNumber = order?.orderNumber || order?.order_number || 'Clinical order';
@@ -364,6 +373,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     newSocket.on('visit:consultation_paid', (visit: any) => {
       invalidateClinicalFlow();
+      invalidateRevenueFlow();
       if (hasRole('doctor', 'nurse', 'admin')) {
         soundService.play('payment-received');
         toast.success(hasRole('nurse') ? 'Patient ready for triage' : 'Patient sent to nurse vitals', {
@@ -408,6 +418,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     newSocket.on('visit:lab_paid', (visit: any) => {
       invalidateClinicalFlow();
+      invalidateRevenueFlow();
       if (hasRole('lab_tech', 'admin')) {
         soundService.play('payment-received');
         toast.success('New paid lab order', {
@@ -419,6 +430,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     newSocket.on('visit:pharmacy_paid', (visit: any) => {
       invalidateClinicalFlow();
+      invalidateRevenueFlow();
       if (hasRole('pharmacist', 'admin')) {
         soundService.play('payment-received');
         toast.success('New paid prescription', {

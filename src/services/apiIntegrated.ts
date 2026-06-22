@@ -869,7 +869,11 @@ export const settingsAPI = {
     return response.data;
   },
   updatePrinterSettings: async (patch: Record<string, any>) => {
-    const response = await api.patch('/settings/printer', patch);
+    const response = await api.post('/settings', {
+      key: 'printer',
+      value: patch,
+      description: 'Printer settings',
+    });
     return response.data;
   },
 };

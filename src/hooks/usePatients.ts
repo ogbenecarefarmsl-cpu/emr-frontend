@@ -13,6 +13,24 @@ interface Patient {
   phone?: string;
   email?: string;
   address?: string;
+  occupation?: string;
+  nationality?: string;
+  mrn?: string;
+  patientCategory?: 'private' | 'nhis' | 'corporate' | 'family' | 'staff' | 'other';
+  nextOfKinName?: string;
+  nextOfKinPhone?: string;
+  nextOfKinRelationship?: string;
+  bloodType?: string;
+  allergies?: string[];
+  chronicConditions?: string[];
+  medicalHistory?: string;
+  currentMedications?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+  corporateEmployer?: string;
+  corporateStaffId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -28,21 +46,27 @@ interface PatientCreate {
   phone?: string;
   email?: string;
   address?: string;
+  occupation?: string;
+  nationality?: string;
+  mrn?: string;
+  patientCategory?: 'private' | 'nhis' | 'corporate' | 'family' | 'staff' | 'other';
+  nextOfKinName?: string;
+  nextOfKinPhone?: string;
+  nextOfKinRelationship?: string;
   bloodType?: string;
   allergies?: string[];
+  chronicConditions?: string[];
+  medicalHistory?: string;
+  currentMedications?: string;
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+  corporateEmployer?: string;
+  corporateStaffId?: string;
 }
 
-interface PatientUpdate {
-  firstName?: string;
-  lastName?: string;
-  age?: number;
-  ageValue?: number;
-  ageUnit?: 'years' | 'months' | 'weeks' | 'days';
-  gender?: 'M' | 'F' | 'O';
-  phone?: string;
-  email?: string;
-  address?: string;
-}
+type PatientUpdate = Partial<PatientCreate>;
 
 const isValidResourceId = (id?: string): boolean => {
   if (!id) {

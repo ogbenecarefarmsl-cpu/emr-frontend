@@ -87,7 +87,7 @@ export const ordersAPIEnhanced = {
     retry: { maxRetries: 5, backoffMs: 2000 }
   }),
   
-  updateStatus: (id: string, status: string) => offlineAPI.patch(`/orders/${id}/status`, { status }, {
+  updateStatus: (id: string, status: string) => offlineAPI.patch(`/orders/${id}`, { status }, {
     optimistic: true,
     retry: { maxRetries: 5, backoffMs: 2000 }
   }),
@@ -129,7 +129,7 @@ export const resultsAPIEnhanced = {
     retry: { maxRetries: 5, backoffMs: 2000 }
   }),
   
-  verify: (id: string) => offlineAPI.patch(`/results/${id}/verify`, {}, {
+  verify: (id: string) => offlineAPI.post(`/results/${id}/verify`, {}, {
     optimistic: true,
     retry: { maxRetries: 5, backoffMs: 2000 }
   }),
