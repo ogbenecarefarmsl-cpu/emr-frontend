@@ -38,6 +38,13 @@ import { useExpenditureSummary } from '@/hooks/useExpenditures';
 import { cn } from '@/lib/utils';
 import { Pill } from 'lucide-react';
 
+const formatLocalDate = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function ReceptionDashboard() {
   const { profile } = useAuth();
   
@@ -83,7 +90,7 @@ export default function ReceptionDashboard() {
   todayStart.setHours(0, 0, 0, 0);
 
   const todayPatients = Array.isArray(patients) ? patients.filter(p => new Date(p.createdAt) >= todayStart).length : 0;
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = formatLocalDate(new Date());
   const { data: paymentStats } = usePaymentStats(todayStr, todayStr);
   const { data: visitStats } = useVisitStats(todayStr);
   const { data: doctorQueue = [], isLoading: queueLoading } = useDoctorQueue();
