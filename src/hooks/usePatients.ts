@@ -226,6 +226,11 @@ export function useDepositWallet() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['patients', variables.id, 'wallet'] });
       queryClient.invalidateQueries({ queryKey: ['patients', variables.id, 'wallet-transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['payments'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['payment-stats'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['daily-income'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['revenue'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'dashboard'], exact: false });
     },
   });
 }

@@ -524,6 +524,9 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
     newSocket.on('wallet:updated', (payload: any) => {
       queryClient.invalidateQueries({ queryKey: ['patients'], exact: false });
+      if (payload?.type === 'deposit') {
+        invalidateRevenueFlow();
+      }
       if (payload?.patientId) {
         queryClient.invalidateQueries({ queryKey: ['patients', payload.patientId, 'wallet'], exact: false });
         queryClient.invalidateQueries({ queryKey: ['patients', payload.patientId, 'wallet-transactions'], exact: false });
