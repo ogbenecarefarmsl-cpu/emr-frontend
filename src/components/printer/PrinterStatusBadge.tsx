@@ -49,7 +49,7 @@ export function PrinterStatusBadge() {
 
   // Not connected — link to setup
   return (
-    <Link to="/reception/printer-setup">
+    <Link to="/reception/printer">
       <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-muted border-yellow-500 text-yellow-700">
         <AlertCircle className="w-3 h-3" />
         Printer Offline
