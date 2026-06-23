@@ -257,8 +257,8 @@ export default function AdminDashboard() {
             {Array.isArray(weeklyRevenue) && weeklyRevenue.length > 0 ? (
               <div className="space-y-2">
                 {weeklyRevenue.slice(-7).map((day: any, i: number) => {
-                  const maxRev = Math.max(...weeklyRevenue.map((d: any) => d.totalAmount || d.total || d.revenue || 0));
-                  const dayRev = day.totalAmount || day.total || day.revenue || 0;
+                  const maxRev = Math.max(...weeklyRevenue.map((d: any) => d.totalIncome || d.totalAmount || d.total || d.revenue || 0));
+                  const dayRev = day.totalIncome || day.totalAmount || day.total || day.revenue || 0;
                   const pct = maxRev > 0 ? (dayRev / maxRev) * 100 : 0;
                   return (
                     <div key={i} className="flex items-center gap-3">

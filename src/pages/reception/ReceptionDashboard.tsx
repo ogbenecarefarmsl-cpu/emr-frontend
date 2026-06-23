@@ -148,9 +148,9 @@ export default function ReceptionDashboard() {
     const methods: Record<string, number> = { cash: 0, orange_money: 0, afrimoney: 0 };
     if (Array.isArray(dailyIncome)) {
       dailyIncome.forEach((entry: any) => {
-        const method = entry.paymentMethod || entry.payment_method || 'cash';
-        const amount = entry.totalAmount || entry.total_amount || entry.amount || 0;
-        if (methods[method] !== undefined) methods[method] += amount;
+        methods.cash += entry.cashPayments || 0;
+        methods.orange_money += entry.orangeMoneyPayments || 0;
+        methods.afrimoney += entry.afrimoneyPayments || 0;
       });
     }
     return methods;

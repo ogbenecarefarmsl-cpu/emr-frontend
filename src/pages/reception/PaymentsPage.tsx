@@ -372,7 +372,7 @@ export default function PaymentsPage() {
               <div key={index} className="flex items-center justify-between py-3">
                 <div>
                   <p className="font-medium text-sm">{format(new Date(day.date), 'EEE, MMM dd')}</p>
-                  <p className="text-xs text-muted-foreground">{day.orderCount} order{day.orderCount !== 1 ? 's' : ''}</p>
+                  <p className="text-xs text-muted-foreground">{day.paymentCount} payment{day.paymentCount !== 1 ? 's' : ''}</p>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="flex gap-2">
