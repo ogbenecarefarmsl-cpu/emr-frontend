@@ -97,6 +97,10 @@ export interface PrinterContextValue {
   btConnected: boolean;
   /** Whether the browser supports Web Bluetooth */
   btSupported: boolean;
+  /** Whether the BT service is currently attempting to reconnect */
+  btReconnecting: boolean;
+  /** Number of reconnect attempts so far */
+  btReconnectAttempt: number;
 
   /** Triggers the browser USB picker and pairs the chosen device */
   connectThermalPrinter: () => Promise<void>;
@@ -106,6 +110,8 @@ export interface PrinterContextValue {
   connectBtPrinter: () => Promise<void>;
   /** Disconnects the Bluetooth printer */
   disconnectBtPrinter: () => Promise<void>;
+  /** Attempt silent reconnect, fall back to browser picker if needed */
+  reconnectBtPrinter: () => Promise<boolean>;
   /** Connect to QZ Tray */
   connectQZTray: () => Promise<void>;
   /** Disconnect from QZ Tray */
@@ -132,6 +138,8 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
   );
   const [btConnected, setBtConnected] = useState(false);
   const [btSupported] = useState(() => btPrinterService.isSupported);
+  const [btReconnecting, setBtReconnecting] = useState(false);
+  const [btReconnectAttempt, setBtReconnectAttempt] = useState(0);
 
   // Attempt silent reconnect on mount + start health check
   useEffect(() => {
@@ -150,7 +158,13 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
     });
     btPrinterService.onReconnect(() => {
       setBtConnected(true);
+      setBtReconnecting(false);
+      setBtReconnectAttempt(0);
       setBtDevice(btPrinterService.getSavedDevice());
+    });
+    btPrinterService.onReconnecting((attempt) => {
+      setBtReconnecting(true);
+      setBtReconnectAttempt(attempt);
     });
 
     // Try to connect to QZ Tray on mount
@@ -247,6 +261,23 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
     await btPrinterService.disconnect();
     setBtDevice(null);
     setBtConnected(false);
+    setBtReconnecting(false);
+    setBtReconnectAttempt(0);
+  }, []);
+
+  const reconnectBtPrinter = useCallback(async (): Promise<boolean> => {
+    setBtReconnecting(true);
+    try {
+      const ok = await btPrinterService.reconnect();
+      if (ok) {
+        setBtConnected(true);
+        setBtDevice(btPrinterService.getSavedDevice());
+      }
+      return ok;
+    } finally {
+      setBtReconnecting(false);
+      setBtReconnectAttempt(0);
+    }
   }, []);
 
   const connectQZTray = useCallback(async () => {
@@ -281,10 +312,13 @@ export function PrinterProvider({ children }: { children: ReactNode }) {
         btDevice,
         btConnected,
         btSupported,
+        btReconnecting,
+        btReconnectAttempt,
         connectThermalPrinter,
         disconnectThermalPrinter,
         connectBtPrinter,
         disconnectBtPrinter,
+        reconnectBtPrinter,
         connectQZTray,
         disconnectQZTray,
       }}

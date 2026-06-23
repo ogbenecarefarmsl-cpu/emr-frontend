@@ -42,10 +42,15 @@ export const useThermalPrint = () => {
         }
       } catch {}
 
-      // Try Bluetooth
+      // Try Bluetooth — autoConnect first, then reconnect (which falls back to picker)
       try {
         if (!btPrinterService.isConnected) {
-          await btPrinterService.autoConnect();
+          const ok = await btPrinterService.autoConnect();
+          if (!ok) {
+            // Silent reconnect failed — try reconnect with user gesture fallback
+            // Note: this may open the browser picker if autoConnect fails
+            await btPrinterService.reconnect();
+          }
         }
         if (btPrinterService.isConnected) {
           const patientBytes = buildReceiptESCPOS(receiptData, 'patient');

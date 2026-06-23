@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { medicationService } from '@/services/medicationService';
-import { treatmentPlanService, CreateTreatmentPlanItemInput } from '@/services/treatmentPlanService';
+import { treatmentPlanService } from '@/services/treatmentPlanService';
+import type { CreateTreatmentPlanItemInput } from '@/types/treatment-plan';
 import { visitsAPI, ordersAPI } from '@/services/api';
 import { Loader2, Pill, Plus, Search, Send, Trash2, Beaker, Scissors, FileText, FlaskConical } from 'lucide-react';
 

@@ -8,7 +8,9 @@ export interface SavedBtDeviceInfo {
 const CHUNK_SIZE = 50;
 const CHUNK_DELAY = 30;
 const MAX_RECONNECT_ATTEMPTS = 50;
-const HEALTH_CHECK_INTERVAL = 30_000;
+const HEALTH_CHECK_INTERVAL = 10_000; // 10s — faster detection of disconnection
+const INITIAL_RECONNECT_DELAY = 1_000;
+const MAX_RECONNECT_DELAY = 10_000;
 
 class BluetoothPrinterService {
   private device: BluetoothDevice | null = null;
@@ -18,6 +20,8 @@ class BluetoothPrinterService {
   private healthCheckTimer: ReturnType<typeof setInterval> | null = null;
   private _onDisconnect: (() => void) | null = null;
   private _onReconnect: (() => void) | null = null;
+  private _onReconnecting: ((attempt: number) => void) | null = null;
+  private _lastConnectedAt: number | null = null;
 
   get isSupported(): boolean {
     return typeof navigator !== 'undefined' && 'bluetooth' in navigator;
@@ -27,8 +31,17 @@ class BluetoothPrinterService {
     return this.device !== null && this.device.gatt?.connected === true && this.characteristic !== null;
   }
 
+  get lastConnectedAt(): number | null {
+    return this._lastConnectedAt;
+  }
+
+  get currentReconnectAttempt(): number {
+    return this.reconnectAttempts;
+  }
+
   onDisconnect(cb: () => void) { this._onDisconnect = cb; }
   onReconnect(cb: () => void) { this._onReconnect = cb; }
+  onReconnecting(cb: (attempt: number) => void) { this._onReconnecting = cb; }
 
   getSavedDevice(): SavedBtDeviceInfo | null {
     try {
@@ -65,6 +78,7 @@ class BluetoothPrinterService {
     };
     localStorage.setItem(SAVED_BT_KEY, JSON.stringify(info));
     this.reconnectAttempts = 0;
+    this._lastConnectedAt = Date.now();
     this._startHealthCheck();
     return info;
   }
@@ -81,10 +95,55 @@ class BluetoothPrinterService {
 
       await this._connectGatt(match);
       this.reconnectAttempts = 0;
+      this._lastConnectedAt = Date.now();
       this._startHealthCheck();
       return true;
     } catch (err) {
       console.warn('BT auto-connect failed:', err);
+      return false;
+    }
+  }
+
+  /**
+   * Manual reconnect — tries autoConnect first, falls back to requestDevice
+   * (which shows the browser's Bluetooth picker). This is the "one-click fix"
+   * for when auto-reconnect fails after page refresh.
+   */
+  async reconnect(): Promise<boolean> {
+    // Try silent reconnect first
+    if (await this.autoConnect()) return true;
+
+    // Fall back to browser picker — user selects the printer again
+    if (!this.isSupported) return false;
+
+    try {
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: [
+          '000018f0-0000-1000-8000-00805f9b34fb',
+          '0000ff00-0000-1000-8000-00805f9b34fb',
+          '00001800-0000-1000-8000-00805f9b34fb',
+          '00001801-0000-1000-8000-00805f9b34fb',
+          '49535343-fe7d-4ae5-8fa9-9fafd205e455',
+          '0000180a-0000-1000-8000-00805f9b34fb',
+          '0000180f-0000-1000-8000-00805f9b34fb',
+        ],
+      });
+
+      await this._connectGatt(device);
+
+      const info: SavedBtDeviceInfo = {
+        name: device.name || 'Unknown Printer',
+        id: device.id,
+      };
+      localStorage.setItem(SAVED_BT_KEY, JSON.stringify(info));
+      this.reconnectAttempts = 0;
+      this._lastConnectedAt = Date.now();
+      this._startHealthCheck();
+      this._onReconnect?.();
+      return true;
+    } catch (err) {
+      console.warn('BT reconnect via picker failed:', err);
       return false;
     }
   }
@@ -142,6 +201,7 @@ class BluetoothPrinterService {
           if (ok) {
             console.log('BT health check: reconnected');
             this.reconnectAttempts = 0;
+            this._lastConnectedAt = Date.now();
             this._onReconnect?.();
           }
         }).catch(() => {});
@@ -161,12 +221,14 @@ class BluetoothPrinterService {
       return;
     }
     this.reconnectAttempts++;
-    const delay = Math.min(1000 * this.reconnectAttempts, 15_000);
+    this._onReconnecting?.(this.reconnectAttempts);
+    const delay = Math.min(INITIAL_RECONNECT_DELAY * this.reconnectAttempts, MAX_RECONNECT_DELAY);
     this.reconnectTimer = setTimeout(async () => {
       try {
         const ok = await this.autoConnect();
         if (ok) {
           this.reconnectAttempts = 0;
+          this._lastConnectedAt = Date.now();
           this._onReconnect?.();
         } else {
           this._scheduleReconnect();

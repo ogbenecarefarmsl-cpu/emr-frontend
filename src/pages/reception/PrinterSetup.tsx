@@ -41,10 +41,13 @@ export default function PrinterSetup() {
     btDevice,
     btConnected,
     btSupported,
+    btReconnecting,
+    btReconnectAttempt,
     connectThermalPrinter,
     disconnectThermalPrinter,
     connectBtPrinter,
     disconnectBtPrinter,
+    reconnectBtPrinter,
   } = usePrinterContext();
 
   const [connectingThermal, setConnectingThermal] = useState(false);
@@ -118,6 +121,24 @@ export default function PrinterSetup() {
       toast.error(msg);
     } finally {
       setDisconnectingBt(false);
+    }
+  };
+
+  const handleBtReconnect = async () => {
+    try {
+      const ok = await reconnectBtPrinter();
+      if (ok) {
+        toast.success('Bluetooth printer reconnected');
+      } else {
+        toast.info('Could not reconnect automatically. Select your printer from the list.');
+      }
+    } catch (err: unknown) {
+      const msg = (err instanceof Error ? err.message : null) ?? 'Reconnect failed';
+      if (msg?.includes('User cancelled')) {
+        toast.info('Reconnect cancelled');
+      } else {
+        toast.error(msg);
+      }
     }
   };
 
@@ -214,15 +235,40 @@ export default function PrinterSetup() {
               </Alert>
             )}
 
+            {btReconnecting && !btConnected && (
+              <Alert>
+                <RefreshCw className="w-4 h-4 animate-spin" />
+                <AlertDescription>
+                  Reconnecting to printer{btReconnectAttempt > 0 ? ` (attempt ${btReconnectAttempt})` : ''}…
+                  If this takes too long, click <strong>Connect Bluetooth</strong> to re-pair.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex flex-wrap gap-2">
               {!btConnected ? (
-                <Button onClick={handleBtConnect} disabled={!btSupported || connectingBt}>
-                  {connectingBt ? (
-                    <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Pairing…</>
-                  ) : (
-                    <><Bluetooth className="w-4 h-4 mr-2" />Connect Bluetooth</>
+                <>
+                  <Button onClick={handleBtConnect} disabled={!btSupported || connectingBt || btReconnecting}>
+                    {connectingBt ? (
+                      <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Pairing…</>
+                    ) : (
+                      <><Bluetooth className="w-4 h-4 mr-2" />Connect Bluetooth</>
+                    )}
+                  </Button>
+                  {btDevice && (
+                    <Button
+                      variant="outline"
+                      onClick={handleBtReconnect}
+                      disabled={!btSupported || btReconnecting}
+                    >
+                      {btReconnecting ? (
+                        <><RefreshCw className="w-4 h-4 mr-2 animate-spin" />Reconnecting{btReconnectAttempt > 0 ? ` (attempt ${btReconnectAttempt})` : ''}…</>
+                      ) : (
+                        <><RefreshCw className="w-4 h-4 mr-2" />Reconnect</>
+                      )}
+                    </Button>
                   )}
-                </Button>
+                </>
               ) : (
                 <Button variant="outline" onClick={handleBtDisconnect} disabled={disconnectingBt}>
                   {disconnectingBt ? (

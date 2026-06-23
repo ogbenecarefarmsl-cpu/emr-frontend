@@ -73,7 +73,7 @@ import ManagementKpisPage from "./pages/admin/ManagementKpisPage";
 // Doctor Pages
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
 import PrescriptionForm from "./pages/doctor/PrescriptionForm";
-import { TreatmentPlanBuilder } from "./pages/shared/TreatmentPlanBuilder";
+
 
 // Nurse Pages
 import NurseDashboard from "./pages/nurse/NurseDashboard";
@@ -85,6 +85,7 @@ import NurseObservationPage from "./pages/nurse/NurseObservationPage";
 import NurseProceduresPage from "./pages/nurse/NurseProceduresPage";
 import NurseTriagePage from "./pages/nurse/NurseTriagePage";
 import NurseTreatmentPlanPage from "./pages/nurse/NurseTreatmentPlanPage";
+import DoctorTreatmentPlanPage from "./pages/doctor/DoctorTreatmentPlanPage";
 
 // Pharmacy Pages
 import PharmacyDashboard from "./pages/pharmacy/PharmacyDashboard";
@@ -387,11 +388,7 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['doctor', 'specialist', 'admin']}><PrescriptionForm /></RoleGuard>
       } />
       <Route path="/doctor/treatment-plans" element={
-        <RoleGuard allowedRoles={['doctor', 'specialist', 'admin']}>
-          <div className="p-6">
-            <TreatmentPlanBuilder />
-          </div>
-        </RoleGuard>
+        <RoleGuard allowedRoles={['doctor', 'specialist', 'admin']}><DoctorTreatmentPlanPage /></RoleGuard>
       } />
 
       {/* Nurse Routes */}

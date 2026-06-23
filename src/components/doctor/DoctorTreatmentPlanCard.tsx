@@ -7,26 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
 import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
+import type { TreatmentPlan } from '@/types/treatment-plan';
 import { Loader2, Plus, Pencil, Trash2, FileText } from 'lucide-react';
 import { toast } from 'sonner';
-
-interface TreatmentPlanItem {
-  type: string;
-  description: string;
-  amount: number;
-}
-
-interface TreatmentPlan {
-  _id: string;
-  planNumber: string;
-  status: string;
-  createdByName: string;
-  createdByRole: string;
-  items: TreatmentPlanItem[];
-  totalAmount: number;
-  notes?: string;
-  createdAt: string;
-}
 
 interface DoctorTreatmentPlanCardProps {
   visitId?: string;
@@ -134,7 +117,7 @@ export function DoctorTreatmentPlanCard({ visitId, patientId, patientName, canEd
                   </div>
                 </div>
                 <div className="space-y-1">
-                  {(plan.items || []).map((item: TreatmentPlanItem, idx: number) => (
+                  {(plan.items || []).map((item, idx) => (
                     <div key={idx} className="flex items-center justify-between text-xs">
                       <span className="truncate">{item.description}</span>
                       <span className="text-muted-foreground shrink-0">Le {item.amount?.toLocaleString()}</span>
