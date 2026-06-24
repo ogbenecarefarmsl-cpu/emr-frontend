@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useDoctors } from '@/hooks/useDoctors';
 import { useCompleteTriage } from '@/hooks/useVisits';
+import { admissionsAPI } from '@/services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -10,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Activity, AlertCircle, Heart, Loader2, Send } from 'lucide-react';
+import { Activity, AlertCircle, BedDouble, Heart, Loader2, Send } from 'lucide-react';
 import { ESI_LEVELS, checkAbnormalVitals, patientName, triagePriorityFromEsi } from './nurseUtils';
 
 interface TriageDialogProps {
@@ -31,6 +33,7 @@ const EMPTY_VITALS = {
 };
 
 export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageDialogProps) {
+  const qc = useQueryClient();
   const completeTriage = useCompleteTriage();
   const { data: doctors = [], isLoading: doctorsLoading } = useDoctors();
   const [vitals, setVitals] = useState(EMPTY_VITALS);
@@ -38,6 +41,15 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
   const [triageNotes, setTriageNotes] = useState('');
   const [chiefComplaint, setChiefComplaint] = useState('');
   const [doctorId, setDoctorId] = useState('');
+  const [admitOpen, setAdmitOpen] = useState(false);
+  const [isAdmitting, setIsAdmitting] = useState(false);
+  const [admitForm, setAdmitForm] = useState({
+    wardType: 'general',
+    bedNumber: '',
+    admissionReason: '',
+    diagnosis: '',
+    notes: '',
+  });
 
   useEffect(() => {
     if (!visit || !open) return;
@@ -46,6 +58,15 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
     setTriageNotes('');
     setDoctorId(typeof visit.doctorId === 'object' ? visit.doctorId?._id || '' : visit.doctorId || '');
     setVitals(EMPTY_VITALS);
+    setAdmitOpen(false);
+    setIsAdmitting(false);
+    setAdmitForm({
+      wardType: 'general',
+      bedNumber: '',
+      admissionReason: visit.chiefComplaint || '',
+      diagnosis: '',
+      notes: '',
+    });
   }, [visit, open]);
 
   const availableDoctors = doctors.filter((d: any) => d.isActive !== false);
@@ -84,23 +105,83 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
     }
   };
 
+  const admitPatient = async () => {
+    if (!visit) return;
+    if (!admitForm.admissionReason.trim()) {
+      toast.error('Admission reason is required');
+      return;
+    }
+
+    const patientId = visit.patientId?._id || visit.patientId;
+    if (!patientId) {
+      toast.error('Patient record is missing from this visit');
+      return;
+    }
+
+    const initialVitals = {
+      temperature: vitals.temperature ? parseFloat(vitals.temperature) : undefined,
+      bloodPressure: vitals.bloodPressure || undefined,
+      heartRate: vitals.heartRate ? parseInt(vitals.heartRate, 10) : undefined,
+      respiratoryRate: vitals.respiratoryRate ? parseInt(vitals.respiratoryRate, 10) : undefined,
+      oxygenSaturation: vitals.oxygenSaturation ? parseInt(vitals.oxygenSaturation, 10) : undefined,
+      notes: [
+        chiefComplaint ? `Chief complaint: ${chiefComplaint}` : '',
+        `ESI ${triageEsiLevel}: ${triagePriorityFromEsi(triageEsiLevel)}`,
+        triageNotes ? `Triage notes: ${triageNotes}` : '',
+        alerts.length > 0 ? `Alerts: ${alerts.join('; ')}` : '',
+      ].filter(Boolean).join('\n') || undefined,
+    };
+    const hasInitialVitals = Object.values(initialVitals).some((value) => value !== undefined && value !== '');
+
+    setIsAdmitting(true);
+    try {
+      const admission = await admissionsAPI.create({
+        patientId,
+        visitId: visit._id || visit.id,
+        doctorId: doctorId || undefined,
+        wardType: admitForm.wardType,
+        bedNumber: admitForm.bedNumber || undefined,
+        admissionReason: admitForm.admissionReason.trim(),
+        diagnosis: admitForm.diagnosis || undefined,
+        notes: admitForm.notes || triageNotes || undefined,
+      });
+
+      if (hasInitialVitals && admission?._id) {
+        await admissionsAPI.recordVitals(admission._id, initialVitals);
+      }
+
+      toast.success('Patient admitted');
+      qc.invalidateQueries({ queryKey: ['admissions'] });
+      qc.invalidateQueries({ queryKey: ['visits'] });
+      qc.invalidateQueries({ queryKey: ['prescriptions', 'mar-worklist'] });
+      setAdmitOpen(false);
+      onOpenChange(false);
+      onCompleted?.();
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Failed to admit patient');
+    } finally {
+      setIsAdmitting(false);
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Triage: {patientName(visit?.patientId)}</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4">
-          <div>
-            <Label className="text-sm">Chief Complaint</Label>
-            <Textarea
-              value={chiefComplaint}
-              onChange={(e) => setChiefComplaint(e.target.value)}
-              placeholder="What brings the patient in today?"
-              rows={2}
-              className="mt-1"
-            />
-          </div>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Triage: {patientName(visit?.patientId)}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm">Chief Complaint</Label>
+              <Textarea
+                value={chiefComplaint}
+                onChange={(e) => setChiefComplaint(e.target.value)}
+                placeholder="What brings the patient in today?"
+                rows={2}
+                className="mt-1"
+              />
+            </div>
 
           {alerts.length > 0 && (
             <Alert variant="destructive">
@@ -187,14 +268,73 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
             />
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submitTriage} disabled={completeTriage.isPending || doctorsLoading || !doctorId || availableDoctors.length === 0}>
-            {completeTriage.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
-            Send to Selected Doctor
+        <DialogFooter className="gap-2 sm:justify-between">
+          <Button variant="outline" onClick={() => setAdmitOpen(true)}>
+            <BedDouble className="w-4 h-4 mr-2" />
+            Admit Patient
           </Button>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+            <Button onClick={submitTriage} disabled={completeTriage.isPending || doctorsLoading || !doctorId || availableDoctors.length === 0}>
+              {completeTriage.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+              Send to Selected Doctor
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+      <Dialog open={admitOpen} onOpenChange={setAdmitOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Admit Patient</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="text-sm text-muted-foreground">
+              {patientName(visit?.patientId)} will be moved to the inpatient admissions board.
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Ward Type</Label>
+                <Select value={admitForm.wardType} onValueChange={(v) => setAdmitForm({ ...admitForm, wardType: v })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="general">General</SelectItem>
+                    <SelectItem value="private">Private</SelectItem>
+                    <SelectItem value="icu">ICU</SelectItem>
+                    <SelectItem value="maternity">Maternity</SelectItem>
+                    <SelectItem value="pediatric">Pediatric</SelectItem>
+                    <SelectItem value="isolation">Isolation</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Bed Number</Label>
+                <Input value={admitForm.bedNumber} onChange={(e) => setAdmitForm({ ...admitForm, bedNumber: e.target.value })} placeholder="e.g., B-12" />
+              </div>
+            </div>
+            <div>
+              <Label>Admission Reason *</Label>
+              <Input value={admitForm.admissionReason} onChange={(e) => setAdmitForm({ ...admitForm, admissionReason: e.target.value })} placeholder="Primary reason for admission" />
+            </div>
+            <div>
+              <Label>Working Diagnosis</Label>
+              <Input value={admitForm.diagnosis} onChange={(e) => setAdmitForm({ ...admitForm, diagnosis: e.target.value })} placeholder="Optional" />
+            </div>
+            <div>
+              <Label>Notes</Label>
+              <Textarea value={admitForm.notes} onChange={(e) => setAdmitForm({ ...admitForm, notes: e.target.value })} rows={3} placeholder="Handoff notes for the ward team..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdmitOpen(false)}>Cancel</Button>
+            <Button onClick={admitPatient} disabled={isAdmitting || !admitForm.admissionReason.trim()}>
+              {isAdmitting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <BedDouble className="w-4 h-4 mr-2" />}
+              Admit
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
