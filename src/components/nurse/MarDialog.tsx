@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Check, Clock, Loader2, Pill, X } from 'lucide-react';
@@ -11,81 +10,52 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { admissionLocation, patientName } from './nurseUtils';
 import { prescriptionService } from '@/services/prescriptionService';
-import { useRecordMedication } from '@/hooks/useAdmissions';
 
 interface MarDialogProps {
-  admission: any | null;
+  prescription: any | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 const ROUTE_OPTIONS = ['PO', 'IV', 'IM', 'SC', 'topical', 'inhalation', 'NG', 'PR'];
 
-export function MarDialog({ admission, open, onOpenChange }: MarDialogProps) {
+export function MarDialog({ prescription, open, onOpenChange }: MarDialogProps) {
   const qc = useQueryClient();
-  const admissionId = admission?._id;
-  const patientId = admission?.patientId?._id;
   const [form, setForm] = useState({
     medicationName: '',
     dosage: '',
     route: 'PO',
-    prescriptionId: '',
-    medicationId: '',
     refused: false,
     refusalReason: '',
     notes: '',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: prescriptions = [] } = useQuery({
-    queryKey: ['prescriptions', 'patient', patientId],
-    queryFn: () => prescriptionService.findByPatient(patientId!),
-    enabled: !!patientId && open,
-    staleTime: 30 * 1000,
-  });
-
-  const scheduledItems = useMemo(() => {
-    return prescriptions
-      .filter((rx: any) => rx.status !== 'cancelled')
-      .flatMap((rx: any) => (rx.items || []).map((item: any) => ({
-        ...item,
-        prescriptionId: rx._id,
-        prescriptionNumber: rx.prescriptionNumber,
-        frequency: item.frequency || '',
-        nextDue: item.nextDue,
-        status: item.status,
-      })));
-  }, [prescriptions]);
-
-  const adminLog = admission?.medicationLog || [];
-  const recentByName = useMemo(() => {
-    const map = new Map<string, any>();
-    for (const entry of adminLog) {
-      if (!entry?.medicationName) continue;
-      const key = entry.medicationName.toLowerCase();
-      const existing = map.get(key);
-      if (!existing || new Date(entry.administeredAt) > new Date(existing.administeredAt)) {
-        map.set(key, entry);
-      }
+  // Reset form when prescription changes
+  useMemo(() => {
+    if (prescription) {
+      const firstItem = prescription.items?.[0];
+      setForm({
+        medicationName: firstItem?.medicationName || '',
+        dosage: firstItem?.strengthPerDose || firstItem?.dosage || '',
+        route: firstItem?.route || 'PO',
+        refused: false,
+        refusalReason: '',
+        notes: '',
+      });
     }
-    return map;
-  }, [adminLog]);
+  }, [prescription?._id]);
 
-  const recordMedication = useRecordMedication(admissionId);
+  if (!prescription) return null;
 
-  const fillFromItem = (item: any) => {
-    setForm({
-      medicationName: item.medicationName || '',
-      dosage: item.dosage || '',
-      route: item.route || 'PO',
-      prescriptionId: item.prescriptionId || '',
-      medicationId: item.medicationId || '',
-      refused: false,
-      refusalReason: '',
-      notes: '',
-    });
-  };
+  const patient = prescription.patientId;
+  const firstItem = prescription.items?.[0];
+  const adminLog = prescription.administrationLog || [];
+  const progress = prescription.totalDoses > 0
+    ? Math.round((prescription.dosesGiven / prescription.totalDoses) * 100)
+    : 0;
+  const isCompleted = prescription.status === 'completed';
 
   const submit = async () => {
     if (!form.medicationName || !form.dosage) {
@@ -96,31 +66,33 @@ export function MarDialog({ admission, open, onOpenChange }: MarDialogProps) {
       toast.error('Please record a reason for the refusal');
       return;
     }
+
+    setIsSubmitting(true);
     try {
-      await recordMedication.mutateAsync({
+      await prescriptionService.administer(prescription._id, {
         medicationName: form.medicationName,
         dosage: form.dosage,
         route: form.route,
-        prescriptionId: form.prescriptionId || undefined,
-        medicationId: form.medicationId || undefined,
+        given: !form.refused,
         refused: form.refused,
         refusalReason: form.refused ? form.refusalReason : undefined,
         notes: form.notes || undefined,
       });
+
       toast.success(form.refused ? 'Refusal recorded' : 'Medication administered');
-      qc.invalidateQueries({ queryKey: ['admissions', admissionId] });
-      setForm({
-        medicationName: '',
-        dosage: '',
-        route: 'PO',
-        prescriptionId: '',
-        medicationId: '',
+      qc.invalidateQueries({ queryKey: ['prescriptions', 'mar-worklist'] });
+
+      // Reset form but keep same medication
+      setForm((f) => ({
+        ...f,
         refused: false,
         refusalReason: '',
         notes: '',
-      });
+      }));
     } catch (e: any) {
       toast.error(e?.response?.data?.message || 'Failed to record administration');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -130,56 +102,39 @@ export function MarDialog({ admission, open, onOpenChange }: MarDialogProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Pill className="w-5 h-5 text-primary" />
-            MAR: {patientName(admission?.patientId)}
+            MAR: {patient?.firstName} {patient?.lastName}
           </DialogTitle>
         </DialogHeader>
 
         <div className="text-xs text-muted-foreground">
-          {admission?.admissionNumber} - {admissionLocation(admission)}
+          {prescription.prescriptionNumber}
+          {prescription.isAdmitted && ` — ${prescription.admissionNumber}`}
+          {` — ${firstItem?.route?.toUpperCase() || 'PO'}`}
         </div>
 
         <div className="space-y-5">
-          <div>
-            <h4 className="text-sm font-semibold mb-2">Prescribed medications</h4>
-            {scheduledItems.length === 0 ? (
-              <p className="text-sm text-muted-foreground italic">No active prescriptions for this patient.</p>
-            ) : (
-              <div className="clinical-panel overflow-hidden">
-                {scheduledItems.map((item, index) => {
-                  const last = recentByName.get((item.medicationName || '').toLowerCase());
-                  const lastAt = last ? new Date(last.administeredAt) : null;
-                  const isRecent = lastAt && Date.now() - lastAt.getTime() < 6 * 60 * 60 * 1000;
-                  return (
-                    <div key={`${item.medicationName}-${index}`} className="clinical-list-row relative p-3 pl-5 flex items-center justify-between gap-3">
-                      <div className={`clinical-status-strip ${last?.refused ? 'bg-rose-500' : isRecent ? 'bg-primary' : 'bg-amber-500'}`} />
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium">{item.medicationName}</p>
-                        <p className="clinical-label">
-                          {item.dosage} - {item.frequency} - {item.route || 'PO'}
-                        </p>
-                        {last && (
-                          <p className={cn('text-xs mt-0.5 font-medium', last.refused ? 'text-rose-600' : 'text-primary')}>
-                            {last.refused ? 'Refused' : 'Last given'}: {lastAt!.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                          </p>
-                        )}
-                      </div>
-                      <div className="flex gap-1 flex-shrink-0">
-                        <Button size="sm" variant="default" onClick={() => { fillFromItem(item); setForm((f) => ({ ...f, refused: false })); }}>
-                          <Check className="w-3 h-3 mr-1" /> Give
-                        </Button>
-                        <Button size="sm" variant="outline" className="text-rose-600 border-rose-200 hover:bg-rose-50" onClick={() => { fillFromItem(item); setForm((f) => ({ ...f, refused: true })); }}>
-                          <X className="w-3 h-3 mr-1" /> Refuse
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+          {/* Progress */}
+          <div className="bg-muted/50 rounded-lg p-3">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-sm font-medium">Course Progress</span>
+              <span className="text-sm text-muted-foreground">{prescription.dosesGiven} of {prescription.totalDoses} doses</span>
+            </div>
+            <div className="h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className={cn('h-full rounded-full transition-all', isCompleted ? 'bg-green-500' : 'bg-primary')}
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            {prescription.nextDueAt && !isCompleted && (
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Next dose: {new Date(prescription.nextDueAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </p>
             )}
           </div>
 
+          {/* Record administration form */}
           <div className="border rounded-lg p-4 bg-muted/30 space-y-3">
-            <h4 className="text-sm font-semibold">Record administration</h4>
+            <h4 className="text-sm font-semibold">Record Administration</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <Label>Medication *</Label>
@@ -200,7 +155,7 @@ export function MarDialog({ admission, open, onOpenChange }: MarDialogProps) {
               </div>
               <div className="flex items-end">
                 <label className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" id="refused" checked={form.refused} onChange={(e) => setForm({ ...form, refused: e.target.checked })} />
+                  <input type="checkbox" checked={form.refused} onChange={(e) => setForm({ ...form, refused: e.target.checked })} />
                   Patient refused
                 </label>
               </div>
@@ -217,19 +172,19 @@ export function MarDialog({ admission, open, onOpenChange }: MarDialogProps) {
             </div>
           </div>
 
+          {/* Administration history */}
           {adminLog.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                <Clock className="w-4 h-4" /> Administration history
+                <Clock className="w-4 h-4" /> Administration History
               </h4>
-              <div className="clinical-panel overflow-hidden max-h-48 overflow-y-auto">
-                {[...adminLog].reverse().slice(0, 10).map((entry: any, index: number) => (
-                  <div key={`${entry.administeredAt}-${index}`} className="clinical-list-row relative p-2.5 pl-4 text-xs">
-                    <div className={`clinical-status-strip ${entry.refused ? 'bg-rose-500' : 'bg-primary'}`} />
+              <div className="border rounded-lg overflow-hidden max-h-48 overflow-y-auto">
+                {[...adminLog].reverse().map((entry: any, index: number) => (
+                  <div key={`${entry.administeredAt}-${index}`} className="p-2.5 pl-4 text-xs border-b last:border-b-0">
                     <div className="flex items-center justify-between gap-2">
                       <div>
                         <span className="font-medium">{entry.medicationName}</span>
-                        <span className="text-muted-foreground"> - {entry.dosage} {entry.route ? `(${entry.route})` : ''}</span>
+                        <span className="text-muted-foreground"> - {entry.dosage} ({entry.route})</span>
                         {entry.refused && entry.refusalReason && (
                           <span className="text-rose-600 ml-2">- {entry.refusalReason}</span>
                         )}
@@ -241,6 +196,7 @@ export function MarDialog({ admission, open, onOpenChange }: MarDialogProps) {
                     </div>
                     <p className="text-muted-foreground text-[10px] mt-0.5">
                       {new Date(entry.administeredAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      {entry.administeredByName && ` by ${entry.administeredByName}`}
                     </p>
                   </div>
                 ))}
@@ -251,9 +207,9 @@ export function MarDialog({ admission, open, onOpenChange }: MarDialogProps) {
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
-          <Button onClick={submit} disabled={recordMedication.isPending}>
-            {recordMedication.isPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-1" />}
-            {form.refused ? 'Record refusal' : 'Mark as given'}
+          <Button onClick={submit} disabled={isSubmitting || isCompleted}>
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Check className="w-4 h-4 mr-1" />}
+            {isCompleted ? 'Course Complete' : (form.refused ? 'Record Refusal' : 'Mark as Given')}
           </Button>
         </DialogFooter>
       </DialogContent>

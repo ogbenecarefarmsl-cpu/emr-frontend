@@ -104,4 +104,27 @@ export const prescriptionService = {
     const response = await api.patch(`/prescriptions/${id}`, data);
     return response.data;
   },
+
+  async getMarWorklist(): Promise<any[]> {
+    const response = await api.get('/prescriptions/mar-worklist');
+    return response.data;
+  },
+
+  async administer(id: string, data: {
+    medicationName: string;
+    dosage: string;
+    route: string;
+    given?: boolean;
+    refused?: boolean;
+    refusalReason?: string;
+    notes?: string;
+  }): Promise<Prescription> {
+    const response = await api.post(`/prescriptions/${id}/administer`, data);
+    return response.data;
+  },
+
+  async initializeAdmin(id: string): Promise<Prescription> {
+    const response = await api.post(`/prescriptions/${id}/initialize-admin`);
+    return response.data;
+  },
 };
