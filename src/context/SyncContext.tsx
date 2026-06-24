@@ -288,8 +288,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
     // Use LAN URL if available and configured URL isn't reachable
     const baseUrl = lanBackendUrl || API_BASE_URL;
 
-    console.log(`[Sync] Flushing ${pending.length} pending mutations...`);
-
     for (const mut of pending) {
       try {
         await db.pendingMutations.update(mut.id!, { status: 'syncing' });
@@ -309,7 +307,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
         });
 
         await db.pendingMutations.delete(mut.id!);
-        console.log(`[Sync] ✓ Mutation ${mut.id} synced successfully`);
       } catch (err: unknown) {
         const retries = (mut.retries || 0) + 1;
         const axiosErr = err as { response?: unknown; code?: string; message?: string };
@@ -333,7 +330,6 @@ export function SyncProvider({ children }: { children: React.ReactNode }) {
           });
           
           if (backoffDelay > 0) {
-            console.log(`[Sync] ⏳ Mutation ${mut.id} retry ${retries}/${MAX_RETRIES} (backoff: ${backoffDelay}ms)`);
             await new Promise(resolve => setTimeout(resolve, backoffDelay));
           }
         }

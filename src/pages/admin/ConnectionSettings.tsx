@@ -157,7 +157,6 @@ export default function ConnectionSettings() {
       // Save to backend (this will sync to all clients)
       try {
         await api.post('/settings/connection/config', config);
-        console.log('✅ Configuration saved to backend');
       } catch (backendError) {
         console.warn('⚠️ Failed to save to backend, saving locally only:', backendError);
       }

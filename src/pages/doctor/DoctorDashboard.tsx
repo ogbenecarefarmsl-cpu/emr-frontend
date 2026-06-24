@@ -870,6 +870,8 @@ export default function DoctorDashboard() {
   const awaitingPharmacy = dashboardData?.awaitingPharmacy || [];
   const awaitingDispensing = dashboardData?.awaitingDispensing || [];
   const resultsReady = dashboardData?.resultsReady || [];
+  const incomingReferrals = dashboardData?.incomingReferrals || [];
+  const admittedPatients = dashboardData?.admittedPatients || [];
   const openEncounterCount = activePatients.length;
 
   // Global search across all visit queues
@@ -1140,6 +1142,70 @@ export default function DoctorDashboard() {
           <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row gap-6 p-4 md:p-6">
             {/* Left Editor Area */}
             <div className="flex-1 flex flex-col gap-5 min-w-0">
+              {/* Quick Actions Bar - Always visible when patient selected */}
+              {(selectedVisit || searchedPatient) && (
+                <div className="bg-gradient-to-r from-primary/5 via-primary/3 to-transparent border border-primary/20 rounded-xl p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 hover:bg-primary/10 hover:border-primary"
+                      onClick={() => { setLabOrderModalOpen(true); setEditingOrder(null); }}
+                      disabled={!contextPatient}
+                    >
+                      <FlaskConical className="w-4 h-4" />
+                      Order Lab
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 hover:bg-primary/10 hover:border-primary"
+                      onClick={() => { setPrescriptionModalOpen(true); setEditingPrescription(null); }}
+                      disabled={!contextPatient}
+                    >
+                      <Pill className="w-4 h-4" />
+                      Prescribe
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 hover:bg-primary/10 hover:border-primary"
+                      onClick={() => setTreatmentPlanOpen(true)}
+                      disabled={!contextPatient}
+                    >
+                      <ClipboardList className="w-4 h-4" />
+                      Treatment Plan
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 hover:bg-primary/10 hover:border-primary"
+                      onClick={() => { setReferralOpen(true); setReferralForm({ specialistId: '', reason: '', notes: '' }); }}
+                      disabled={!selectedVisit}
+                    >
+                      <UserCheck className="w-4 h-4" />
+                      Refer
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2 hover:bg-primary/10 hover:border-primary"
+                      onClick={() => { setAdmitOpen(true); setAdmitForm({ wardType: 'general', bedNumber: '', admissionReason: '', diagnosis: '', notes: '' }); }}
+                      disabled={!selectedVisit}
+                    >
+                      <BedDouble className="w-4 h-4" />
+                      Admit
+                    </Button>
+                    <div className="flex-1" />
+                    {abnormalLabResults.length > 0 && (
+                      <Badge className="bg-red-500 text-white gap-1.5 animate-pulse">
+                        <AlertTriangle className="w-3 h-3" />
+                        {abnormalLabResults.length} abnormal result{abnormalLabResults.length > 1 ? 's' : ''}
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+              )}
               {selectedVisit || searchedPatient ? (
                 <>
                   {selectedVisit.triageAlert && selectedVisit.triageAlerts && selectedVisit.triageAlerts.length > 0 && (
@@ -1514,6 +1580,54 @@ export default function DoctorDashboard() {
                       </div>
                     </TabsContent>
 
+                    {/* Lab Results Tab */}
+                    <TabsContent value="lab-results" className="p-6 mt-0">
+                      {selectedVisit ? (
+                        <div className="flex flex-col gap-4">
+                          <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold flex items-center gap-2">
+                              <FlaskConical className="w-4 h-4 text-green-600" />
+                              Lab Results — {patientDisplayName(selectedVisit)}
+                            </h3>
+                            {sortedLabResults.length > 0 && (
+                              <span className="text-xs text-muted-foreground">{sortedLabResults.length} result{sortedLabResults.length !== 1 ? 's' : ''}</span>
+                            )}
+                          </div>
+                          {sortedLabResults.length === 0 ? (
+                            <div className="text-center py-12 text-muted-foreground">
+                              <FlaskConical className="w-10 h-10 mx-auto mb-3 opacity-30" />
+                              <p className="text-sm">No lab results yet for this visit.</p>
+                              <p className="text-xs mt-1">Results will appear here once the lab releases them.</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {sortedLabResults.map((result: LabResult) => (
+                                <div key={result._id} className={cn('rounded-lg border p-3 flex items-center justify-between', getFlagColor(result.flag))}>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                      <p className="text-sm font-medium truncate">{result.testName}</p>
+                                      <span className="text-[10px] text-muted-foreground font-mono">{result.testCode}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 mt-0.5">
+                                      <span className="text-lg font-bold">{result.value}{result.unit ? ` ${result.unit}` : ''}</span>
+                                      {(result.referenceRange || result.reference_range) && (
+                                        <span className="text-[10px] text-muted-foreground">Ref: {result.referenceRange || result.reference_range}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <Badge variant="outline" className={cn('text-[10px] capitalize shrink-0 ml-2', getFlagColor(result.flag))}>
+                                    {getFlagLabel(result.flag)}
+                                  </Badge>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="text-center py-12 text-muted-foreground text-sm">Select a patient to view lab results</div>
+                      )}
+                    </TabsContent>
+
                     {/* Timeline Tab */}
                     <TabsContent value="timeline" className="p-0 mt-0">
                       {patientId ? (
@@ -1564,42 +1678,243 @@ export default function DoctorDashboard() {
                   </div>
                 </>
               ) : (
-                /* Empty State */
-                <div className="flex-1 flex items-center justify-center">
-                  <div className="max-w-md text-center">
-                    <User className="w-14 h-14 mx-auto mb-4 text-muted-foreground/30" />
-                    <h2 className="text-xl font-semibold">Ready to consult</h2>
-                    <p className="text-sm text-muted-foreground mt-2">Accept a patient from the top bar or use the search box to view any patient's chart.</p>
-                    <div className="flex flex-col items-center gap-2 mt-5">
-                      {waitingQueue.length > 0 && (
-                        <Button
-                          size="lg"
-                          className="gap-2"
-                          onClick={() => handleAcceptPatient(waitingQueue[0])}
-                          disabled={acceptPatient.isPending}
-                        >
-                          {acceptPatient.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserCheck className="h-4 w-4" />}
-                          Accept next patient ({patientDisplayName(waitingQueue[0])})
-                        </Button>
-                      )}
-                      {resultsReady.length > 0 && (
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          className="gap-2"
-                          onClick={() => { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); }}
-                        >
-                          <FlaskConical className="h-4 w-4" />
-                          Review {resultsReady.length} result{resultsReady.length === 1 ? '' : 's'} ready
-                        </Button>
-                      )}
+                /* Dashboard Home View */
+                <div className="flex-1 flex flex-col gap-6">
+                  {/* Today's Stats */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="bg-white border border-border rounded-xl p-5 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => { if (activePatients.length > 0) { setSelectedVisit(activePatients[0]); setActiveTab('soap'); } }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                          <Activity className="w-5 h-5 text-blue-600" />
+                        </div>
+                        <Badge variant="secondary" className="text-xs">{openEncounterCount} active</Badge>
+                      </div>
+                      <p className="text-2xl font-bold text-foreground">{stats.seen}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Patients seen today</p>
                     </div>
-                    {(waitingQueue.length > 0 || resultsReady.length > 0) && (
-                      <p className="text-[11px] text-muted-foreground mt-3">
-                        <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">1-3</kbd> Switch tabs · <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">Ctrl+S</kbd> Save · <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">Ctrl+Enter</kbd> Complete
-                      </p>
-                    )}
+
+                    <div className="bg-white border border-border rounded-xl p-5 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => { if (waitingQueue.length > 0) handleAcceptPatient(waitingQueue[0]); }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                          <User className="w-5 h-5 text-amber-600" />
+                        </div>
+                        <Badge variant="secondary" className="text-xs">in queue</Badge>
+                      </div>
+                      <p className="text-2xl font-bold text-foreground">{stats.waiting}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Patients waiting</p>
+                    </div>
+
+                    <div className="bg-white border border-border rounded-xl p-5 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => { if (resultsReady.length > 0) { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); } }}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                          <FlaskConical className="w-5 h-5 text-green-600" />
+                        </div>
+                        <Badge variant="secondary" className="text-xs">ready</Badge>
+                      </div>
+                      <p className="text-2xl font-bold text-foreground">{resultsReady.length}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Lab results ready</p>
+                    </div>
+
+                    <div className="bg-white border border-border rounded-xl p-5 hover:shadow-lg transition-shadow">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                          <CheckCircle className="w-5 h-5 text-primary" />
+                        </div>
+                        <Badge variant="secondary" className="text-xs">completed</Badge>
+                      </div>
+                      <p className="text-2xl font-bold text-foreground">{stats.completed}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Visits completed</p>
+                    </div>
                   </div>
+
+                  {/* Waiting Queue */}
+                  {waitingQueue.length > 0 && (
+                    <div className="bg-white border border-border rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          Waiting Queue ({waitingQueue.length})
+                        </h3>
+                        <Button size="sm" onClick={() => handleAcceptPatient(waitingQueue[0])} disabled={acceptPatient.isPending}>
+                          {acceptPatient.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5 mr-1.5" />}
+                          Accept Next
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        {waitingQueue.slice(0, 5).map((visit: Visit) => (
+                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => handleAcceptPatient(visit)}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-primary">
+                                  {visit.patientId?.firstName?.[0]}{visit.patientId?.lastName?.[0]}
+                                </span>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{patientDisplayName(visit)}</p>
+                                <p className="text-xs text-muted-foreground truncate">{visit.chiefComplaint || 'No complaint'}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {visit.triagePriority && (
+                                <span className={cn("w-2 h-2 rounded-full", visit.triagePriority.includes('emergency') || visit.triagePriority.includes('urgent') ? "bg-red-500 animate-pulse" : "bg-amber-500")} />
+                              )}
+                              <Badge variant="outline" className="text-[10px]">{visit.visitNumber}</Badge>
+                            </div>
+                          </div>
+                        ))}
+                        {waitingQueue.length > 5 && (
+                          <p className="text-xs text-center text-muted-foreground pt-2">+ {waitingQueue.length - 5} more in queue</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Results Ready */}
+                  {resultsReady.length > 0 && (
+                    <div className="bg-white border border-green-200 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <FlaskConical className="w-4 h-4 text-green-600" />
+                          Lab Results Ready ({resultsReady.length})
+                        </h3>
+                        <Button size="sm" variant="outline" onClick={() => { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); }}>
+                          <FlaskConical className="w-3.5 h-3.5 mr-1.5" />
+                          Review Results
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        {resultsReady.slice(0, 3).map((visit: Visit) => (
+                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50/50 hover:bg-green-100/50 transition-colors cursor-pointer" onClick={() => { setSelectedVisit(visit); setActiveTab('lab-results'); }}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-green-700">
+                                  {visit.patientId?.firstName?.[0]}{visit.patientId?.lastName?.[0]}
+                                </span>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{patientDisplayName(visit)}</p>
+                                <p className="text-xs text-muted-foreground truncate">{visit.chiefComplaint || 'Lab results available'}</p>
+                              </div>
+                            </div>
+                            <Badge className="bg-green-600 text-white text-[10px] shrink-0">Results Ready</Badge>
+                          </div>
+                        ))}
+                        {resultsReady.length > 3 && (
+                          <p className="text-xs text-center text-muted-foreground pt-2">+ {resultsReady.length - 3} more results ready</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Active Encounters */}
+                  {activePatients.length > 0 && (
+                    <div className="bg-white border border-border rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <Activity className="w-4 h-4 text-blue-600" />
+                          Active Encounters ({activePatients.length})
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        {activePatients.map((visit: Visit) => (
+                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => { setSelectedVisit(visit); setActiveTab('soap'); }}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-blue-700">
+                                  {visit.patientId?.firstName?.[0]}{visit.patientId?.lastName?.[0]}
+                                </span>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{patientDisplayName(visit)}</p>
+                                <p className="text-xs text-muted-foreground truncate">{visit.chiefComplaint || 'In consultation'}</p>
+                              </div>
+                            </div>
+                            <Badge className={cn("text-[10px] shrink-0", visitStatusTone(visit.status))}>{statusLabel(visit.status)}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Incoming Referrals */}
+                  {incomingReferrals.length > 0 && (
+                    <div className="bg-white border border-purple-200 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <UserCheck className="w-4 h-4 text-purple-600" />
+                          Incoming Referrals ({incomingReferrals.length})
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        {incomingReferrals.slice(0, 5).map((visit: Visit) => (
+                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-purple-200 bg-purple-50/50 hover:bg-purple-100/50 transition-colors cursor-pointer" onClick={() => { setSelectedVisit(visit); setActiveTab('soap'); }}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-purple-700">
+                                  {visit.patientId?.firstName?.[0]}{visit.patientId?.lastName?.[0]}
+                                </span>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{patientDisplayName(visit)}</p>
+                                <p className="text-xs text-muted-foreground truncate">{visit.chiefComplaint || 'Referred to you'}</p>
+                              </div>
+                            </div>
+                            <Badge className="bg-purple-500 text-white text-[10px] shrink-0">Referral</Badge>
+                          </div>
+                        ))}
+                        {incomingReferrals.length > 5 && (
+                          <p className="text-xs text-center text-muted-foreground pt-2">+ {incomingReferrals.length - 5} more referrals</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Admitted Patients */}
+                  {admittedPatients.length > 0 && (
+                    <div className="bg-white border border-blue-200 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-semibold flex items-center gap-2">
+                          <BedDouble className="w-4 h-4 text-blue-600" />
+                          My Admitted Patients ({admittedPatients.length})
+                        </h3>
+                      </div>
+                      <div className="space-y-2">
+                        {admittedPatients.slice(0, 5).map((visit: Visit) => (
+                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-blue-200 bg-blue-50/50 hover:bg-blue-100/50 transition-colors cursor-pointer" onClick={() => { setSelectedVisit(visit); setActiveTab('soap'); }}>
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                                <span className="text-xs font-bold text-blue-700">
+                                  {visit.patientId?.firstName?.[0]}{visit.patientId?.lastName?.[0]}
+                                </span>
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{patientDisplayName(visit)}</p>
+                                <p className="text-xs text-muted-foreground truncate">{visit.chiefComplaint || 'Admitted'}</p>
+                              </div>
+                            </div>
+                            <Badge className="bg-blue-600 text-white text-[10px] shrink-0">Admitted</Badge>
+                          </div>
+                        ))}
+                        {admittedPatients.length > 5 && (
+                          <p className="text-xs text-center text-muted-foreground pt-2">+ {admittedPatients.length - 5} more admitted</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty State - No patients at all */}
+                  {waitingQueue.length === 0 && resultsReady.length === 0 && activePatients.length === 0 && incomingReferrals.length === 0 && admittedPatients.length === 0 && (
+                    <div className="flex-1 flex items-center justify-center">
+                      <div className="max-w-md text-center">
+                        <User className="w-14 h-14 mx-auto mb-4 text-muted-foreground/30" />
+                        <h2 className="text-xl font-semibold">All caught up!</h2>
+                        <p className="text-sm text-muted-foreground mt-2">No patients waiting. Use the search box to view any patient's chart or check back later.</p>
+                        <p className="text-[11px] text-muted-foreground mt-5">
+                          <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">1-3</kbd> Switch tabs · <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">Ctrl+S</kbd> Save · <kbd className="px-1 py-0.5 rounded bg-muted border text-[10px] font-mono">Ctrl+Enter</kbd> Complete
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

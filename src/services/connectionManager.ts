@@ -86,7 +86,6 @@ class ConnectionManager {
    */
   reloadConfiguration() {
     this.loadConfiguration();
-    console.log('🔄 Connection configuration reloaded');
   }
 
   /**
@@ -112,7 +111,6 @@ class ConnectionManager {
         if (data && data.value) {
           localStorage.setItem('connection_config', JSON.stringify(data.value));
           this.loadConfiguration();
-          console.log('✅ Configuration synced from server');
           return true;
         }
       }

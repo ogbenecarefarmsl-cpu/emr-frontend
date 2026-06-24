@@ -26,7 +26,6 @@ import PaymentsPage from "./pages/reception/PaymentsPage";
 import DailyReconciliation from "./pages/reception/DailyReconciliation";
 import AccountsReceivable from "./pages/reception/AccountsReceivable";
 import PaymentReceipt from "./pages/reception/PaymentReceipt";
-import PaymentDemo from "./pages/reception/PaymentDemo";
 import PrinterSetup from "./pages/reception/PrinterSetup";
 import PriceListPage from "./pages/reception/PriceListPage";
 import PrescriptionReceipt from "./pages/reception/PrescriptionReceipt";
@@ -215,9 +214,6 @@ function AppRoutes() {
       } />
       <Route path="/reception/receipt/:orderId" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PaymentReceipt /></RoleGuard>
-      } />
-      <Route path="/reception/payment-demo" element={
-        <RoleGuard allowedRoles={['receptionist', 'admin']}><PaymentDemo /></RoleGuard>
       } />
       <Route path="/reception/printer" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><PrinterSetup /></RoleGuard>

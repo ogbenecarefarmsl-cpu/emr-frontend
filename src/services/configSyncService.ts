@@ -25,7 +25,7 @@ class ConfigSyncService {
       this.syncNow();
     }, this.syncIntervalMs);
 
-    console.log(`🔄 Config sync started (interval: ${intervalMs}ms)`);
+    // Config sync started
   }
 
   /**
@@ -35,7 +35,7 @@ class ConfigSyncService {
     if (this.syncInterval) {
       clearInterval(this.syncInterval);
       this.syncInterval = null;
-      console.log('⏹️ Config sync stopped');
+      // Config sync stopped
     }
   }
 
@@ -48,7 +48,6 @@ class ConfigSyncService {
       const currentBackend = connectionManager.getCurrentBackend();
       
       if (!currentBackend) {
-        console.log('⚠️ No backend available for config sync');
         return false;
       }
 
@@ -57,7 +56,6 @@ class ConfigSyncService {
       
       if (success) {
         this.lastSyncTime = Date.now();
-        console.log('✅ Configuration synced successfully');
         
         // Notify listeners that config was updated
         this.notifyConfigUpdate();

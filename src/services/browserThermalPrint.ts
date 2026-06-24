@@ -144,7 +144,6 @@ export async function printBothReceiptCopies(
 
   try {
     // Print patient copy first
-    console.log('🖨️ Printing patient copy...');
     const patientHTML = generateReceiptHTML(patientCopyElement);
     await printThermalReceipt(patientHTML);
     printedCount++;
@@ -153,7 +152,6 @@ export async function printBothReceiptCopies(
     await new Promise(resolve => setTimeout(resolve, 1500));
 
     // Print lab copy
-    console.log('🖨️ Printing lab copy...');
     const labHTML = generateReceiptHTML(labCopyElement);
     await printThermalReceipt(labHTML);
     printedCount++;

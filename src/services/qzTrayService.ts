@@ -31,14 +31,11 @@ class QZTrayService {
   async connect(): Promise<boolean> {
     try {
       if (this.connected) {
-        console.log('✅ QZ Tray already connected');
         return true;
       }
 
-      console.log('🔌 Connecting to QZ Tray...');
       await qz.websocket.connect();
       this.connected = true;
-      console.log('✅ Connected to QZ Tray');
       return true;
     } catch (error) {
       console.error('❌ Failed to connect to QZ Tray:', error);
@@ -55,7 +52,6 @@ class QZTrayService {
       if (!this.connected) return;
       await qz.websocket.disconnect();
       this.connected = false;
-      console.log('🔌 Disconnected from QZ Tray');
     } catch (error) {
       console.error('❌ Failed to disconnect from QZ Tray:', error);
     }
@@ -70,7 +66,6 @@ class QZTrayService {
         await this.connect();
       }
       const printers = await qz.printers.find();
-      console.log('🖨️ Available printers:', printers);
       return printers;
     } catch (error) {
       console.error('❌ Failed to get printers:', error);
@@ -93,13 +88,11 @@ class QZTrayService {
       );
 
       if (xprinter) {
-        console.log('✅ Found XPrinter:', xprinter);
         return xprinter;
       }
 
       // If no XPrinter found, try to get default printer
       const defaultPrinter = await qz.printers.getDefault();
-      console.log('⚠️ No XPrinter found, using default:', defaultPrinter);
       return defaultPrinter;
     } catch (error) {
       console.error('❌ Failed to find printer:', error);
@@ -112,7 +105,6 @@ class QZTrayService {
    */
   setPrinter(printerName: string): void {
     this.printerName = printerName;
-    console.log('🖨️ Printer set to:', printerName);
   }
 
   /**
@@ -146,8 +138,6 @@ class QZTrayService {
         this.printerName = printer;
       }
 
-      console.log(`🖨️ Printing ${copyType} copy to ${printer}...`);
-
       // Build ESC/POS commands
       const escposBytes = buildReceiptESCPOS(receiptData, copyType);
 
@@ -160,7 +150,6 @@ class QZTrayService {
       // Print
       await qz.print(config, [{ type: 'raw', data }]);
 
-      console.log(`✅ ${copyType} copy printed successfully`);
       return true;
     } catch (error) {
       console.error(`❌ Failed to print ${copyType} copy:`, error);
@@ -220,8 +209,6 @@ class QZTrayService {
         }
       }
 
-      console.log('🖨️ Sending test print to', printer);
-
       const config = qz.configs.create(printer);
       const testData = [
         '\x1B\x40',              // Initialize printer
@@ -236,7 +223,6 @@ class QZTrayService {
       ];
 
       await qz.print(config, testData);
-      console.log('✅ Test print sent successfully');
       return true;
     } catch (error) {
       console.error('❌ Test print failed:', error);

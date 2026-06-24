@@ -196,10 +196,8 @@ class BluetoothPrinterService {
     this._stopHealthCheck();
     this.healthCheckTimer = setInterval(() => {
       if (!this.isConnected && this.getSavedDevice() && this.reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
-        console.log('BT health check: not connected, attempting auto-reconnect...');
         this.autoConnect().then(ok => {
           if (ok) {
-            console.log('BT health check: reconnected');
             this.reconnectAttempts = 0;
             this._lastConnectedAt = Date.now();
             this._onReconnect?.();
