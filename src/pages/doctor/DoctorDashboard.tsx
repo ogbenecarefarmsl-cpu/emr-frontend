@@ -1142,535 +1142,311 @@ export default function DoctorDashboard() {
           <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row gap-6 p-4 md:p-6">
             {/* Left Editor Area */}
             <div className="flex-1 flex flex-col gap-5 min-w-0">
-              {/* Quick Actions Bar - Always visible when patient selected */}
-              {(selectedVisit || searchedPatient) && (
-                <div className="bg-gradient-to-r from-primary/5 via-primary/3 to-transparent border border-primary/20 rounded-xl p-4">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2 hover:bg-primary/10 hover:border-primary"
-                      onClick={() => { setLabOrderModalOpen(true); setEditingOrder(null); }}
-                      disabled={!contextPatient}
-                    >
-                      <FlaskConical className="w-4 h-4" />
-                      Order Lab
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2 hover:bg-primary/10 hover:border-primary"
-                      onClick={() => { setPrescriptionModalOpen(true); setEditingPrescription(null); }}
-                      disabled={!contextPatient}
-                    >
-                      <Pill className="w-4 h-4" />
-                      Prescribe
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2 hover:bg-primary/10 hover:border-primary"
-                      onClick={() => setTreatmentPlanOpen(true)}
-                      disabled={!contextPatient}
-                    >
-                      <ClipboardList className="w-4 h-4" />
-                      Treatment Plan
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2 hover:bg-primary/10 hover:border-primary"
-                      onClick={() => { setReferralOpen(true); setReferralForm({ specialistId: '', reason: '', notes: '' }); }}
-                      disabled={!selectedVisit}
-                    >
-                      <UserCheck className="w-4 h-4" />
-                      Refer
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="gap-2 hover:bg-primary/10 hover:border-primary"
-                      onClick={() => { setAdmitOpen(true); setAdmitForm({ wardType: 'general', bedNumber: '', admissionReason: '', diagnosis: '', notes: '' }); }}
-                      disabled={!selectedVisit}
-                    >
-                      <BedDouble className="w-4 h-4" />
-                      Admit
-                    </Button>
-                    <div className="flex-1" />
-                    {abnormalLabResults.length > 0 && (
-                      <Badge className="bg-red-500 text-white gap-1.5 animate-pulse">
-                        <AlertTriangle className="w-3 h-3" />
-                        {abnormalLabResults.length} abnormal result{abnormalLabResults.length > 1 ? 's' : ''}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              )}
               {selectedVisit || searchedPatient ? (
                 <>
-                  {selectedVisit.triageAlert && selectedVisit.triageAlerts && selectedVisit.triageAlerts.length > 0 && (
-                    <div className="bg-red-50 border-2 border-red-300 rounded-xl p-3 flex items-start gap-2.5 shadow-[0_1px_3px_rgba(220,38,38,0.08)]">
-                      <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                        <AlertCircle className="w-4 h-4 text-red-600" />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-xs font-bold text-red-800 uppercase tracking-wider">Nurse Triage Alert</p>
-                        <p className="text-sm font-semibold text-red-900 mt-0.5">{selectedVisit.triageAlert}</p>
-                        {selectedVisit.triageAlerts.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1.5">
-                            {selectedVisit.triageAlerts.map((a: string, i: number) => (
-                              <span key={i} className="px-1.5 py-0.5 rounded bg-red-100 text-red-800 text-[10px] font-medium border border-red-200">
-                                {a.replace(/_/g, ' ')}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Patient Context Strip */}
-                  <div className="bg-white border border-border rounded-xl p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between shadow-[0_1px_2px_rgba(0,0,0,0.02)]">
-                    <div className="flex flex-wrap items-center gap-3 min-w-0">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-                        <span className="text-sm font-bold text-primary">
-                          {contextPatient?.firstName?.[0]}{contextPatient?.lastName?.[0]}
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <h2 className="text-sm font-semibold">{[contextPatient?.firstName, contextPatient?.lastName].filter(Boolean).join(' ').trim() || 'Unnamed patient'}</h2>
-                        <p className="text-[11px] text-muted-foreground font-mono">{contextPatient?.patientId || 'N/A'}</p>
-                      </div>
-                      <div className="hidden sm:block h-8 w-px bg-border mx-1" />
-                      <span className="text-xs text-muted-foreground">{patientAgeLabel(contextPatient)} · {contextPatient?.gender || 'N/A'}</span>
-                      {selectedVisit && (
-                        <>
-                          <div className="hidden sm:block h-8 w-px bg-border mx-1" />
-                          <div className="flex items-center gap-1.5">
-                            {selectedVisit.triagePriority && (
-                              <span className={cn("w-2 h-2 rounded-full", selectedVisit.triagePriority.includes('emergency') || selectedVisit.triagePriority.includes('urgent') ? "bg-red-500" : "bg-amber-500")} />
+                  {/* Calm Patient Header */}
+                  <section className="bg-white border-b border-border px-4 md:px-5 py-3">
+                    <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-bold text-primary">
+                            {contextPatient?.firstName?.[0]}{contextPatient?.lastName?.[0]}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h2 className="text-base font-semibold leading-tight">
+                              {[contextPatient?.firstName, contextPatient?.lastName].filter(Boolean).join(' ').trim() || 'Unnamed patient'}
+                            </h2>
+                            {selectedVisit?.triagePriority && (
+                              <Badge variant={selectedVisit.triagePriority.includes('emergency') || selectedVisit.triagePriority.includes('urgent') ? 'destructive' : 'outline'} className="h-5 text-[10px] capitalize">
+                                {selectedVisit.triagePriority.replace('esi_', 'ESI ').replace(/_/g, ' ')}
+                              </Badge>
                             )}
-                            <span className="text-[11px] text-muted-foreground">{selectedVisit.triagePriority ? statusLabel(selectedVisit.triagePriority) : 'Triage'}</span>
+                            {contextPatient?.allergies?.length > 0 ? (
+                              <Badge variant="outline" className="h-5 border-red-200 bg-red-50 text-[10px] text-red-700">
+                                Allergy: {contextPatient.allergies.slice(0, 1).join(', ')}{contextPatient.allergies.length > 1 ? ' +' + (contextPatient.allergies.length - 1) : ''}
+                              </Badge>
+                            ) : (
+                              <span className="text-[10px] text-muted-foreground">NKDA</span>
+                            )}
+                            {isReadOnly && <Badge className="h-5 bg-amber-500 text-[10px] text-white hover:bg-amber-500">View-only</Badge>}
                           </div>
-                        </>
-                      )}
-                      {selectedVisit && (
-                        <span className="text-[11px] text-muted-foreground truncate max-w-full md:max-w-[180px]">{chiefComplaintForm || selectedVisit.chiefComplaint || 'No complaint'}</span>
-                      )}
-                      <div className="flex items-center gap-1 flex-wrap">
-                        {contextPatient?.allergies?.length > 0 ? (
-                          <span className="px-1.5 py-0.5 rounded bg-red-50 text-red-600 text-[10px] font-medium border border-red-200 flex items-center gap-1">
-                            <AlertTriangle className="w-2.5 h-2.5" />
-                            {contextPatient.allergies.length} allerg{contextPatient.allergies.length === 1 ? 'y' : 'ies'}
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-muted-foreground">NKDA</span>
-                        )}
-                        {contextPatient?.chronicConditions?.slice(0, 2).map((c: string) => (
-                          <span key={c} className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[10px] font-medium border border-amber-200">
-                            {c}
-                          </span>
-                        ))}
-                        {contextPatient?.chronicConditions?.length > 2 && (
-                          <span className="text-[10px] text-muted-foreground">+{contextPatient.chronicConditions.length - 2}</span>
-                        )}
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                            <span className="font-mono">{contextPatient?.patientId || 'PID N/A'}</span>
+                            <span>{patientAgeLabel(contextPatient)} ? {contextPatient?.gender || 'N/A'}</span>
+                            {selectedVisit && <span className="font-mono">{selectedVisit.visitNumber}</span>}
+                            {selectedVisit && <span className="capitalize">{statusLabel(selectedVisit.status)}</span>}
+                            <span>Wallet: Le {selectedWalletBalance.toLocaleString()}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                      <span className="text-xs font-mono text-muted-foreground">Le {selectedWalletBalance.toLocaleString()}</span>
-                      {selectedVisit ? (
-                        <>
-                          <Badge variant="outline" className="text-[10px]">{selectedVisit.visitNumber}</Badge>
-                          <Badge className={cn("text-[10px]", visitStatusTone(selectedVisit.status))}>{statusLabel(selectedVisit.status)}</Badge>
-                        </>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px]">No active visit</Badge>
-                      )}
-                      {isReadOnly && (
-                        <Badge className="text-[10px] bg-amber-500 hover:bg-amber-500 text-white">View-only</Badge>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Read-only banner */}
-                  {/* Read-only banner */}
-                  {isReadOnly && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-xs text-amber-800">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                        <span>
-                          {searchedPatient
-                            ? 'View-only mode — no active visit from triage. You can order labs/prescriptions and view history, but clinical notes cannot be saved.'
-                            : 'View-only mode — accept this patient from the queue to enable clinical documentation.'}
-                        </span>
-                      </div>
-                      {searchedPatient && (
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setSearchedPatient(null); setSelectedVisit(null); }}>
-                          Close
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1 xl:pb-0">
+                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!contextPatient}>
+                          <FlaskConical className="w-3.5 h-3.5" /> Order Lab
                         </Button>
-                      )}
-                    </div>
-                  )}
-
-                  {consultationPaymentBlocksWriting && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-xs text-red-800">
-                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
-                        <span>
-                          Consultation fee has not been paid. You can view the chart and order labs/prescriptions, but clinical notes cannot be saved until payment is received.
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* C1: Unsaved changes banner */}
-                  {isDirty && canWriteConsultation && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-xs text-amber-800">
-                        <AlertTriangle className="w-3.5 h-3.5" />
-                        <span className="font-medium">You have unsaved changes</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => { setIsDirty(false); toast.info('Changes discarded'); }}>Discard</Button>
-                        <Button size="sm" className="h-7 text-xs bg-amber-600 hover:bg-amber-700 text-white" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending}>
-                          {updateVisit.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />} Save Draft
+                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }} disabled={!contextPatient}>
+                          <Pill className="w-3.5 h-3.5" /> Prescribe
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" onClick={() => setTreatmentPlanOpen(true)} disabled={!contextPatient}>
+                          <ClipboardList className="w-3.5 h-3.5" /> Treatment Plan
+                        </Button>
+                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" onClick={() => { setReferralOpen(true); setReferralForm({ specialistId: '', reason: '', notes: '' }); }} disabled={!selectedVisit}>
+                          <Send className="w-3.5 h-3.5" /> Refer
                         </Button>
                       </div>
                     </div>
+                  </section>
+
+                  {(selectedVisit?.triageAlert || consultationPaymentBlocksWriting || (isDirty && canWriteConsultation)) && (
+                    <div className="border-b border-border bg-white px-4 md:px-5 py-2">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        {selectedVisit?.triageAlert && (
+                          <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1 font-medium text-red-700">
+                            <AlertCircle className="w-3.5 h-3.5" /> {selectedVisit.triageAlert}
+                          </span>
+                        )}
+                        {consultationPaymentBlocksWriting && (
+                          <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1 font-medium text-red-700">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Consultation fee unpaid
+                          </span>
+                        )}
+                        {isDirty && canWriteConsultation && (
+                          <span className="inline-flex items-center gap-1.5 rounded-md bg-amber-50 px-2 py-1 font-medium text-amber-700">
+                            <AlertTriangle className="w-3.5 h-3.5" /> Unsaved changes
+                          </span>
+                        )}
+                      </div>
+                    </div>
                   )}
 
-                  {/* Tabs */}
-                  <Tabs value={activeTab} onValueChange={(val) => guardNavigation(() => setActiveTab(val), 'tab', val)} className="w-full flex flex-col flex-1">
-                    <div className="border-b border-border bg-white rounded-t-xl overflow-x-auto">
-                      <TabsList className="bg-transparent h-auto p-0 min-w-max px-4">
-                        <TabsTrigger value="soap" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-sm">Consult</TabsTrigger>
-                        <TabsTrigger value="lab-results" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none relative text-sm">
-                          Results
-                          {labResults.length > 0 && (
-                            <Badge className="ml-1.5 h-4 min-w-4 text-[10px]">{labResults.length}</Badge>
-                          )}
-                        </TabsTrigger>
-                        <TabsTrigger value="timeline" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none text-sm">Timeline</TabsTrigger>
-                      </TabsList>
-                    </div>
+                  <div className="grid flex-1 min-h-0 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] bg-white">
+                    <section className="min-w-0 border-r border-border/80">
+                      <Tabs value={activeTab} onValueChange={(val) => guardNavigation(() => setActiveTab(val), 'tab', val)} className="flex h-full flex-col">
+                        <div className="border-b border-border px-4 md:px-5">
+                          <TabsList className="h-11 bg-transparent p-0">
+                            <TabsTrigger value="soap" className="rounded-none border-b-2 border-transparent px-0 mr-6 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Consult</TabsTrigger>
+                            <TabsTrigger value="lab-results" className="rounded-none border-b-2 border-transparent px-0 mr-6 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">
+                              Results
+                              {labResults.length > 0 && <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{labResults.length}</span>}
+                            </TabsTrigger>
+                            <TabsTrigger value="timeline" className="rounded-none border-b-2 border-transparent px-0 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Timeline</TabsTrigger>
+                          </TabsList>
+                        </div>
 
-                    {/* Consult Tab — Stitch Layout */}
-                    <TabsContent value="soap" className="p-6 mt-0">
-                      <div className="flex flex-col gap-5">
-                        {/* Triage Vitals - Auto-populated from nurse triage */}
-                        {(selectedVisit?.temperature || selectedVisit?.bloodPressure || selectedVisit?.heartRate || selectedVisit?.triagePriority) && (
-                          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-                            <h4 className="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2 flex items-center gap-2">
-                              <Activity className="w-4 h-4" />
-                              Nurse Triage
-                            </h4>
-                            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2 text-xs">
-                              {selectedVisit.temperature && <div><span className="text-muted-foreground">Temp:</span> <span className="font-medium">{selectedVisit.temperature} C</span></div>}
-                              {selectedVisit.bloodPressure && <div><span className="text-muted-foreground">BP:</span> <span className="font-medium">{selectedVisit.bloodPressure}</span></div>}
-                              {selectedVisit.heartRate && <div><span className="text-muted-foreground">HR:</span> <span className="font-medium">{selectedVisit.heartRate} bpm</span></div>}
-                              {selectedVisit.respiratoryRate && <div><span className="text-muted-foreground">RR:</span> <span className="font-medium">{selectedVisit.respiratoryRate}/min</span></div>}
-                              {selectedVisit.weight && <div><span className="text-muted-foreground">Weight:</span> <span className="font-medium">{selectedVisit.weight} kg</span></div>}
-                              {selectedVisit.height && <div><span className="text-muted-foreground">Height:</span> <span className="font-medium">{selectedVisit.height} cm</span></div>}
-                              {selectedVisit.oxygenSaturation && <div><span className="text-muted-foreground">SpO2:</span> <span className="font-medium">{selectedVisit.oxygenSaturation}%</span></div>}
-                              {selectedVisit.triagePriority && (
-                                <div>
-                                  <span className="text-muted-foreground">Priority:</span>{' '}
-                                  <Badge variant={selectedVisit.triagePriority.includes('emergency') || selectedVisit.triagePriority.includes('urgent') ? 'destructive' : 'outline'} className="text-[10px] capitalize">
-                                    {selectedVisit.triagePriority.replace('esi_', 'ESI ')}
-                                  </Badge>
+                        <TabsContent value="soap" className="m-0 flex-1 overflow-y-auto p-4 md:p-5">
+                          <div className="mx-auto max-w-5xl space-y-5">
+                            {(selectedVisit?.temperature || selectedVisit?.bloodPressure || selectedVisit?.heartRate || selectedVisit?.oxygenSaturation || selectedVisit?.triagePriority) && (
+                              <div className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+                                  <span className="font-semibold text-blue-800">Triage</span>
+                                  {selectedVisit.temperature && <span><span className="text-muted-foreground">Temp</span> {selectedVisit.temperature} C</span>}
+                                  {selectedVisit.bloodPressure && <span><span className="text-muted-foreground">BP</span> {selectedVisit.bloodPressure}</span>}
+                                  {selectedVisit.heartRate && <span><span className="text-muted-foreground">HR</span> {selectedVisit.heartRate}</span>}
+                                  {selectedVisit.respiratoryRate && <span><span className="text-muted-foreground">RR</span> {selectedVisit.respiratoryRate}</span>}
+                                  {selectedVisit.oxygenSaturation && <span><span className="text-muted-foreground">SpO2</span> {selectedVisit.oxygenSaturation}%</span>}
+                                  {selectedVisit.triagePriority && <span className="capitalize text-blue-800">{selectedVisit.triagePriority.replace('esi_', 'ESI ').replace(/_/g, ' ')}</span>}
+                                </div>
+                                {selectedVisit.triageNotes && <p className="mt-1 text-xs italic text-blue-700">{selectedVisit.triageNotes}</p>}
+                              </div>
+                            )}
+
+                            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+                              <div className="space-y-4">
+                                <div className="space-y-2">
+                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Chief Complaint</Label>
+                                  <Textarea value={chiefComplaintForm} onChange={(e) => setChiefComplaintForm(e.target.value)} placeholder="What brings the patient in today?" rows={2} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Subjective</Label>
+                                  <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({ ...soapForm, subjective: e.target.value })} placeholder="Patient history, symptoms, relevant negatives..." rows={8} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Objective</Label>
+                                  <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({ ...soapForm, objective: e.target.value })} placeholder="Exam findings, observations, reviewed results..." rows={6} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                </div>
+                              </div>
+
+                              <div className="space-y-4">
+                                <div className="grid grid-cols-2 gap-2 rounded-lg border border-border/70 bg-muted/20 p-3">
+                                  {[
+                                    { key: 'temperature', label: 'Temp', placeholder: '36.5', type: 'number' },
+                                    { key: 'bloodPressure', label: 'BP', placeholder: '120/80', type: 'text' },
+                                    { key: 'heartRate', label: 'HR', placeholder: '72', type: 'number' },
+                                    { key: 'respiratoryRate', label: 'RR', placeholder: '16', type: 'number' },
+                                    { key: 'weight', label: 'Weight', placeholder: '70', type: 'number' },
+                                    { key: 'oxygenSaturation', label: 'SpO2', placeholder: '98', type: 'number' },
+                                  ].map((field) => (
+                                    <div key={field.key}>
+                                      <Label className="text-[10px] text-muted-foreground">{field.label}</Label>
+                                      <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(e) => setVitalsForm({ ...vitalsForm, [field.key]: e.target.value })} placeholder={field.placeholder} className={cn('mt-1 h-8 bg-white text-xs font-mono', vitalsErrors[field.key] && 'border-red-400 focus-visible:ring-red-400')} disabled={isReadOnly || !canWriteConsultation} />
+                                      {vitalsErrors[field.key] && <p className="mt-0.5 text-[10px] text-red-500">{vitalsErrors[field.key]}</p>}
+                                    </div>
+                                  ))}
+                                  <div className="col-span-2">
+                                    <Label className="text-[10px] text-muted-foreground">Priority Override</Label>
+                                    <Select value={triageOverride || selectedVisit?.triagePriority || ''} onValueChange={setTriageOverride} disabled={isReadOnly || !canWriteConsultation}>
+                                      <SelectTrigger className="mt-1 h-8 bg-white text-xs"><SelectValue placeholder="Set priority" /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="esi_1_emergency">ESI 1 - Emergency</SelectItem>
+                                        <SelectItem value="esi_2_urgent">ESI 2 - Urgent</SelectItem>
+                                        <SelectItem value="esi_3_urgent">ESI 3 - Urgent</SelectItem>
+                                        <SelectItem value="esi_4_less_urgent">ESI 4 - Less Urgent</SelectItem>
+                                        <SelectItem value="esi_5_non_urgent">ESI 5 - Non Urgent</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Diagnosis</Label>
+                                  <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({ ...soapForm, diagnosis: e.target.value })} placeholder="Primary diagnosis" className="h-9 border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Assessment</Label>
+                                  <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({ ...soapForm, assessment: e.target.value })} placeholder="Clinical impression and differential..." rows={5} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Plan</Label>
+                                  <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({ ...soapForm, plan: e.target.value })} placeholder="Treatment plan, follow-up, counselling..." rows={5} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent value="lab-results" className="m-0 flex-1 overflow-y-auto p-4 md:p-5">
+                          {selectedVisit ? (
+                            <div className="mx-auto max-w-5xl space-y-3">
+                              <div className="flex items-center justify-between">
+                                <h3 className="text-sm font-semibold">Lab Results</h3>
+                                {sortedLabResults.length > 0 && <span className="text-xs text-muted-foreground">{sortedLabResults.length} result{sortedLabResults.length !== 1 ? 's' : ''}</span>}
+                              </div>
+                              {sortedLabResults.length === 0 ? (
+                                <div className="py-14 text-center text-sm text-muted-foreground">No lab results yet for this visit.</div>
+                              ) : (
+                                <div className="divide-y rounded-lg border border-border bg-white">
+                                  {sortedLabResults.map((result: LabResult) => (
+                                    <div key={result._id} className="flex items-center justify-between gap-4 px-4 py-3">
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <p className="truncate text-sm font-medium">{result.testName}</p>
+                                          <span className="font-mono text-[10px] text-muted-foreground">{result.testCode}</span>
+                                        </div>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">Ref: {result.referenceRange || result.reference_range || 'N/A'}</p>
+                                      </div>
+                                      <div className="flex items-center gap-3 shrink-0">
+                                        <span className="text-sm font-semibold">{result.value}{result.unit ? ' ' + result.unit : ''}</span>
+                                        <Badge variant="outline" className={cn('text-[10px]', getFlagColor(result.flag))}>{getFlagLabel(result.flag)}</Badge>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
                             </div>
-                            {selectedVisit.triageNotes && (
-                              <p className="text-xs text-blue-700 dark:text-blue-400 mt-2 italic">
-                                Nurse notes: {selectedVisit.triageNotes}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Rapid Test Results (malaria/typhoid) */}
-                        {selectedVisit?.rapidTestResults && selectedVisit.rapidTestResults.length > 0 && (
-                          <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-lg p-4">
-                            <h4 className="text-sm font-semibold text-amber-900 dark:text-amber-300 mb-2 flex items-center gap-2">
-                              <TestTube className="w-4 h-4" />
-                              Rapid Test Results
-                            </h4>
-                            <div className="space-y-2">
-                              {[...selectedVisit.rapidTestResults].reverse().map((r: any, i: number) => (
-                                <div key={i} className={cn('rounded-md border p-2.5', r.result === 'positive' ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200')}>
-                                  <div className="flex items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="text-xs font-semibold capitalize text-amber-900">{r.testType}</span>
-                                      <Badge variant={r.result === 'positive' ? 'destructive' : 'default'} className="text-[10px]">
-                                        {r.result === 'positive' ? 'POSITIVE' : 'NEGATIVE'}
-                                      </Badge>
-                                      {r.parasiteCount != null && (
-                                        <span className="text-xs text-amber-900">Parasite load: <span className="font-semibold">{r.parasiteCount}/µL</span></span>
-                                      )}
-                                      {r.antigen && <span className="text-xs text-amber-900">Antigen: {r.antigen}</span>}
-                                    </div>
-                                    <span className="text-[10px] text-amber-700">
-                                      {new Date(r.performedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                    </span>
-                                  </div>
-                                  {r.notes && <p className="text-xs text-amber-800 italic mt-1">{r.notes}</p>}
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Subjective Card */}
-                        <div className="bg-white border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                          <div className="bg-muted/30 px-4 py-2.5 border-b border-border flex justify-between items-center">
-                            <h3 className="text-sm font-semibold flex items-center gap-2">
-                              <span className="material-symbols-outlined text-[18px] text-primary">chat_bubble</span> Subjective
-                            </h3>
-                          </div>
-                          <div className="p-4">
-                            <Label className="text-[11px] text-muted-foreground font-semibold">Chief Complaint</Label>
-                            <Input
-                              value={chiefComplaintForm}
-                              onChange={(e) => setChiefComplaintForm(e.target.value)}
-                              placeholder="e.g., Fever and chills x 3 days"
-                              className="mt-1"
-                              disabled={isReadOnly || !canWriteConsultation}
-                            />
-                            <Label className="text-[11px] text-muted-foreground font-semibold mt-3 block">Patient History (HPI)</Label>
-                            <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({...soapForm, subjective: e.target.value})} placeholder="Patient's description of symptoms, history of present illness..." rows={4} className="mt-1 resize-y text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                          </div>
-                        </div>
-
-                        {/* Objective Card */}
-                        <div className="bg-white border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                          <div className="bg-muted/30 px-4 py-2.5 border-b border-border flex justify-between items-center">
-                            <h3 className="text-sm font-semibold flex items-center gap-2">
-                              <span className="material-symbols-outlined text-[18px] text-primary">monitor_heart</span> Objective
-                            </h3>
-                          </div>
-                          <div className="p-4 flex flex-col gap-3">
-                              <div className="grid grid-cols-2 gap-2">
-                                {[
-                                  { key: 'temperature', label: 'Temp (C)', placeholder: '36.5', type: 'number', hint: '30-42' },
-                                  { key: 'bloodPressure', label: 'BP (mmHg)', placeholder: '120/80', type: 'text' },
-                                  { key: 'heartRate', label: 'HR (bpm)', placeholder: '72', type: 'number', hint: '20-300' },
-                                  { key: 'respiratoryRate', label: 'RR (/min)', placeholder: '16', type: 'number', hint: '5-60' },
-                                  { key: 'weight', label: 'Weight (kg)', placeholder: '70', type: 'number', hint: '0.5-300' },
-                                  { key: 'height', label: 'Height (cm)', placeholder: '170', type: 'number', hint: '30-250' },
-                                  { key: 'oxygenSaturation', label: 'SpO2 (%)', placeholder: '98', type: 'number', hint: '0-100' },
-                                ].map((field) => (
-                                  <div key={field.key}>
-                                    <Label className="text-[10px] text-muted-foreground">{field.label}</Label>
-                                    <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(e) => setVitalsForm({ ...vitalsForm, [field.key]: e.target.value })} placeholder={field.placeholder} className={cn("mt-1 h-8 text-xs font-mono", vitalsErrors[field.key] && "border-red-400 focus-visible:ring-red-400")} disabled={isReadOnly || !canWriteConsultation} />
-                                    {vitalsErrors[field.key] ? (
-                                      <p className="text-[10px] text-red-500 mt-0.5">{vitalsErrors[field.key]}</p>
-                                    ) : field.hint ? (
-                                      <p className="text-[10px] text-muted-foreground mt-0.5">{field.hint}</p>
-                                    ) : null}
-                                  </div>
-                                ))}
-                              </div>
-                              {/* Triage Priority Override */}
-                              <div>
-                                <Label className="text-[10px] text-muted-foreground">Triage Priority (Override)</Label>
-                                <Select value={triageOverride || selectedVisit?.triagePriority || ''} onValueChange={setTriageOverride} disabled={isReadOnly || !canWriteConsultation}>
-                                  <SelectTrigger className="mt-1 h-8 text-xs">
-                                    <SelectValue placeholder="Set priority" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="esi_1_emergency">ESI 1 - Emergency</SelectItem>
-                                    <SelectItem value="esi_2_urgent">ESI 2 - Urgent</SelectItem>
-                                    <SelectItem value="esi_3_urgent">ESI 3 - Urgent</SelectItem>
-                                    <SelectItem value="esi_4_less_urgent">ESI 4 - Less Urgent</SelectItem>
-                                    <SelectItem value="esi_5_non_urgent">ESI 5 - Non Urgent</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <Label className="text-[11px] text-muted-foreground font-semibold">Doctor Triage Notes</Label>
-                              <Textarea
-                                value={doctorTriageNotes}
-                                onChange={(e) => setDoctorTriageNotes(e.target.value)}
-                                placeholder="Doctor's triage addendum or override rationale..."
-                                rows={2}
-                                className="resize-y text-sm"
-                                disabled={isReadOnly || !canWriteConsultation}
-                              />
-                              <Label className="text-[11px] text-muted-foreground font-semibold">Exam Notes</Label>
-                              <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({...soapForm, objective: e.target.value})} placeholder="Physical exam findings, vitals, observations..." rows={3} className="resize-y text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                            </div>
-                        </div>
-
-                        {/* Assessment & Plan Card */}
-                        <div className="bg-white border border-border rounded-xl overflow-hidden shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
-                          <div className="bg-muted/30 px-4 py-2.5 border-b border-border flex justify-between items-center">
-                            <h3 className="text-sm font-semibold flex items-center gap-2">
-                              <span className="material-symbols-outlined text-[18px] text-primary">fact_check</span> Assessment & Plan
-                            </h3>
-                          </div>
-                          <div className="p-4 flex flex-col gap-3">
-                            <Label className="text-[11px] text-muted-foreground font-semibold">Diagnosis</Label>
-                            <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({...soapForm, diagnosis: e.target.value})} placeholder="Primary diagnosis" className="h-8 text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                            <Label className="text-[11px] text-muted-foreground font-semibold">Clinical Assessment</Label>
-                            <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({...soapForm, assessment: e.target.value})} placeholder="Clinical impression, differential diagnosis..." rows={3} className="resize-y text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                            <Label className="text-[11px] text-muted-foreground font-semibold">Treatment Plan Notes</Label>
-                            <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({...soapForm, plan: e.target.value})} placeholder="Treatment plan, medications, follow-up..." rows={3} className="resize-y text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                            {selectedVisit?.roomType === 'emergency' && (
-                              <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-center gap-2">
-                                <AlertTriangle className="w-4 h-4 text-red-600" />
-                                <span className="text-sm font-semibold text-red-700 dark:text-red-300">Emergency - {selectedVisit.room || 'Treatment Room'}</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Treatment Plans */}
-                        <DoctorTreatmentPlanCard
-                          visitId={selectedVisit?._id || selectedVisit?.id}
-                          patientId={!selectedVisit ? contextPatient?._id : undefined}
-                          patientName={!selectedVisit ? [contextPatient?.firstName, contextPatient?.lastName].filter(Boolean).join(' ').trim() : undefined}
-                          canEdit={true}
-                        />
-
-                        {/* Compact Action Buttons Row */}
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}>
-                            <FlaskConical className="w-3.5 h-3.5" /> Order Labs
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }}>
-                            <Pill className="w-3.5 h-3.5" /> Prescribe
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setTreatmentPlanOpen(true)}>
-                            <ClipboardList className="w-3.5 h-3.5" /> Treatment Plan
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setReferralOpen(true)} disabled={!selectedVisit}>
-                            <Send className="w-3.5 h-3.5" /> Refer
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => setAdmitOpen(true)} disabled={!selectedVisit}>
-                            <BedDouble className="w-3.5 h-3.5" /> Admit
-                          </Button>
-                        </div>
-
-                        {/* Pending Orders Inline */}
-                        {(currentVisitOrders.length > 0 || currentVisitPrescriptions.length > 0) && (
-                          <div className="border border-border border-dashed rounded-lg p-3 bg-muted/20">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-2">Pending Orders</p>
-                            <div className="space-y-1.5">
-                              {currentVisitOrders.map((order: any) => (
-                                <div key={order._id || order.id} className="flex items-center justify-between gap-3 p-2 bg-white border border-border rounded min-w-0">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <FlaskConical className="w-3.5 h-3.5 text-primary shrink-0" />
-                                    <span className="text-xs font-medium truncate">{(order.order_tests || order.tests || []).map((t: any) => t.testName || t.testCode).join(', ')}</span>
-                                  </div>
-                                  <Badge variant={(order.paymentStatus || order.payment_status) === 'paid' ? 'default' : 'outline'} className="text-[9px] shrink-0">{(order.paymentStatus || order.payment_status || 'pending')}</Badge>
-                                </div>
-                              ))}
-                              {currentVisitPrescriptions.map((rx: any) => (
-                                <div key={rx._id} className="flex items-center justify-between gap-3 p-2 bg-white border border-border rounded min-w-0">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <Pill className="w-3.5 h-3.5 text-primary shrink-0" />
-                                    <span className="text-xs font-medium truncate">{(rx.items || []).map((i: any) => `${i.medicationName} ${i.dosage || ''}`).join(', ')}</span>
-                                  </div>
-                                  <Badge variant={rx.isPaid ? 'default' : 'secondary'} className="text-[9px] shrink-0">{rx.isPaid ? 'Paid' : 'Pending'}</Badge>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </TabsContent>
-
-                    {/* Lab Results Tab */}
-                    <TabsContent value="lab-results" className="p-6 mt-0">
-                      {selectedVisit ? (
-                        <div className="flex flex-col gap-4">
-                          <div className="flex items-center justify-between">
-                            <h3 className="text-sm font-semibold flex items-center gap-2">
-                              <FlaskConical className="w-4 h-4 text-green-600" />
-                              Lab Results — {patientDisplayName(selectedVisit)}
-                            </h3>
-                            {sortedLabResults.length > 0 && (
-                              <span className="text-xs text-muted-foreground">{sortedLabResults.length} result{sortedLabResults.length !== 1 ? 's' : ''}</span>
-                            )}
-                          </div>
-                          {sortedLabResults.length === 0 ? (
-                            <div className="text-center py-12 text-muted-foreground">
-                              <FlaskConical className="w-10 h-10 mx-auto mb-3 opacity-30" />
-                              <p className="text-sm">No lab results yet for this visit.</p>
-                              <p className="text-xs mt-1">Results will appear here once the lab releases them.</p>
-                            </div>
                           ) : (
-                            <div className="space-y-2">
-                              {sortedLabResults.map((result: LabResult) => (
-                                <div key={result._id} className={cn('rounded-lg border p-3 flex items-center justify-between', getFlagColor(result.flag))}>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                      <p className="text-sm font-medium truncate">{result.testName}</p>
-                                      <span className="text-[10px] text-muted-foreground font-mono">{result.testCode}</span>
-                                    </div>
-                                    <div className="flex items-center gap-3 mt-0.5">
-                                      <span className="text-lg font-bold">{result.value}{result.unit ? ` ${result.unit}` : ''}</span>
-                                      {(result.referenceRange || result.reference_range) && (
-                                        <span className="text-[10px] text-muted-foreground">Ref: {result.referenceRange || result.reference_range}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <Badge variant="outline" className={cn('text-[10px] capitalize shrink-0 ml-2', getFlagColor(result.flag))}>
-                                    {getFlagLabel(result.flag)}
-                                  </Badge>
-                                </div>
-                              ))}
-                            </div>
+                            <div className="py-12 text-center text-sm text-muted-foreground">Select a patient to view lab results</div>
                           )}
+                        </TabsContent>
+
+                        <TabsContent value="timeline" className="m-0 flex-1 overflow-y-auto">
+                          {patientId ? (
+                            <PatientTimeline patientId={patientId} patientChart={patientChart} patientVisits={patientVisits} patientOrders={currentVisitOrders} patientPrescriptions={currentVisitPrescriptions} chartLoading={chartLoading} />
+                          ) : (
+                            <div className="py-12 text-center text-sm text-muted-foreground">Select a patient to view timeline</div>
+                          )}
+                        </TabsContent>
+                      </Tabs>
+                    </section>
+
+                    <aside className="bg-slate-50/60 px-4 py-4 xl:h-[calc(100vh-157px)] xl:overflow-y-auto">
+                      <div className="space-y-5">
+                        <div>
+                          <div className="mb-2 flex items-center justify-between">
+                            <h3 className="text-sm font-semibold">Encounter</h3>
+                            {selectedVisit && <span className="text-[10px] capitalize text-muted-foreground">{statusLabel(selectedVisit.status)}</span>}
+                          </div>
+                          <Button className="w-full justify-center bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
+                            {completeVisit.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                            Complete & Next
+                          </Button>
+                          {closureBlockers.length > 0 && <p className="mt-2 text-xs text-amber-700">{closureBlockers[0]}</p>}
                         </div>
-                      ) : (
-                        <div className="text-center py-12 text-muted-foreground text-sm">Select a patient to view lab results</div>
-                      )}
-                    </TabsContent>
 
-                    {/* Timeline Tab */}
-                    <TabsContent value="timeline" className="p-0 mt-0">
-                      {patientId ? (
-                        <PatientTimeline
-                          patientId={patientId}
-                          patientChart={patientChart}
-                          patientVisits={patientVisits}
-                          patientOrders={currentVisitOrders}
-                          patientPrescriptions={currentVisitPrescriptions}
-                          chartLoading={chartLoading}
-                        />
-                      ) : (
-                        <div className="text-center py-12 text-muted-foreground text-sm">Select a patient to view timeline</div>
-                      )}
-                    </TabsContent>
-                  </Tabs>
+                        <div className="border-t border-border pt-4">
+                          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Needs attention</h4>
+                          <div className="space-y-2 text-xs">
+                            {abnormalLabResults[0] && (
+                              <button className="flex w-full items-center justify-between gap-2 rounded-md bg-red-50 px-2 py-2 text-left text-red-700" onClick={() => setActiveTab('lab-results')}>
+                                <span className="truncate">Critical/abnormal: {abnormalLabResults[0].testName}</span>
+                                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                              </button>
+                            )}
+                            {consultationPaymentBlocksWriting && <div className="rounded-md bg-red-50 px-2 py-2 text-red-700">Consultation fee unpaid</div>}
+                            {currentVisitPrescriptions.some((rx: any) => !rx.isPaid) && <div className="rounded-md bg-amber-50 px-2 py-2 text-amber-700">Prescription unpaid</div>}
+                            {closureBlockers.length === 0 && abnormalLabResults.length === 0 && !consultationPaymentBlocksWriting && !currentVisitPrescriptions.some((rx: any) => !rx.isPaid) && <div className="text-muted-foreground">No blocking items.</div>}
+                          </div>
+                        </div>
 
-                  {/* Sticky Action Bar */}
-                  <div className="sticky bottom-0 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 px-4 md:px-6 py-3 rounded-b-xl shadow-[0_-2px_10px_rgba(0,0,0,0.03)]">
-                    {closureBlockers.length > 0 && (
-                      <div className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-1.5 text-[11px] text-amber-800">
-                        {closureBlockers.length === 1 ? closureBlockers[0] : `${closureBlockers.length} blocker(s) before closing`}
+                        <div className="border-t border-border pt-4">
+                          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Orders</h4>
+                          <div className="space-y-2 text-xs">
+                            {currentVisitOrders.slice(0, 3).map((order: any) => (
+                              <div key={order._id || order.id} className="flex items-center justify-between gap-2">
+                                <span className="truncate">{(order.order_tests || order.tests || []).map((t: any) => t.testName || t.testCode).join(', ') || statusLabel(order.orderType || order.order_type)}</span>
+                                <span className="shrink-0 capitalize text-muted-foreground">{statusLabel(order.status || order.paymentStatus || order.payment_status)}</span>
+                              </div>
+                            ))}
+                            {currentVisitPrescriptions.slice(0, 3).map((rx: any) => (
+                              <div key={rx._id} className="flex items-center justify-between gap-2">
+                                <span className="truncate">{(rx.items || []).map((i: any) => i.medicationName).join(', ') || rx.prescriptionNumber}</span>
+                                <span className="shrink-0 text-muted-foreground">{rx.isPaid ? statusLabel(rx.status) : 'unpaid'}</span>
+                              </div>
+                            ))}
+                            {currentVisitOrders.length === 0 && currentVisitPrescriptions.length === 0 && <div className="text-muted-foreground">No active orders.</div>}
+                          </div>
+                        </div>
+
+                        <div className="border-t border-border pt-4">
+                          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Handoff</h4>
+                          <div className="flex items-center justify-between gap-3 text-xs">
+                            <span className="text-muted-foreground">{selectedVisit?.status === 'admitted' ? 'Admitted' : 'Not admitted'}</span>
+                            <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAdmitOpen(true)} disabled={!selectedVisit}>Admit</Button>
+                          </div>
+                        </div>
+
+                        <div className="border-t border-border pt-4">
+                          <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Closure checklist</h4>
+                          <div className="space-y-1.5 text-xs">
+                            {[
+                              { label: 'Diagnosis entered', done: !!soapForm.diagnosis },
+                              { label: 'SOAP saved', done: !isDirty },
+                              { label: 'No blockers', done: closureBlockers.length === 0 },
+                              { label: 'Results reviewed', done: abnormalLabResults.length === 0 || activeTab === 'lab-results' },
+                            ].map((item) => (
+                              <div key={item.label} className="flex items-center justify-between gap-2">
+                                <span className={item.done ? 'text-muted-foreground' : 'text-foreground'}>{item.label}</span>
+                                <span className={cn('h-2 w-2 rounded-full', item.done ? 'bg-emerald-500' : 'bg-amber-400')} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
-                    )}
-                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        {selectedVisit ? (
-                          <>
-                            <span className="font-medium text-foreground">{statusLabel(selectedVisit.status)}</span>
-                            {selectedVisit.room && <span className="px-1.5 py-0.5 rounded bg-muted text-[10px]">Room: {selectedVisit.room}</span>}
-                            {isDirty && !isReadOnly && <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 text-[10px] font-medium">Unsaved</span>}
-                          </>
-                        ) : (
-                          <span className="font-medium text-amber-700">View-only patient chart</span>
-                        )}
+                    </aside>
+                  </div>
+
+                  <div className="sticky bottom-0 z-10 border-t bg-white/95 px-4 md:px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="text-xs text-muted-foreground">
+                        {isDirty ? <span className="font-medium text-amber-700">Unsaved changes</span> : <span>All changes saved</span>}
+                        {selectedVisit?.room && <span className="ml-3">Room: {selectedVisit.room}</span>}
                       </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Button size="sm" className="rounded-full" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending || isReadOnly || !canWriteConsultation}>
-                          {updateVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <Save className="w-3.5 h-3.5 mr-1.5" />}
-                          {isDirty ? 'Save (Ctrl+S)' : 'Save'}
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending || isReadOnly || !canWriteConsultation}>
+                          {updateVisit.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
+                          Save Draft
                         </Button>
-                        <Button size="sm" className="rounded-full bg-[#0d9488] hover:bg-[#0f766e] text-white" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
-                          {completeVisit.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5 mr-1.5" />}
+                        <Button size="sm" className="bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation}>
+                          {completeVisit.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="mr-2 h-3.5 w-3.5" />}
                           Complete & Next
                         </Button>
                       </div>
@@ -1678,7 +1454,6 @@ export default function DoctorDashboard() {
                   </div>
                 </>
               ) : (
-                /* Dashboard Home View */
                 <div className="flex-1 flex flex-col gap-6">
                   {/* Today's Stats */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
