@@ -8,7 +8,7 @@ export function PrinterStatusBadge() {
 
   if (!settings.thermal.enabled) {
     return (
-      <Link to="/admin/printer-settings">
+      <Link to="/admin/printers">
         <Badge variant="secondary" className="gap-1 cursor-pointer hover:bg-secondary/80">
           <Printer className="w-3 h-3" />
           Thermal Disabled

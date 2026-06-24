@@ -66,6 +66,7 @@ export default function VisitRegistration() {
   const [procedureType, setProcedureType] = useState('');
   const [wantsMalariaTest, setWantsMalariaTest] = useState(false);
   const [wantsTyphoidTest, setWantsTyphoidTest] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
 
   const { data: doctors = [] } = useDoctors();
   const specialistOptions = useMemo(
@@ -158,7 +159,7 @@ export default function VisitRegistration() {
         rapidTestsRequested: rapidTestsRequested.length > 0 ? rapidTestsRequested : undefined,
       });
 
-      await markConsultationPaid.mutateAsync({ visitId: visit._id || visit.id, paymentMethod: 'cash' });
+      await markConsultationPaid.mutateAsync({ visitId: visit._id || visit.id, paymentMethod });
       toast.success('Consultation payment confirmed. Patient sent to nurse vitals.');
       navigate(`/reception/visit-receipt?visitId=${visit._id || visit.id}`);
     } catch (error: any) {
@@ -420,6 +421,21 @@ export default function VisitRegistration() {
                     placeholder="Enter consultation fee"
                     min="0"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="paymentMethod">Payment Method</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select payment method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="orange_money">Orange Money</SelectItem>
+                      <SelectItem value="afrimoney">Afrimoney</SelectItem>
+                      <SelectItem value="wallet">Wallet</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

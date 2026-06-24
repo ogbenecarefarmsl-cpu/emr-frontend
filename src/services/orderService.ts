@@ -5,7 +5,8 @@ export const orderService = {
     const response = await api.get('/orders', {
       params: { patientId },
     });
-    return response.data;
+    const data = response.data;
+    return Array.isArray(data) ? data : data?.data || [];
   },
 
   async findById(id: string): Promise<any> {
@@ -13,11 +14,11 @@ export const orderService = {
     return response.data;
   },
 
-  async findByPatientDetailed(patientId: string): Promise<any> {
-    // Get orders with populated results
+  async findByPatientDetailed(patientId: string): Promise<any[]> {
     const response = await api.get('/orders', {
       params: { patientId, includeResults: true },
     });
-    return response.data;
+    const data = response.data;
+    return Array.isArray(data) ? data : data?.data || [];
   },
 };

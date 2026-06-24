@@ -116,11 +116,19 @@ export default function ReceptionDashboard() {
       .slice(0, 5);
   }, [readyToDispense]);
 
-  const { data: todayVisits = [] } = useQuery({
+  const { data: allVisits = [] } = useQuery({
     queryKey: ['visits', 'reception-today'],
-    queryFn: () => visitsAPI.getAll({ startDate: todayStr, endDate: todayStr, limit: 500 }),
+    queryFn: () => visitsAPI.getAll({}),
     staleTime: 15 * 1000,
   });
+
+  const todayVisits = useMemo(() => {
+    if (!Array.isArray(allVisits)) return [];
+    return allVisits.filter((v: any) => {
+      const created = v.createdAt || v.checkedInAt;
+      return created && formatLocalDate(new Date(created)) === todayStr;
+    });
+  }, [allVisits, todayStr]);
 
   const serviceTypeCounts = useMemo(() => {
     const c: Record<string, number> = {
@@ -276,7 +284,7 @@ export default function ReceptionDashboard() {
             <Wallet className="w-4 h-4 text-primary" />
             Daily Cash Summary
           </h3>
-          <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reconciliation')}>
+          <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reception/reconciliation')}>
             Full Reconciliation <ArrowRight className="w-3.5 h-3.5" />
           </Button>
         </div>

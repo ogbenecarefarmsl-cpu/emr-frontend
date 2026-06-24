@@ -6,11 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle, Wallet } from 'lucide-react';
+import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle } from 'lucide-react';
 import { prescriptionService } from '@/services/prescriptionService';
 
 export function PendingOrders() {
   const [activeTab, setActiveTab] = useState('all');
+  const [selectedMethods, setSelectedMethods] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
   const { data: allOrders = [], isLoading, refetch } = usePendingClinicalOrders();
   const { data: labOrders = [] } = usePendingClinicalOrders('lab');
@@ -157,30 +158,35 @@ export function PendingOrders() {
                     })}
                   </div>
                 </div>
-                <Button
-                  onClick={() => isPrescription ? handleMarkPrescriptionPaid(item._id || item.id) : handleMarkPaid(item._id || item.id)}
-                  disabled={markPaid.isPending || markPrescriptionPaid.isPending}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {(markPaid.isPending || markPrescriptionPaid.isPending) ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <>
-                      <CreditCard className="h-4 w-4 mr-1" />
-                      Pay Cash
-                    </>
-                  )}
-                </Button>
-                {!isPrescription && (
-                  <Button
-                    variant="outline"
-                    onClick={() => handleMarkPaid(item._id || item.id, 'wallet')}
-                    disabled={markPaid.isPending}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedMethods[`${isPrescription ? 'rx' : 'order'}-${item._id || item.id}`] || 'cash'}
+                    onChange={(e) => setSelectedMethods(prev => ({ ...prev, [`${isPrescription ? 'rx' : 'order'}-${item._id || item.id}`]: e.target.value }))}
+                    className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
-                    <Wallet className="h-4 w-4 mr-1" />
-                    Wallet
+                    <option value="cash">Cash</option>
+                    <option value="orange_money">Orange Money</option>
+                    <option value="afrimoney">Afrimoney</option>
+                    {!isPrescription && <option value="wallet">Wallet</option>}
+                  </select>
+                  <Button
+                    onClick={() => {
+                      const method = selectedMethods[`${isPrescription ? 'rx' : 'order'}-${item._id || item.id}`] || 'cash';
+                      isPrescription ? handleMarkPrescriptionPaid(item._id || item.id, method) : handleMarkPaid(item._id || item.id, method);
+                    }}
+                    disabled={markPaid.isPending || markPrescriptionPaid.isPending}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {(markPaid.isPending || markPrescriptionPaid.isPending) ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <>
+                        <CreditCard className="h-4 w-4 mr-1" />
+                        Pay
+                      </>
+                    )}
                   </Button>
-                )}
+                </div>
               </div>
             </div>
           );

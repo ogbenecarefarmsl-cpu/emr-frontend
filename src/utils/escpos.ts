@@ -26,7 +26,7 @@ export interface ReceiptData {
   discountType: 'percentage' | 'fixed';
   total: number;
   amountPaid: number;
-  paymentMethod: 'cash' | 'card' | 'mobile-money';
+  paymentMethod: 'cash' | 'orange_money' | 'afrimoney' | 'wallet';
   paymentDate: string;
   cashier: string;
   collectionDate?: string;

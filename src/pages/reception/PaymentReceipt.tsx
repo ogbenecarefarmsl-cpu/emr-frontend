@@ -75,7 +75,7 @@ export default function PaymentReceipt() {
     discountType: order.discountType || 'fixed',
     total: order.total || 0,
     amountPaid: order.total || 0,
-    paymentMethod: (order.payment_method === 'orange_money' || order.payment_method === 'afrimoney') ? 'mobile-money' : (order.payment_method || 'cash') as 'cash' | 'card' | 'mobile-money',
+    paymentMethod: (order.paymentMethod || order.payment_method || 'cash') as 'cash' | 'orange_money' | 'afrimoney' | 'wallet',
     paymentDate: (() => { const d = new Date(order.created_at || order.createdAt || ''); return isValid(d) ? d.toISOString() : new Date().toISOString(); })(),
     cashier: profile?.fullName || 'Cashier',
     collectionDate: (() => { const raw = order.collection_date || order.collectionDate; if (!raw) return undefined; const d = new Date(raw); return isValid(d) ? format(d, 'yyyy-MM-dd HH:mm') : undefined; })(),
@@ -265,7 +265,7 @@ export default function PaymentReceipt() {
         <div className="info-row">
           <span className="info-label">Payment Method:</span>
           <span className="info-value" style={{ textTransform: 'uppercase' }}>
-            {receiptData.paymentMethod.replace('-', ' ')}
+            {receiptData.paymentMethod.replace(/_/g, ' ')}
           </span>
         </div>
         <div className="info-row">

@@ -211,7 +211,7 @@ export function RoomWorkBoard({ mode }: RoomWorkBoardProps) {
                         <div className="flex flex-col items-end gap-1 flex-shrink-0">
                           <Badge variant={STATUS_BADGE_VARIANT[activeStatus] || 'outline'}>{STATUS_LABELS[activeStatus]}</Badge>
                           {admission && (
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => navigate(`/nurse/admission/${admission._id}`)}>
+                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => navigate('/nurse/admissions')}>
                               <Stethoscope className="w-3 h-3 mr-1" /> Workspace
                             </Button>
                           )}
