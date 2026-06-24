@@ -1,6 +1,6 @@
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
-import { useSearchPatients } from '@/hooks/usePatients';
+import { useSearchPatients, useDepositWallet } from '@/hooks/usePatients';
 import { usePaymentStats, useDailyIncome, useOutstandingBalances } from '@/hooks/useOrders';
 import { useRealtimeOrders } from '@/hooks/useRealtimeOrders';
 import { useRealtimePatients } from '@/hooks/useRealtimePatients';
@@ -10,9 +10,11 @@ import { PendingOrders } from '@/components/reception/PendingOrders';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getPatientFullName } from '@/utils/orderHelpers';
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   UserPlus,
   Users,
@@ -29,14 +31,16 @@ import {
   Phone,
   Scissors,
   UserCog,
+  AlertTriangle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { prescriptionService } from '@/services/prescriptionService';
-import { visitsAPI } from '@/services/api';
+import { visitsAPI, ordersAPI } from '@/services/api';
 import { useDoctorQueue, useVisitStats } from '@/hooks/useVisits';
 import { useExpenditureSummary } from '@/hooks/useExpenditures';
 import { cn } from '@/lib/utils';
 import { Pill } from 'lucide-react';
+import { toast } from 'sonner';
 
 const formatLocalDate = (date: Date) => {
   const year = date.getFullYear();
@@ -97,6 +101,11 @@ export default function ReceptionDashboard() {
   const { data: dailyIncome = [] } = useDailyIncome(todayStr, todayStr);
   const { data: outstandingBalances = [] } = useOutstandingBalances();
   const { data: expenditureSummary } = useExpenditureSummary(todayStr, todayStr);
+  const { data: patientOutstandingData } = useQuery({
+    queryKey: ['patient-outstanding'],
+    queryFn: () => ordersAPI.getPatientOutstanding(),
+    staleTime: 30_000,
+  });
   const { data: pendingPrescriptions = [] } = useQuery({
     queryKey: ['prescriptions', 'pending-payment'],
     queryFn: () => prescriptionService.findPendingPayment(),
@@ -342,6 +351,11 @@ export default function ReceptionDashboard() {
         </div>
       </div>
 
+      {/* Patients Who Owe */}
+      {patientOutstandingData?.patients?.length > 0 && (
+        <OwingPatientsCard patients={patientOutstandingData.patients} />
+      )}
+
       {/* Pending Clinical Orders (created by doctors, paid at reception) */}
       <div className="mb-6">
         <PendingOrders />
@@ -523,6 +537,163 @@ function ServiceTypeTile({ icon: Icon, label, value, color }: { icon: any; label
         <p className={cn('text-xs font-medium', c.text)}>{label}</p>
       </div>
       <p className={cn('text-lg font-bold', c.text)}>{value}</p>
+    </div>
+  );
+}
+
+function OwingPatientsCard({ patients }: { patients: any[] }) {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const deposit = useDepositWallet();
+  const [depositPatient, setDepositPatient] = useState<any>(null);
+  const [depositAmount, setDepositAmount] = useState('');
+  const [depositMethod, setDepositMethod] = useState('cash');
+  const [depositNotes, setDepositNotes] = useState('');
+
+  const handleDeposit = async () => {
+    if (!depositPatient) return;
+    const amount = parseFloat(depositAmount);
+    if (isNaN(amount) || amount <= 0) {
+      toast.error('Enter a valid amount');
+      return;
+    }
+    try {
+      await deposit.mutateAsync({
+        id: depositPatient.patientId,
+        amount,
+        notes: depositNotes || `Quick deposit from dashboard`,
+        paymentMethod: depositMethod,
+      });
+      toast.success(`Le ${amount.toLocaleString()} deposited for ${depositPatient.firstName} ${depositPatient.lastName}`);
+      setDepositPatient(null);
+      setDepositAmount('');
+      setDepositNotes('');
+      setDepositMethod('cash');
+      queryClient.invalidateQueries({ queryKey: ['patient-outstanding'] });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Deposit failed');
+    }
+  };
+
+  return (
+    <div className="mb-6 bg-card border rounded-xl shadow-sm border-red-200">
+      <div className="px-5 py-4 border-b flex items-center justify-between">
+        <h3 className="font-semibold text-sm flex items-center gap-2">
+          <AlertTriangle className="w-4 h-4 text-red-500" />
+          Patients Who Owe
+          <Badge variant="secondary" className="ml-1 text-xs bg-red-100 text-red-700">{patients.length}</Badge>
+        </h3>
+        <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reception/accounts-receivable')}>
+          View All <ArrowRight className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+      <div className="divide-y">
+        {patients.slice(0, 5).map((patient: any) => (
+          <div key={patient.patientId} className="px-5 py-3 hover:bg-muted/30 transition-colors">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-medium text-sm">{patient.firstName} {patient.lastName}</span>
+                  <Badge variant="outline" className="text-[10px] font-mono">{patient.patientCode}</Badge>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {patient.orderCount} unpaid order{patient.orderCount !== 1 ? 's' : ''} · Owes Le {patient.totalOwed.toLocaleString()}
+                </p>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button
+                  size="sm"
+                  className="gap-1 text-xs bg-green-600 hover:bg-green-700 text-white"
+                  onClick={() => setDepositPatient(patient)}
+                >
+                  <Wallet className="h-3.5 w-3.5" /> Top Up
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="text-xs"
+                  onClick={() => navigate(`/reception/patients/${patient.patientId}`)}
+                >
+                  View
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Quick Deposit Dialog */}
+      {depositPatient && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm">Quick Deposit — {depositPatient.firstName} {depositPatient.lastName}</h3>
+              <Button variant="ghost" size="sm" onClick={() => setDepositPatient(null)}>
+                <span className="sr-only">Close</span> ×
+              </Button>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm">
+              <p className="text-red-700">Current amount owed: <strong>Le {depositPatient.totalOwed.toLocaleString()}</strong></p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="deposit-amount">Deposit Amount (Le)</Label>
+              <Input
+                id="deposit-amount"
+                type="number"
+                min="1"
+                step="100"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                placeholder="Enter deposit amount"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select value={depositMethod} onValueChange={setDepositMethod}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="orange_money">Orange Money</SelectItem>
+                  <SelectItem value="afrimoney">Afrimoney</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="deposit-notes">Notes (optional)</Label>
+              <Input
+                id="deposit-notes"
+                value={depositNotes}
+                onChange={(e) => setDepositNotes(e.target.value)}
+                placeholder="Payment notes..."
+              />
+            </div>
+
+            <div className="flex gap-2 pt-2">
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                disabled={!depositAmount || deposit.isPending}
+                onClick={handleDeposit}
+              >
+                {deposit.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                ) : (
+                  <Wallet className="h-4 w-4 mr-1" />
+                )}
+                Deposit Le {parseFloat(depositAmount || '0').toLocaleString()}
+              </Button>
+              <Button variant="outline" onClick={() => setDepositPatient(null)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -371,6 +371,11 @@ export const ordersAPI = {
     return response.data;
   },
 
+  getPatientOutstanding: async () => {
+    const response = await api.get('/orders/stats/patient-outstanding');
+    return response.data;
+  },
+
   getPaymentHistory: async (id: string) => {
     const response = await api.get(`/orders/${id}/payments`);
     return response.data;
@@ -389,6 +394,11 @@ export const ordersAPI = {
 export const paymentsAPI = {
   getAll: async (params?: any) => {
     const response = await api.get('/payments', { params });
+    return response.data;
+  },
+
+  findByPatient: async (patientId: string) => {
+    const response = await api.get(`/payments/patient/${patientId}`);
     return response.data;
   },
 };

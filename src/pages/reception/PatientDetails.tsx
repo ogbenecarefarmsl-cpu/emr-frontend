@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { usePatient, usePatientResults, useUpdatePatient, usePatientWallet, useWalletTransactions, useDepositWallet, useWithdrawWallet } from '@/hooks/usePatients';
 import { useOrders } from '@/hooks/useOrders';
+import { paymentsAPI } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -17,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { toast } from 'sonner';
 import {
   ArrowLeft, Edit, Eye, Loader2, Save, X, Wallet, ArrowDownToLine, ArrowUpFromLine,
-  Clock, User, FileText, FlaskConical, ShoppingCart, Calendar, AlertTriangle, Phone, Mail, MapPin, Hash
+  Clock, User, FileText, FlaskConical, ShoppingCart, Calendar, AlertTriangle, Phone, Mail, MapPin, Hash, CreditCard
 } from 'lucide-react';
 import { PatientNotesPanel } from '@/components/patients/PatientNotesPanel';
 import { getPatientAgeDisplay, getPatientFullName } from '@/utils/orderHelpers';
@@ -150,6 +152,13 @@ export default function PatientDetails() {
   const { data: patientResults, isLoading: isLoadingResults } = usePatientResults(id || '');
   const { data: wallet } = usePatientWallet(id || '');
   const updatePatient = useUpdatePatient();
+
+  const { data: patientPayments = [], isLoading: isLoadingPayments } = useQuery({
+    queryKey: ['payments', 'patient', id],
+    queryFn: () => paymentsAPI.findByPatient(id || ''),
+    enabled: !!id,
+    staleTime: 30_000,
+  });
 
   const normalizedPatient = useMemo(() => {
     if (!patient) return null;
@@ -444,6 +453,9 @@ export default function PatientDetails() {
           <TabsTrigger value="notes" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
             Notes
           </TabsTrigger>
+          <TabsTrigger value="billing" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
+            Billing <Badge variant="secondary" className="ml-1.5 h-5 text-[10px]">{patientPayments.length}</Badge>
+          </TabsTrigger>
         </TabsList>
 
         {/* Orders Tab */}
@@ -586,6 +598,60 @@ export default function PatientDetails() {
           <div className="bg-card border rounded-xl p-5">
             <PatientNotesPanel patientId={id || ''} />
           </div>
+        </TabsContent>
+
+        {/* Billing Tab */}
+        <TabsContent value="billing" className="mt-4">
+          <Card>
+            <CardContent className="p-5">
+              {isLoadingPayments ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : patientPayments.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground text-sm">
+                  No payment records yet
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {patientPayments.map((payment: any) => (
+                    <div key={payment._id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge variant="outline" className="text-[10px] capitalize bg-green-50 text-green-700">
+                            {payment.paymentMethod?.replace(/_/g, ' ')}
+                          </Badge>
+                          <Badge variant="outline" className="text-[10px] capitalize">
+                            {payment.paymentType}
+                          </Badge>
+                          {payment.orderId && (
+                            <span className="text-xs text-muted-foreground">Order: {payment.orderId.orderNumber || '-'}</span>
+                          )}
+                          {payment.treatmentPlanId && (
+                            <span className="text-xs text-muted-foreground">Plan: {payment.treatmentPlanId.planNumber || '-'}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{formatDateTimeSafe(payment.createdAt)}</p>
+                        {payment.notes && (
+                          <p className="text-xs text-muted-foreground mt-0.5">{payment.notes}</p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="font-bold text-green-700">Le {payment.amount.toLocaleString()}</p>
+                        {payment.receivedBy && (
+                          <p className="text-[10px] text-muted-foreground">by {payment.receivedBy.fullName || '-'}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <div className="border-t pt-3 flex justify-between font-semibold text-sm">
+                    <span>Total Payments:</span>
+                    <span className="text-green-700">Le {patientPayments.reduce((sum: number, p: any) => sum + (p.amount || 0), 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </RoleLayout>

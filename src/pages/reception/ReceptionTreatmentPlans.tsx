@@ -9,12 +9,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
+import { patientsAPI } from '@/services/api';
 import { useMyBranch } from '@/hooks/useBranch';
 import { buildTreatmentPlanESCPOS } from '@/utils/escpos';
 import { usbPrinterService } from '@/services/usbPrinterService';
 import { btPrinterService } from '@/services/bluetoothPrinterService';
 import type { TreatmentPlan } from '@/types/treatment-plan';
-import { Printer, Eye, Loader2, Send, DollarSign, Wallet, Banknote } from 'lucide-react';
+import { Printer, Eye, Loader2, Send, DollarSign, Wallet, Banknote, Plus, X } from 'lucide-react';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'bg-gray-100 text-gray-700' },
@@ -46,6 +47,8 @@ export default function ReceptionTreatmentPlans() {
   const [payMethod, setPayMethod] = useState('cash');
   const [payNotes, setPayNotes] = useState('');
   const [isPrinting, setIsPrinting] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [splits, setSplits] = useState<{ amount: string; method: string }[]>([]);
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['treatment-plans', 'reception'],
@@ -61,8 +64,8 @@ export default function ReceptionTreatmentPlans() {
   });
 
   const payMutation = useMutation({
-    mutationFn: ({ id, amount, paymentMethod, notes }: { id: string; amount: number; paymentMethod: string; notes?: string }) =>
-      treatmentPlanService.pay(id, { amount, paymentMethod, notes }),
+    mutationFn: ({ id, amount, paymentMethod, payments, notes }: { id: string; amount?: number; paymentMethod?: string; payments?: { amount: number; paymentMethod: string }[]; notes?: string }) =>
+      treatmentPlanService.pay(id, payments ? { payments, notes } : { amount, paymentMethod, notes }),
     onSuccess: async (updatedPlan) => {
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] });
       setPayPlan(null);
@@ -198,7 +201,24 @@ export default function ReceptionTreatmentPlans() {
   };
 
   const handlePay = () => {
-    if (!payPlan || !payAmount) return;
+    if (!payPlan) return;
+
+    // Check if split payments are being used
+    const validSplits = splits.filter(s => parseFloat(s.amount) > 0 && s.method);
+    if (validSplits.length > 0) {
+      const payments = validSplits.map(s => ({ amount: parseFloat(s.amount), paymentMethod: s.method }));
+      const totalPayment = payments.reduce((sum, p) => sum + p.amount, 0);
+      const remaining = (payPlan.totalAmount || 0) - (payPlan.amountPaid || 0);
+      if (totalPayment > remaining + 0.01) {
+        toast.error(`Total payment (Le ${totalPayment.toLocaleString()}) exceeds remaining balance (Le ${remaining.toLocaleString()})`);
+        return;
+      }
+      payMutation.mutate({ id: payPlan._id, payments, notes: payNotes || undefined });
+      return;
+    }
+
+    // Single payment fallback
+    if (!payAmount) return;
     const amount = parseFloat(payAmount);
     if (isNaN(amount) || amount <= 0) {
       toast.error('Enter a valid amount');
@@ -212,12 +232,41 @@ export default function ReceptionTreatmentPlans() {
     payMutation.mutate({ id: payPlan._id, amount, paymentMethod: payMethod, notes: payNotes || undefined });
   };
 
-  const openPayDialog = (plan: TreatmentPlan) => {
+  const addSplit = () => {
+    setSplits([...splits, { amount: '', method: 'cash' }]);
+  };
+
+  const removeSplit = (index: number) => {
+    setSplits(splits.filter((_, i) => i !== index));
+  };
+
+  const updateSplit = (index: number, field: 'amount' | 'method', value: string) => {
+    const updated = [...splits];
+    updated[index] = { ...updated[index], [field]: value };
+    setSplits(updated);
+  };
+
+  const totalSplitAmount = splits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+
+  const openPayDialog = async (plan: TreatmentPlan) => {
     setPayPlan(plan);
     const remaining = (plan.totalAmount || 0) - (plan.amountPaid || 0);
     setPayAmount(remaining > 0 ? remaining.toString() : '');
     setPayMethod('cash');
     setPayNotes('');
+    setSplits([]);
+    // Fetch wallet balance for the patient
+    const patientId = typeof plan.patientId === 'object' ? plan.patientId?._id || plan.patientId?.id : plan.patientId;
+    if (patientId) {
+      try {
+        const wallet = await patientsAPI.getWallet(patientId);
+        setWalletBalance(wallet?.balance || 0);
+      } catch {
+        setWalletBalance(0);
+      }
+    } else {
+      setWalletBalance(null);
+    }
   };
 
   const sentPlans = useMemo(
@@ -437,15 +486,20 @@ export default function ReceptionTreatmentPlans() {
                     <DollarSign className="h-4 w-4" />
                     Receive Payment — {payPlan.planNumber}
                   </CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => setPayPlan(null)}>
+                  <Button variant="ghost" size="sm" onClick={() => { setPayPlan(null); setSplits([]); }}>
                     Close
                   </Button>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 {typeof payPlan.patientId === 'object' && (
-                  <div className="text-sm">
-                    Patient: {payPlan.patientId.firstName} {payPlan.patientId.lastName}
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Patient: {payPlan.patientId.firstName} {payPlan.patientId.lastName}</span>
+                    {walletBalance !== null && (
+                      <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700">
+                        <Wallet className="h-3 w-3 mr-1" />Wallet: Le {walletBalance.toLocaleString()}
+                      </Badge>
+                    )}
                   </div>
                 )}
 
@@ -466,34 +520,80 @@ export default function ReceptionTreatmentPlans() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="pay-amount">Amount (Le)</Label>
-                  <Input
-                    id="pay-amount"
-                    type="number"
-                    min="1"
-                    step="100"
-                    value={payAmount}
-                    onChange={(e) => setPayAmount(e.target.value)}
-                    placeholder="Enter amount"
-                  />
-                </div>
+                {/* Split Payments */}
+                {splits.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-medium">Split Payment</Label>
+                      <span className="text-xs text-muted-foreground">
+                        Total: Le {totalSplitAmount.toLocaleString()} / Le {((payPlan.totalAmount || 0) - (payPlan.amountPaid || 0)).toLocaleString()}
+                      </span>
+                    </div>
+                    {splits.map((split, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          min="1"
+                          step="100"
+                          placeholder="Amount"
+                          value={split.amount}
+                          onChange={(e) => updateSplit(idx, 'amount', e.target.value)}
+                          className="flex-1"
+                        />
+                        <Select value={split.method} onValueChange={(v) => updateSplit(idx, 'method', v)}>
+                          <SelectTrigger className="w-[140px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {PAYMENT_METHODS.map((m) => (
+                              <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <Button variant="ghost" size="sm" onClick={() => removeSplit(idx)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label>Payment Method</Label>
-                  <Select value={payMethod} onValueChange={setPayMethod}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {PAYMENT_METHODS.map((m) => (
-                        <SelectItem key={m.value} value={m.value}>
-                          {m.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Single payment (when no splits) */}
+                {splits.length === 0 && (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="pay-amount">Amount (Le)</Label>
+                      <Input
+                        id="pay-amount"
+                        type="number"
+                        min="1"
+                        step="100"
+                        value={payAmount}
+                        onChange={(e) => setPayAmount(e.target.value)}
+                        placeholder="Enter amount"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Payment Method</Label>
+                      <Select value={payMethod} onValueChange={setPayMethod}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PAYMENT_METHODS.map((m) => (
+                            <SelectItem key={m.value} value={m.value}>
+                              {m.label}
+                              {m.value === 'wallet' && walletBalance !== null && walletBalance > 0 && (
+                                <span className="text-xs text-muted-foreground ml-1">(Le {walletBalance.toLocaleString()})</span>
+                              )}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="pay-notes">Notes (optional)</Label>
@@ -508,7 +608,7 @@ export default function ReceptionTreatmentPlans() {
                 <div className="flex gap-2 pt-2">
                   <Button
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                    disabled={!payAmount || payMutation.isPending}
+                    disabled={payMutation.isPending || (splits.length === 0 && !payAmount)}
                     onClick={handlePay}
                   >
                     {payMutation.isPending ? (
@@ -516,9 +616,14 @@ export default function ReceptionTreatmentPlans() {
                     ) : (
                       <DollarSign className="h-4 w-4 mr-1" />
                     )}
-                    {payMethod === 'wallet' ? 'Pay from Wallet' : 'Receive Payment'}
+                    {splits.length > 0 ? `Pay Le ${totalSplitAmount.toLocaleString()}` : (payMethod === 'wallet' ? 'Pay from Wallet' : 'Receive Payment')}
                   </Button>
-                  <Button variant="outline" onClick={() => setPayPlan(null)}>
+                  {splits.length === 0 && (
+                    <Button variant="outline" onClick={addSplit}>
+                      <Plus className="h-4 w-4 mr-1" />Split
+                    </Button>
+                  )}
+                  <Button variant="outline" onClick={() => { setPayPlan(null); setSplits([]); }}>
                     Cancel
                   </Button>
                 </div>

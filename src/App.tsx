@@ -24,6 +24,7 @@ import PatientsPage from "./pages/reception/PatientsPage";
 import OrdersPage from "./pages/reception/OrdersPage";
 import PaymentsPage from "./pages/reception/PaymentsPage";
 import DailyReconciliation from "./pages/reception/DailyReconciliation";
+import AccountsReceivable from "./pages/reception/AccountsReceivable";
 import PaymentReceipt from "./pages/reception/PaymentReceipt";
 import PaymentDemo from "./pages/reception/PaymentDemo";
 import PrinterSetup from "./pages/reception/PrinterSetup";
@@ -199,6 +200,9 @@ function AppRoutes() {
       } />
       <Route path="/reception/reconciliation" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><DailyReconciliation /></RoleGuard>
+      } />
+      <Route path="/reception/accounts-receivable" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><AccountsReceivable /></RoleGuard>
       } />
       <Route path="/reception/quick-result-entry" element={
         <RoleGuard allowedRoles={['receptionist', 'admin']}><Navigate to="/reception/lab-reports" replace /></RoleGuard>
