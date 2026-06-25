@@ -30,14 +30,37 @@ export default function ReceptionDispensingQueue() {
   const readyToDispense = prescriptions.filter((rx: any) => rx.isPaid && rx.status !== 'dispensed');
   const dispensed = prescriptions.filter((rx: any) => rx.status === 'dispensed');
 
+  const groupedReadyToDispense = Object.values(
+    readyToDispense.reduce((acc: Record<string, any>, rx: any) => {
+      const patientId = rx.patientId?._id || rx.patientId?.patientId || 'unknown';
+      if (!acc[patientId]) {
+        acc[patientId] = {
+          patientId,
+          patient: rx.patientId,
+          prescriptions: [],
+          itemCount: 0,
+          total: 0,
+          earliestDate: rx.createdAt,
+        };
+      }
+      acc[patientId].prescriptions.push(rx);
+      acc[patientId].itemCount += (rx.items || []).length;
+      acc[patientId].total += rx.actualTotalAmount || rx.totalAmount || 0;
+      if (rx.createdAt && (!acc[patientId].earliestDate || new Date(rx.createdAt) < new Date(acc[patientId].earliestDate))) {
+        acc[patientId].earliestDate = rx.createdAt;
+      }
+      return acc;
+    }, {}),
+  ).sort((a: any, b: any) => new Date(a.earliestDate || 0).getTime() - new Date(b.earliestDate || 0).getTime());
+
   const filtered = searchTerm.trim()
-    ? readyToDispense.filter((rx: any) => {
+    ? groupedReadyToDispense.filter((group: any) => {
         const q = searchTerm.toLowerCase();
-        const name = patientName(rx.patientId).toLowerCase();
-        const num = (rx.prescriptionNumber || '').toLowerCase();
+        const name = patientName(group.patient).toLowerCase();
+        const num = group.prescriptions.map((rx: any) => rx.prescriptionNumber || '').join(' ').toLowerCase();
         return name.includes(q) || num.includes(q);
       })
-    : readyToDispense;
+    : groupedReadyToDispense;
 
   return (
     <RoleLayout
@@ -55,8 +78,8 @@ export default function ReceptionDispensingQueue() {
                 <Clock className="w-5 h-5 text-amber-600" />
               </div>
               <div>
-                <p className="text-2xl font-bold">{readyToDispense.length}</p>
-                <p className="text-xs text-muted-foreground">Ready to Dispense</p>
+                <p className="text-2xl font-bold">{groupedReadyToDispense.length}</p>
+                <p className="text-xs text-muted-foreground">Patients Ready</p>
               </div>
             </CardContent>
           </Card>
@@ -110,17 +133,17 @@ export default function ReceptionDispensingQueue() {
         ) : (
           <ScrollArea className="h-[calc(100vh-320px)]">
             <div className="space-y-2">
-              {filtered.map((rx: any) => {
-                const pName = patientName(rx.patientId);
-                const itemCount = (rx.items || []).length;
-                const total = rx.actualTotalAmount || rx.totalAmount || 0;
-                const date = rx.createdAt ? format(new Date(rx.createdAt), 'dd MMM, HH:mm') : '';
+              {filtered.map((group: any) => {
+                const pName = patientName(group.patient);
+                const date = group.earliestDate ? format(new Date(group.earliestDate), 'dd MMM, HH:mm') : '';
+                const rxIds = group.prescriptions.map((rx: any) => rx._id).join(',');
+                const primaryRx = group.prescriptions[0];
 
                 return (
                   <Card
-                    key={rx._id}
+                    key={group.patientId}
                     className="hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => navigate(`/reception/dispense/${rx._id}`)}
+                    onClick={() => navigate(`/reception/dispense/${primaryRx._id}?rxIds=${encodeURIComponent(rxIds)}`)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between">
@@ -132,14 +155,17 @@ export default function ReceptionDispensingQueue() {
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-sm truncate">{pName}</span>
                               <Badge variant="outline" className="text-[10px] shrink-0">
-                                {rx.prescriptionNumber}
+                                {group.prescriptions.length} Rx
                               </Badge>
                             </div>
                             <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
-                              <span>{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
-                              <span>Le {total.toLocaleString()}</span>
+                              <span>{group.itemCount} item{group.itemCount !== 1 ? 's' : ''}</span>
+                              <span>Le {group.total.toLocaleString()}</span>
                               <span>{date}</span>
                             </div>
+                            <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                              {group.prescriptions.map((rx: any) => rx.prescriptionNumber).join(', ')}
+                            </p>
                           </div>
                         </div>
                         <Button size="sm" variant="default" className="shrink-0 gap-1">

@@ -51,6 +51,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearTokens();
+      setUser(null);
+      setProfile(null);
+      setRoles([]);
+      setIsLoading(false);
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
+
   const fetchUserProfile = async () => {
     try {
       const data = await authAPI.getProfile();

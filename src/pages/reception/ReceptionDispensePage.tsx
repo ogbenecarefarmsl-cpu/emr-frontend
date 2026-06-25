@@ -21,7 +21,10 @@ import type { Medication, Prescription, PrescriptionItem } from '@/types/prescri
 
 interface DispenseLine {
   lineId: string;
+  prescriptionId: string;
+  prescriptionNumber: string;
   medicationId: string;
+  originalMedicationId: string;
   medicationName: string;
   /** What the doctor prescribed (in base units) */
   prescribedBaseUnits: number;
@@ -49,6 +52,11 @@ export default function ReceptionDispensePage() {
   const queryClient = useQueryClient();
   const { id } = useParams<{ id: string }>();
   const [searchParams] = useSearchParams();
+  const rxIds = useMemo(() => {
+    const raw = searchParams.get('rxIds');
+    const ids = raw ? raw.split(',').map((value) => value.trim()).filter(Boolean) : [];
+    return ids.length > 0 ? ids : (id ? [id] : []);
+  }, [id, searchParams]);
 
   const [lines, setLines] = useState<DispenseLine[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -57,57 +65,66 @@ export default function ReceptionDispensePage() {
   const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [prescription, setPrescription] = useState<Prescription | null>(null);
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
 
-  // Fetch the prescription
-  const { data: rx, isLoading: rxLoading, error: rxError } = useQuery<Prescription>({
-    queryKey: ['prescription', id],
+  // Fetch one or more paid prescriptions for the same patient.
+  const { data: rxBundle = [], isLoading: rxLoading, error: rxError } = useQuery<Prescription[]>({
+    queryKey: ['prescription-dispense-bundle', rxIds],
     queryFn: async () => {
       const list = await prescriptionService.findAll();
-      const found = list.find((p: any) => p._id === id);
-      if (!found) throw new Error('Prescription not found');
+      const found = rxIds
+        .map((rxId) => list.find((p: any) => p._id === rxId))
+        .filter(Boolean) as Prescription[];
+      if (found.length === 0) throw new Error('Prescription not found');
       return found;
     },
-    enabled: !!id,
+    enabled: rxIds.length > 0,
   });
+
+  const rx = rxBundle[0] || null;
+  const prescribedTotal = rxBundle.reduce((sum, prescription) => sum + (prescription.totalAmount || 0), 0);
 
   // Init lines when prescription loads
   useEffect(() => {
-    if (!rx) return;
-    setPrescription(rx);
-    // Build initial lines from prescription items
-    const initialLines: DispenseLine[] = (rx.items || []).map((item: any, idx: number) => {
-      const medId = typeof item.medicationId === 'object' ? item.medicationId._id : item.medicationId;
-      return {
-        lineId: `${medId}-${idx}`,
-        medicationId: medId,
-        medicationName: item.medicationName,
-        prescribedBaseUnits: item.quantity,
-        sellUnits: item.quantity, // default = full prescribed amount
-        baseUnits: item.quantity,
-        dispenseMode: 'individual',
-        pricePerSellUnit: 0,
-        lineTotal: 0,
-        isSubstitute: false,
-      };
-    });
+    if (rxBundle.length === 0) return;
+    setPrescriptions(rxBundle);
+    const initialLines: DispenseLine[] = rxBundle.flatMap((prescription) =>
+      (prescription.items || []).map((item: any, idx: number) => {
+        const medId = typeof item.medicationId === 'object' ? item.medicationId._id : item.medicationId;
+        return {
+          lineId: `${prescription._id}-${medId}-${idx}`,
+          prescriptionId: prescription._id,
+          prescriptionNumber: prescription.prescriptionNumber,
+          medicationId: medId,
+          originalMedicationId: medId,
+          medicationName: item.medicationName,
+          prescribedBaseUnits: item.quantity,
+          sellUnits: item.quantity,
+          baseUnits: item.quantity,
+          dispenseMode: 'individual',
+          pricePerSellUnit: 0,
+          lineTotal: 0,
+          isSubstitute: false,
+        };
+      }),
+    );
     setLines(initialLines);
     // Hydrate each line's medication data
     initialLines.forEach((l) => hydrateLine(l));
-  }, [rx]);
+  }, [rxBundle]);
 
   // Hydrate a single line with medication details (stock, packs, price)
   const hydrateLine = async (line: DispenseLine) => {
     try {
       const med = await medicationService.findById(line.medicationId);
-      updateLineInState({ ...line, medication: med }, false);
+      updateLineInState({ ...line, medication: med });
     } catch {
       // Could be a CAF product, not a local med
       // Try fetching from the search list
       try {
         const results = await medicationService.search(line.medicationName);
         const found = results.find((m: any) => m._id === line.medicationId);
-        if (found) updateLineInState({ ...line, medication: found }, false);
+        if (found) updateLineInState({ ...line, medication: found });
       } catch {
         // Ignore
       }
@@ -241,26 +258,33 @@ export default function ReceptionDispensePage() {
   const canSubmit = lines.length > 0 && !hasErrors;
 
   const handleConfirm = async () => {
-    if (!rx || !canSubmit) return;
+    if (prescriptions.length === 0 || !canSubmit) return;
     setIsSubmitting(true);
     try {
-      const items = lines.map((l) => ({
-        medicationId: l.medicationId,
-        dispenseMode: l.dispenseMode,
-        packSizeIndex: l.packSizeIndex,
-        sellUnits: l.sellUnits,
-      }));
-      const result = await prescriptionService.dispense(rx._id, {
-        items,
-        dispensingNotes: `Dispensed at reception by ${profile?.fullName || user?.email || 'reception'}`,
-      });
+      for (const prescription of prescriptions) {
+        const items = lines
+          .filter((l) => l.prescriptionId === prescription._id)
+          .map((l) => ({
+            medicationId: l.originalMedicationId,
+            dispenseMode: l.dispenseMode,
+            packSizeIndex: l.packSizeIndex,
+            sellUnits: l.sellUnits,
+            ...(l.medicationId !== l.originalMedicationId ? { substituteMedicationId: l.medicationId } : {}),
+          }));
+        await prescriptionService.dispense(prescription._id, {
+          items,
+          dispensingNotes: `Dispensed at reception by ${profile?.fullName || user?.email || 'reception'}`,
+        });
+      }
       toast.success(
-        `Prescription ${rx.prescriptionNumber} dispensed. Bill: Le ${result.actualTotalAmount?.toLocaleString()}`,
+        prescriptions.length === 1
+          ? `Prescription ${prescriptions[0].prescriptionNumber} dispensed.`
+          : `${prescriptions.length} prescriptions dispensed.`,
       );
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
       queryClient.invalidateQueries({ queryKey: ['prescription', id] });
       queryClient.invalidateQueries({ queryKey: ['visits'] });
-      navigate(`/reception/prescription-receipt/${rx._id}`);
+      navigate(prescriptions.length === 1 ? `/reception/prescription-receipt/${prescriptions[0]._id}` : '/reception/dispensing');
     } catch (error: any) {
       const msg = error?.response?.data?.message || error?.message || 'Failed to dispense';
       toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
@@ -297,7 +321,12 @@ export default function ReceptionDispensePage() {
   }
 
   return (
-    <RoleLayout title="Dispense Prescription" subtitle={`Reception dispense for ${rx.prescriptionNumber}`} role="receptionist" userName={profile?.fullName}>
+    <RoleLayout
+      title="Dispense Prescription"
+      subtitle={rxBundle.length > 1 ? `Reception dispense for ${rxBundle.length} prescriptions` : `Reception dispense for ${rx.prescriptionNumber}`}
+      role="receptionist"
+      userName={profile?.fullName}
+    >
       <div className="max-w-5xl space-y-4">
         {/* Patient + prescription header */}
         <Card>
@@ -318,10 +347,10 @@ export default function ReceptionDispensePage() {
             </div>
             <div className="text-right">
               <p className="text-sm text-muted-foreground">Prescribed total</p>
-              <p className="text-lg font-semibold">Le {rx.totalAmount?.toLocaleString()}</p>
-              {rx.actualTotalAmount != null && (
-                <p className="text-xs text-emerald-600">Actual: Le {rx.actualTotalAmount.toLocaleString()}</p>
-              )}
+              <p className="text-lg font-semibold">Le {prescribedTotal.toLocaleString()}</p>
+              <p className="text-xs text-muted-foreground">
+                {rxBundle.length} prescription{rxBundle.length !== 1 ? 's' : ''}
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -347,6 +376,9 @@ export default function ReceptionDispensePage() {
                       <CardTitle className="text-base flex items-center gap-2">
                         <Pill className="w-4 h-4 text-primary" />
                         {line.medicationName}
+                        {rxBundle.length > 1 && (
+                          <Badge variant="secondary" className="text-[10px]">{line.prescriptionNumber}</Badge>
+                        )}
                         {line.isSubstitute && (
                           <Badge variant="outline" className="text-[10px]">Substitute</Badge>
                         )}
@@ -467,9 +499,9 @@ export default function ReceptionDispensePage() {
               <div>
                 <p className="text-sm text-muted-foreground">Total bill (recalculated from your dispense selections)</p>
                 <p className="text-2xl font-bold">Le {totalAmount.toLocaleString()}</p>
-                {rx.totalAmount != null && Math.abs(totalAmount - rx.totalAmount) > 0.01 && (
+                {Math.abs(totalAmount - prescribedTotal) > 0.01 && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Doctor estimated Le {rx.totalAmount.toLocaleString()} — difference is the actual pack/individual selection.
+                    Doctor estimated Le {prescribedTotal.toLocaleString()} - difference is the actual pack/individual selection.
                   </p>
                 )}
               </div>
@@ -539,7 +571,7 @@ export default function ReceptionDispensePage() {
           </DialogHeader>
           <div className="space-y-2">
             <p className="text-sm">
-              You are about to dispense <strong>{rx.prescriptionNumber}</strong> for{' '}
+              You are about to dispense <strong>{rxBundle.length} prescription{rxBundle.length !== 1 ? 's' : ''}</strong> for{' '}
               <strong>{rx.patientId?.firstName} {rx.patientId?.lastName}</strong>.
             </p>
             <div className="border rounded-lg p-3 space-y-1 text-sm">

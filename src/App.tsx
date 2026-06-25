@@ -109,8 +109,12 @@ const queryClient = new QueryClient({
       gcTime: 1000 * 60 * 60 * 24,
       // Consider data stale after 30 seconds (faster refresh)
       staleTime: 1000 * 30,
-      // Retry up to 3 times with exponential backoff
-      retry: 3,
+      // Retry transient failures, but fail auth errors immediately.
+      retry: (failureCount, error: any) => {
+        const status = error?.response?.status;
+        if (status === 401 || status === 403) return false;
+        return failureCount < 3;
+      },
       retryDelay: (attempt) => Math.min(1000 * Math.pow(2, attempt), 10000),
       // Refetch when reconnecting to network
       refetchOnReconnect: 'always',
@@ -133,6 +137,7 @@ function AppRoutes() {
 
   useEffect(() => {
     const handleUnauthorized = () => {
+      queryClient.clear();
       if (window.location.pathname !== '/login') {
         navigate('/login', { replace: true });
       }
