@@ -344,7 +344,7 @@ export default function ReceptionDashboard() {
           </div>
           {totalOutstanding > 0 && (
             <div className="mt-4 pt-4 border-t flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Outstanding balances (unpaid orders):</span>
+              <span className="text-muted-foreground">Outstanding balances:</span>
               <span className="font-semibold text-amber-600">Le {totalOutstanding.toLocaleString()}</span>
             </div>
           )}
@@ -558,13 +558,18 @@ function OwingPatientsCard({ patients }: { patients: any[] }) {
       return;
     }
     try {
-      await deposit.mutateAsync({
+      const result = await deposit.mutateAsync({
         id: depositPatient.patientId,
         amount,
         notes: depositNotes || `Quick deposit from dashboard`,
         paymentMethod: depositMethod,
       });
-      toast.success(`Le ${amount.toLocaleString()} deposited for ${depositPatient.firstName} ${depositPatient.lastName}`);
+      const applied = Number(result?.autoAppliedAmount || 0);
+      toast.success(
+        applied > 0
+          ? `Le ${amount.toLocaleString()} deposited; Le ${applied.toLocaleString()} auto-applied to outstanding bills`
+          : `Le ${amount.toLocaleString()} deposited for ${depositPatient.firstName} ${depositPatient.lastName}`,
+      );
       setDepositPatient(null);
       setDepositAmount('');
       setDepositNotes('');
@@ -597,7 +602,9 @@ function OwingPatientsCard({ patients }: { patients: any[] }) {
                   <Badge variant="outline" className="text-[10px] font-mono">{patient.patientCode}</Badge>
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {patient.orderCount} unpaid order{patient.orderCount !== 1 ? 's' : ''} · Owes Le {patient.totalOwed.toLocaleString()}
+                  {patient.billCount || patient.orderCount} unpaid bill{(patient.billCount || patient.orderCount) !== 1 ? 's' : ''}
+                  {patient.treatmentPlanCount > 0 ? ` (${patient.treatmentPlanCount} treatment plan${patient.treatmentPlanCount !== 1 ? 's' : ''})` : ''}
+                  {' '}· Owes Le {patient.totalOwed.toLocaleString()}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">

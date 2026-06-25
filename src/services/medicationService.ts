@@ -1,6 +1,46 @@
 import api from './api';
 import { MedicationCategoryEnum } from '@/types/medication';
 
+const normalizeMedication = (medication: any) => {
+  if (!medication || typeof medication !== 'object') return medication;
+
+  const stockQuantity = Number(
+    medication.stockQuantity ??
+      medication.quantityAvailable ??
+      medication.calculatedStock ??
+      medication.availableStock ??
+      0,
+  ) || 0;
+  const packSizes = Array.isArray(medication.packSizes)
+    ? medication.packSizes.map((pack: any) => ({
+        ...pack,
+        unitsPerPack: Number(pack.unitsPerPack ?? pack.quantityPerPack ?? 1) || 1,
+        quantityPerPack: Number(pack.quantityPerPack ?? pack.unitsPerPack ?? 1) || 1,
+      }))
+    : medication.packSizes;
+  const defaultPack = packSizes?.[0];
+  const unitPrice = Number(
+    medication.unitPrice ??
+      (defaultPack?.sellingPrice && defaultPack?.unitsPerPack
+        ? defaultPack.sellingPrice / defaultPack.unitsPerPack
+        : undefined) ??
+      medication.suggestedRetailPrice ??
+      medication.basePrice ??
+      0,
+  ) || 0;
+
+  return {
+    ...medication,
+    stockQuantity,
+    quantityAvailable: Number(medication.quantityAvailable ?? stockQuantity) || stockQuantity,
+    unitPrice,
+    baseUnit: medication.baseUnit || medication.unit || 'unit',
+    packSizes,
+  };
+};
+
+const normalizeMedicationList = (medications: any[]) => medications.map(normalizeMedication);
+
 export const medicationService = {
   async create(data: {
     medicationCode: string;
@@ -29,19 +69,19 @@ export const medicationService = {
         ...(lowStock && { lowStock: true }),
       },
     });
-    return response.data;
+    return normalizeMedicationList(response.data);
   },
 
   async search(searchTerm: string): Promise<any[]> {
     const response = await api.get('/medications/search', {
       params: { q: searchTerm },
     });
-    return response.data;
+    return normalizeMedicationList(response.data);
   },
 
   async findById(id: string): Promise<any> {
     const response = await api.get(`/medications/${id}`);
-    return response.data;
+    return normalizeMedication(response.data);
   },
 
   async update(id: string, data: any): Promise<any> {

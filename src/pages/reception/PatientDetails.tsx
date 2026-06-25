@@ -672,8 +672,13 @@ function WalletPanel({ patientId }: { patientId: string }) {
   const handleDeposit = async () => {
     const num = Number(amount);
     if (!num || num <= 0) { toast.error('Enter a valid positive amount'); return; }
-    await deposit.mutateAsync({ id: patientId, amount: num, notes: notes || undefined, paymentMethod: depositMethod });
-    toast.success(`Le ${num.toLocaleString()} deposited`);
+    const result = await deposit.mutateAsync({ id: patientId, amount: num, notes: notes || undefined, paymentMethod: depositMethod });
+    const applied = Number(result?.autoAppliedAmount || 0);
+    toast.success(
+      applied > 0
+        ? `Le ${num.toLocaleString()} deposited; Le ${applied.toLocaleString()} auto-applied to outstanding bills`
+        : `Le ${num.toLocaleString()} deposited`,
+    );
     setDepositOpen(false); setAmount(''); setNotes(''); setDepositMethod('cash');
   };
 

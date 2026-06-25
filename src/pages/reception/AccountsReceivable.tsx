@@ -100,7 +100,8 @@ export default function AccountsReceivable() {
                           )}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1">
-                          {patient.orderCount} unpaid order{patient.orderCount !== 1 ? 's' : ''}
+                          {patient.billCount || patient.orderCount} unpaid bill{(patient.billCount || patient.orderCount) !== 1 ? 's' : ''}
+                          {patient.treatmentPlanCount > 0 ? ` (${patient.treatmentPlanCount} treatment plan${patient.treatmentPlanCount !== 1 ? 's' : ''})` : ''}
                         </div>
                         <div className="flex flex-wrap gap-1 mt-2">
                           {patient.orders.slice(0, 3).map((order: any) => (
@@ -109,7 +110,7 @@ export default function AccountsReceivable() {
                               variant="outline"
                               className={`text-[10px] ${order.paymentStatus === 'partial' ? 'bg-amber-50 text-amber-700' : 'bg-red-50 text-red-700'}`}
                             >
-                              {order.orderNumber}: Le {order.total.toLocaleString()}
+                              {order.billType === 'treatment_plan' ? 'Plan' : 'Order'} {order.orderNumber}: Le {order.total.toLocaleString()}
                               {order.paymentStatus === 'partial' && ` (Bal: Le ${order.balance.toLocaleString()})`}
                             </Badge>
                           ))}
