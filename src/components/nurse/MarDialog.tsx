@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { Check, Clock, Loader2, Pill, X } from 'lucide-react';
@@ -18,14 +18,23 @@ interface MarDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const ROUTE_OPTIONS = ['PO', 'IV', 'IM', 'SC', 'topical', 'inhalation', 'NG', 'PR'];
+const ROUTE_OPTIONS = [
+  { value: 'oral', label: 'PO' },
+  { value: 'intravenous', label: 'IV' },
+  { value: 'intramuscular', label: 'IM' },
+  { value: 'subcutaneous', label: 'SC' },
+  { value: 'topical', label: 'Topical' },
+  { value: 'inhalation', label: 'Inhalation' },
+  { value: 'rectal', label: 'PR' },
+  { value: 'other', label: 'Other' },
+];
 
 export function MarDialog({ prescription, open, onOpenChange }: MarDialogProps) {
   const qc = useQueryClient();
   const [form, setForm] = useState({
     medicationName: '',
     dosage: '',
-    route: 'PO',
+    route: 'oral',
     refused: false,
     refusalReason: '',
     notes: '',
@@ -33,13 +42,13 @@ export function MarDialog({ prescription, open, onOpenChange }: MarDialogProps) 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Reset form when prescription changes
-  useMemo(() => {
+  useEffect(() => {
     if (prescription) {
       const firstItem = prescription.items?.[0];
       setForm({
         medicationName: firstItem?.medicationName || '',
         dosage: firstItem?.strengthPerDose || firstItem?.dosage || '',
-        route: firstItem?.route || 'PO',
+        route: firstItem?.route || 'oral',
         refused: false,
         refusalReason: '',
         notes: '',
@@ -81,6 +90,7 @@ export function MarDialog({ prescription, open, onOpenChange }: MarDialogProps) 
 
       toast.success(form.refused ? 'Refusal recorded' : 'Medication administered');
       qc.invalidateQueries({ queryKey: ['prescriptions', 'mar-worklist'] });
+      onOpenChange(false);
 
       // Reset form but keep same medication
       setForm((f) => ({
@@ -149,7 +159,9 @@ export function MarDialog({ prescription, open, onOpenChange }: MarDialogProps) 
                 <Select value={form.route} onValueChange={(v) => setForm({ ...form, route: v })}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {ROUTE_OPTIONS.map((r) => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    {ROUTE_OPTIONS.map((route) => (
+                      <SelectItem key={route.value} value={route.value}>{route.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

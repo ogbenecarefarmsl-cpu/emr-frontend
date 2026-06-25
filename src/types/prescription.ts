@@ -1,6 +1,8 @@
 export enum PrescriptionStatusEnum {
   PENDING = 'pending',
   DISPENSED = 'dispensed',
+  ADMINISTERING = 'administering',
+  COMPLETED = 'completed',
   CANCELLED = 'cancelled',
 }
 
