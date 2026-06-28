@@ -188,6 +188,15 @@ export default function PaymentsPage() {
     const alreadyPaid = Number(selectedOrder.amountPaid ?? selectedOrder.paidAmount ?? 0);
     const remaining = orderTotal - alreadyPaid;
 
+    if ((selectedOrder as any)._isPendingPrescription) {
+      setIsProcessingPayment(false);
+      setShowPaymentDialog(false);
+      setSelectedOrder(null);
+      setSplitRows([{ method: 'cash', amount: '' }]);
+      navigate(`/reception/dispense/${(selectedOrder as any)._prescriptionId}`);
+      return;
+    }
+
     const validRows = splitRows.filter(r => r.method && parseFloat(r.amount) > 0);
     if (validRows.length === 0) {
       toast.error('Enter at least one payment amount');
@@ -202,27 +211,6 @@ export default function PaymentsPage() {
     }
 
     try {
-      if ((selectedOrder as any)._isPendingPrescription) {
-        if (validRows.length !== 1 || Math.abs(splitTotal - remaining) > 0.001) {
-          toast.error('Prescription payments must be collected in full with one payment method');
-          setIsProcessingPayment(false);
-          return;
-        }
-
-        await prescriptionService.markAsPaid((selectedOrder as any)._prescriptionId, validRows[0].method);
-        toast.success(`Prescription payment of Le ${splitTotal.toLocaleString()} recorded. Now dispense.`);
-        queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
-        queryClient.invalidateQueries({ queryKey: ['payments'] });
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-        queryClient.invalidateQueries({ queryKey: ['visits'] });
-        setShowPaymentDialog(false);
-        setSelectedOrder(null);
-        setSplitRows([{ method: 'cash', amount: '' }]);
-        // Navigate to the new dispense page
-        navigate(`/reception/dispense/${(selectedOrder as any)._prescriptionId}`);
-        return;
-      }
-
       for (const row of validRows) {
         await addPayment.mutateAsync({
           orderId,
@@ -514,13 +502,17 @@ export default function PaymentsPage() {
                           <Button
                             size="sm"
                             onClick={() => {
+                              if (order._isPendingPrescription) {
+                                navigate(`/reception/dispense/${order._prescriptionId}`);
+                                return;
+                              }
                               setSelectedOrder(order);
-                              setSplitRows([{ method: 'cash', amount: order._isPendingPrescription ? String(balance) : '' }]);
+                              setSplitRows([{ method: 'cash', amount: '' }]);
                               setShowPaymentDialog(true);
                             }}
                           >
                             <Plus className="w-3 h-3 mr-1" />
-                            Pay
+                            {order._isPendingPrescription ? 'Cost & Dispense' : 'Pay'}
                           </Button>
                         )}
                         <Button

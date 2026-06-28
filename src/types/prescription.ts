@@ -105,6 +105,7 @@ export interface Prescription {
 }
 
 export interface PackSize {
+  code?: string;
   name: string;
   unit: string;
   unitsPerPack: number;

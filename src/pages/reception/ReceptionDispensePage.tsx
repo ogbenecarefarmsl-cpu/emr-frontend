@@ -12,12 +12,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { Pill, Package, Loader2, AlertTriangle, Check, Search, User, ArrowRight } from 'lucide-react';
+import { Pill, Loader2, AlertTriangle, Check, Search } from 'lucide-react';
 import { medicationService } from '@/services/medicationService';
 import { prescriptionService } from '@/services/prescriptionService';
-import { paymentsAPI } from '@/services/api';
-import { cn } from '@/lib/utils';
-import type { Medication, Prescription, PrescriptionItem } from '@/types/prescription';
+import type { Medication, Prescription } from '@/types/prescription';
 
 interface DispenseLine {
   lineId: string;
@@ -46,6 +44,14 @@ interface DispenseLine {
   error?: string;
 }
 
+const getUnitsPerPack = (pack: Medication['packSizes'][number]) =>
+  Number(pack.unitsPerPack || (pack as any).quantityPerPack || 1) || 1;
+
+const isSingleUseMedication = (med?: Medication) => {
+  const text = `${med?.name || ''} ${med?.dosageForm || ''} ${med?.baseUnit || ''}`.toLowerCase();
+  return /\b(vial|ampoule|ampule|infusion|bag)\b/.test(text);
+};
+
 export default function ReceptionDispensePage() {
   const { user, profile } = useAuth();
   const navigate = useNavigate();
@@ -66,6 +72,7 @@ export default function ReceptionDispensePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
 
   // Fetch one or more paid prescriptions for the same patient.
   const { data: rxBundle = [], isLoading: rxLoading, error: rxError } = useQuery<Prescription[]>({
@@ -117,14 +124,14 @@ export default function ReceptionDispensePage() {
   const hydrateLine = async (line: DispenseLine) => {
     try {
       const med = await medicationService.findById(line.medicationId);
-      updateLineInState({ ...line, medication: med });
+      updateLineInState(recommendDispenseLine({ ...line, medication: med }));
     } catch {
       // Could be a CAF product, not a local med
       // Try fetching from the search list
       try {
         const results = await medicationService.search(line.medicationName);
         const found = results.find((m: any) => m._id === line.medicationId);
-        if (found) updateLineInState({ ...line, medication: found });
+        if (found) updateLineInState(recommendDispenseLine({ ...line, medication: found }));
       } catch {
         // Ignore
       }
@@ -150,16 +157,70 @@ export default function ReceptionDispensePage() {
     let pricePerSellUnit = med?.unitPrice || 0;
     if (line.dispenseMode === 'pack' && line.packSizeIndex != null && med?.packSizes?.[line.packSizeIndex]) {
       const pack = med.packSizes[line.packSizeIndex];
-      baseUnits = line.sellUnits * pack.unitsPerPack;
+      baseUnits = line.sellUnits * getUnitsPerPack(pack);
       pricePerSellUnit = pack.sellingPrice;
     }
+    const stock = Number(med?.stockQuantity ?? 0);
+    const error = med && baseUnits > stock
+      ? `Insufficient stock: have ${stock} ${med.baseUnit || 'units'}, need ${baseUnits} ${med.baseUnit || 'units'}`
+      : undefined;
     return {
       ...line,
       baseUnits,
       pricePerSellUnit,
       lineTotal: line.sellUnits * pricePerSellUnit,
-      error: undefined,
+      error,
     };
+  };
+
+  const recommendDispenseLine = (line: DispenseLine): DispenseLine => {
+    const med = line.medication;
+    const packs = med?.packSizes || [];
+    const needed = Math.max(1, Number(line.prescribedBaseUnits || 1));
+
+    if (!med || packs.length === 0 || med.sellMode === 'individual' || isSingleUseMedication(med)) {
+      return computeLineTotals({
+        ...line,
+        dispenseMode: 'individual',
+        packSizeIndex: undefined,
+        sellUnits: needed,
+      });
+    }
+
+    const exactIndex = packs.findIndex((pack) => getUnitsPerPack(pack) === needed);
+    if (exactIndex >= 0) {
+      return computeLineTotals({
+        ...line,
+        dispenseMode: 'pack',
+        packSizeIndex: exactIndex,
+        sellUnits: 1,
+      });
+    }
+
+    const candidates = packs
+      .map((pack, index) => ({ index, units: getUnitsPerPack(pack) }))
+      .filter((pack) => pack.units > 1)
+      .map((pack) => ({ ...pack, sellUnits: Math.ceil(needed / pack.units) }))
+      .map((pack) => ({ ...pack, baseUnits: pack.sellUnits * pack.units }))
+      .filter((pack) => pack.baseUnits >= needed)
+      .sort((a, b) => a.baseUnits - b.baseUnits || a.units - b.units);
+
+    const best = candidates[0];
+    if (!best || med.sellMode === 'both') {
+      return computeLineTotals({
+        ...line,
+        dispenseMode: 'individual',
+        packSizeIndex: undefined,
+        sellUnits: needed,
+      });
+    }
+
+    return computeLineTotals({
+      ...line,
+      dispenseMode: 'pack',
+      packSizeIndex: best.index,
+      sellUnits: best.sellUnits,
+    });
   };
 
   const setDispenseMode = (lineId: string, mode: 'individual' | 'pack') => {
@@ -208,14 +269,10 @@ export default function ReceptionDispensePage() {
       current.map((l) => {
         if (l.lineId !== substituteFor) return l;
         // Replace this line with a substitute
-        return computeLineTotals({
+        return recommendDispenseLine({
           ...l,
           medicationId: med._id,
           medicationName: med.name,
-          sellUnits: 1,
-          baseUnits: 1,
-          dispenseMode: med.packSizes && med.packSizes.length > 0 ? 'pack' : 'individual',
-          packSizeIndex: med.packSizes && med.packSizes.length > 0 ? 0 : undefined,
           pricePerSellUnit: 0,
           lineTotal: 0,
           isSubstitute: true,
@@ -254,7 +311,7 @@ export default function ReceptionDispensePage() {
     [lines],
   );
 
-  const hasErrors = lines.some((l) => l.error);
+  const hasErrors = lines.some((l) => l.error || l.sellUnits <= 0);
   const canSubmit = lines.length > 0 && !hasErrors;
 
   const handleConfirm = async () => {
@@ -274,6 +331,7 @@ export default function ReceptionDispensePage() {
         await prescriptionService.dispense(prescription._id, {
           items,
           dispensingNotes: `Dispensed at reception by ${profile?.fullName || user?.email || 'reception'}`,
+          paymentMethod,
         });
       }
       toast.success(
@@ -434,7 +492,7 @@ export default function ReceptionDispensePage() {
                           <SelectContent>
                             {packSizes.map((p, idx) => (
                               <SelectItem key={idx} value={String(idx)}>
-                                {p.name} ({p.unitsPerPack} {med?.baseUnit || 'units'}) · Le {p.sellingPrice.toLocaleString()}
+                                {p.name} ({getUnitsPerPack(p)} {med?.baseUnit || 'units'}) · Le {p.sellingPrice.toLocaleString()}
                               </SelectItem>
                             ))}
                           </SelectContent>
@@ -460,10 +518,10 @@ export default function ReceptionDispensePage() {
                   </div>
 
                   {/* Stock check warning */}
-                  {line.baseUnits > (med?.stockQuantity || 0) && (
+                  {line.error && (
                     <p className="text-xs text-red-600 flex items-center gap-1">
                       <AlertTriangle className="w-3 h-3" />
-                      Insufficient stock: have {med?.stockQuantity} {med?.baseUnit}, need {line.baseUnits} {med?.baseUnit}
+                      {line.error}
                     </p>
                   )}
 
@@ -475,7 +533,7 @@ export default function ReceptionDispensePage() {
                         {' → '}
                         Dispensing: <strong>{line.baseUnits} {med?.baseUnit || 'units'}</strong>
                         {line.dispenseMode === 'pack' && packSizes[line.packSizeIndex ?? 0] && (
-                          <> ({line.sellUnits} × {packSizes[line.packSizeIndex ?? 0].unitsPerPack})</>
+                          <> ({line.sellUnits} × {getUnitsPerPack(packSizes[line.packSizeIndex ?? 0])})</>
                         )}
                       </p>
                       <p className="mt-0.5">
@@ -505,7 +563,24 @@ export default function ReceptionDispensePage() {
                   </p>
                 )}
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="space-y-1">
+                  <Label className="text-xs">Payment method</Label>
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger className="h-9 w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="orange_money">Orange Money</SelectItem>
+                      <SelectItem value="africell_money">Africell Money</SelectItem>
+                      <SelectItem value="qmoney">QMoney</SelectItem>
+                      <SelectItem value="card">Card</SelectItem>
+                      <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="insurance">Insurance</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
                 <Button variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
                 <Button
                   onClick={() => setConfirmOpen(true)}
@@ -574,7 +649,7 @@ export default function ReceptionDispensePage() {
               You are about to dispense <strong>{rxBundle.length} prescription{rxBundle.length !== 1 ? 's' : ''}</strong> for{' '}
               <strong>{rx.patientId?.firstName} {rx.patientId?.lastName}</strong>.
             </p>
-            <div className="border rounded-lg p-3 space-y-1 text-sm">
+              <div className="border rounded-lg p-3 space-y-1 text-sm">
               {lines.map((l, idx) => (
                 <div key={idx} className="flex justify-between">
                   <span>
@@ -586,6 +661,10 @@ export default function ReceptionDispensePage() {
               <div className="border-t pt-1 mt-1 flex justify-between font-semibold">
                 <span>Total</span>
                 <span>Le {totalAmount.toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-muted-foreground">
+                <span>Payment method</span>
+                <span className="capitalize">{paymentMethod.replace(/_/g, ' ')}</span>
               </div>
             </div>
             <p className="text-xs text-muted-foreground">

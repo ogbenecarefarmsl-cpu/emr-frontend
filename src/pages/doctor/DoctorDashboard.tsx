@@ -662,7 +662,7 @@ export default function DoctorDashboard() {
         patientId,
         items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, computedQuantity, quantityTouched, isControlled, requiresPrescription, ...item }) => ({
           ...item,
-          quantity: Number(item.quantity || computedQuantity || 1),
+          quantity: Number(computedQuantity || computeMedicationQuantity(item, { baseUnit }) || 1),
           // The frontend no longer sends dosage/frequency/duration (legacy) — backend
           // auto-generates them from strengthPerDose / dosesPerDay / durationDays
           instructions: item.instructions?.trim() || undefined,
@@ -728,7 +728,7 @@ export default function DoctorDashboard() {
       return await prescriptionService.update(editingPrescription._id, {
         items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, computedQuantity, quantityTouched, isControlled, requiresPrescription, ...item }) => ({
           ...item,
-          quantity: Number(item.quantity || computedQuantity || 1),
+          quantity: Number(computedQuantity || computeMedicationQuantity(item, { baseUnit }) || 1),
           instructions: item.instructions?.trim() || undefined,
           pharmacistNote: item.pharmacistNote?.trim() || undefined,
         })),
@@ -1868,13 +1868,11 @@ export default function DoctorDashboard() {
                   <div className="divide-y">
                     {prescriptionItems.map((item, index) => {
                       const computedQty = computeMedicationQuantity(item, { baseUnit: item.baseUnit });
-                      const selectedQty = Number(item.quantity || computedQty);
                       const unitLabel = item.baseUnit || 'unit';
                       const qtyText = `${computedQty} ${unitLabel}`;
                       const duplicateCount = prescriptionItems.filter((candidate) => candidate.medicationId === item.medicationId).length;
                       const isDuplicate = duplicateCount > 1;
-                      const quantityOverridden = Math.abs(selectedQty - computedQty) > 0.001;
-                      const validationErrors = validateMedicationRegimen({ ...item, quantity: selectedQty });
+                      const validationErrors = validateMedicationRegimen({ ...item, quantity: computedQty });
                       return (
                         <div key={index} className="p-3">
                           <div className="flex items-center justify-between mb-2">
@@ -1890,7 +1888,7 @@ export default function DoctorDashboard() {
                             </div>
                             <Button variant="ghost" size="sm" onClick={() => removePrescriptionItem(index)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
                           </div>
-                          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
                             <div>
                               <Label className="text-[10px] text-muted-foreground">Per dose</Label>
                               <Input placeholder="e.g. 500mg or 1 tablet" value={item.strengthPerDose} onChange={(e) => updatePrescriptionItem(index, 'strengthPerDose', e.target.value)} className="h-8 text-xs" />
@@ -1922,22 +1920,11 @@ export default function DoctorDashboard() {
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div>
-                              <Label className="text-[10px] text-muted-foreground">Qty to dispense</Label>
-                              <Input type="number" min={1} step="1" value={selectedQty} onChange={(e) => updatePrescriptionItem(index, 'quantity', e.target.value)} className="h-8 text-xs" />
-                            </div>
                           </div>
                           <div className="text-[10px] text-muted-foreground bg-muted/50 px-2 py-1 rounded mb-2">
-                            Computed quantity: <strong>{qtyText}</strong>
-                            {quantityOverridden && <> · <span className="font-medium text-amber-700">Manual qty: {selectedQty} {unitLabel}</span></>}
-                            {item.unitPrice ? <> · Est. individual line: Le {(selectedQty * item.unitPrice).toLocaleString()}</> : null}
+                            Clinical quantity estimate: <strong>{qtyText}</strong>
+                            {item.unitPrice ? <> · Est. individual line: Le {(computedQty * item.unitPrice).toLocaleString()}</> : null}
                           </div>
-                          {quantityOverridden && (
-                            <div className="mb-2 flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-800">
-                              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
-                              Qty differs from the calculated regimen. Pharmacy will dispense against this manual quantity.
-                            </div>
-                          )}
                           {validationErrors.length > 0 && (
                             <div className="mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[10px] text-red-700">
                               {validationErrors.join(' ')}
@@ -1955,7 +1942,7 @@ export default function DoctorDashboard() {
                             <div className="mt-1 space-y-0.5 text-foreground">
                               <p className="font-semibold">{item.medicationName}</p>
                               <p>{item.instructions || buildSmartInstruction(item)}</p>
-                              <p className="text-muted-foreground">Dispense: {selectedQty} {unitLabel}</p>
+                              <p className="text-muted-foreground">Needed: {computedQty} {unitLabel}. Cashier/pharmacy chooses the final dispense pack.</p>
                               {item.pharmacistNote && <p className="text-muted-foreground">Pharmacist note: {item.pharmacistNote}</p>}
                             </div>
                           </details>
