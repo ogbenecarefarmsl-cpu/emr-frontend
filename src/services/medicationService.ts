@@ -5,8 +5,10 @@ const normalizeMedication = (medication: any) => {
   if (!medication || typeof medication !== 'object') return medication;
 
   const stockQuantity = Number(
-    medication.stockQuantity ??
+      medication.stockQuantity ??
       medication.quantityAvailable ??
+      medication.stockAvailable ??
+      medication.stock ??
       medication.calculatedStock ??
       medication.availableStock ??
       0,
@@ -25,6 +27,8 @@ const normalizeMedication = (medication: any) => {
         ? defaultPack.sellingPrice / defaultPack.unitsPerPack
         : undefined) ??
       medication.suggestedRetailPrice ??
+      medication.sellingPrice ??
+      medication.price ??
       medication.basePrice ??
       0,
   ) || 0;
@@ -33,6 +37,8 @@ const normalizeMedication = (medication: any) => {
     ...medication,
     stockQuantity,
     quantityAvailable: Number(medication.quantityAvailable ?? stockQuantity) || stockQuantity,
+    stockAvailable: Number(medication.stockAvailable ?? medication.stock ?? stockQuantity) || stockQuantity,
+    stock: Number(medication.stock ?? medication.stockAvailable ?? stockQuantity) || stockQuantity,
     unitPrice,
     baseUnit: medication.baseUnit || medication.unit || 'unit',
     packSizes,

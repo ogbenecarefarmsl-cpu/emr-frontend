@@ -10,6 +10,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { MedicationPicker } from '@/components/medications/MedicationPicker';
+import {
+  buildSmartInstruction,
+  buildSmartRegimen,
+  getMedicationBaseUnit,
+  getMedicationPrice,
+  getMedicationStock,
+  isParenteralOrInfusion,
+  type MedicationLike,
+} from '@/lib/medicationIntelligence';
 import { medicationService } from '@/services/medicationService';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
 import type { CreateTreatmentPlanItemInput } from '@/types/treatment-plan';
@@ -121,6 +131,16 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
   const selectedVisit = activeVisits.find((v: any) => (v._id || v.id) === visitId);
   const selectedPatientId = preselectedPatientId || patientIdStr(selectedVisit);
 
+  const selectMedicationForPlan = (med: MedicationLike, type: 'drug' | 'iv' = itemType) => {
+    const regimen = buildSmartRegimen(med);
+    setSelectedMed(med);
+    setStrengthPerDose(regimen.strengthPerDose);
+    setDosesPerDay(regimen.dosesPerDay);
+    setDurationDays(regimen.durationDays);
+    setRoute(type === 'iv' ? 'intravenous' : regimen.route);
+    setItemType(type);
+  };
+
   // Filter lab tests by search
   const filteredLabs = useMemo(() => {
     if (!labSearch.trim()) return (lisCatalog || []).slice(0, 30);
@@ -148,7 +168,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
     return items.reduce((sum, item) => {
       if (item.type === 'drug' || item.type === 'iv') {
         const med = allMedications.find((m: any) => m._id === item.medicationId);
-        const unitPrice = med?.unitPrice || 0;
+        const unitPrice = med ? getMedicationPrice(med) : 0;
         const unitsPerDose = getUnitsPerDose(item.strengthPerDose || '');
         const qty = unitsPerDose * item.dosesPerDay! * item.durationDays!;
         return sum + unitPrice * qty;
@@ -178,6 +198,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
       dosesPerDay,
       durationDays,
       route,
+      notes: buildSmartInstruction({ strengthPerDose, dosesPerDay, durationDays, route }),
     };
     setItems((prev) => [...prev, newItem]);
     // Reset form
@@ -305,7 +326,13 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
       )}
 
       {/* Item type tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={(value) => {
+        setActiveTab(value);
+        if (value === 'drug' || value === 'iv') {
+          setItemType(value);
+          if (value === 'iv') setRoute('intravenous');
+        }
+      }}>
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="drug" className="text-xs">
             <Pill className="h-3 w-3 mr-1" /> Drug
@@ -326,12 +353,12 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
 
         {/* Drug / IV tab */}
         <TabsContent value="drug" className="space-y-3">
-          <DrugIvForm
+          <SmartDrugIvForm
             type="drug"
             allMedications={allMedications}
             medsLoading={medsLoading}
             selectedMed={selectedMed}
-            setSelectedMed={setSelectedMed}
+            setSelectedMed={(med) => selectMedicationForPlan(med, 'drug')}
             strengthPerDose={strengthPerDose}
             setStrengthPerDose={setStrengthPerDose}
             dosesPerDay={dosesPerDay}
@@ -345,12 +372,12 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
         </TabsContent>
 
         <TabsContent value="iv" className="space-y-3">
-          <DrugIvForm
+          <SmartDrugIvForm
             type="iv"
             allMedications={allMedications}
             medsLoading={medsLoading}
             selectedMed={selectedMed}
-            setSelectedMed={setSelectedMed}
+            setSelectedMed={(med) => selectMedicationForPlan(med, 'iv')}
             strengthPerDose={strengthPerDose}
             setStrengthPerDose={setStrengthPerDose}
             dosesPerDay={dosesPerDay}
@@ -771,6 +798,112 @@ function DrugIvForm({
       <div className="text-xs text-muted-foreground">
         Qty: {dosesPerDay * durationDays} {selectedMed?.baseUnit || 'units'} (estimated Le{' '}
         {((selectedMed?.unitPrice || 0) * dosesPerDay * durationDays).toLocaleString()})
+      </div>
+
+      <Button onClick={onAdd} size="sm">
+        <Plus className="h-4 w-4 mr-1" /> Add {type === 'iv' ? 'IV' : 'Drug'}
+      </Button>
+    </>
+  );
+}
+
+function SmartDrugIvForm({
+  type,
+  allMedications,
+  medsLoading,
+  selectedMed,
+  setSelectedMed,
+  strengthPerDose,
+  setStrengthPerDose,
+  dosesPerDay,
+  setDosesPerDay,
+  durationDays,
+  setDurationDays,
+  route,
+  setRoute,
+  onAdd,
+}: DrugIvFormProps) {
+  const medicationsForMode = useMemo(() => {
+    if (type !== 'iv') return allMedications;
+    const ivMeds = allMedications.filter((med: any) => isParenteralOrInfusion(med));
+    const otherMeds = allMedications.filter((med: any) => !isParenteralOrInfusion(med));
+    return [...ivMeds, ...otherMeds];
+  }, [allMedications, type]);
+
+  return (
+    <>
+      <MedicationPicker
+        medications={medicationsForMode}
+        loading={medsLoading}
+        selectedId={selectedMed?._id}
+        onSelect={(med) => setSelectedMed(med)}
+        compact
+        title={type === 'iv' ? 'IV / injection / infusion products' : 'CAF / local medication catalog'}
+      />
+
+      {selectedMed && (
+        <div className="p-2 bg-muted rounded text-sm">
+          {selectedMed.name}
+          {selectedMed.strength ? ` (${selectedMed.strength})` : ''}
+          <span className="ml-2 text-muted-foreground">
+            Stock: {getMedicationStock(selectedMed)} {getMedicationBaseUnit(selectedMed)} | Le {getMedicationPrice(selectedMed).toLocaleString()}/{getMedicationBaseUnit(selectedMed)}
+          </span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-2">
+        <div>
+          <Label className="text-xs">Strength/Dose</Label>
+          <Input
+            className="mt-1"
+            value={strengthPerDose}
+            onChange={(e) => setStrengthPerDose(e.target.value)}
+            placeholder="e.g. 1 vial"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Doses/Day</Label>
+          <Input
+            type="number"
+            className="mt-1"
+            value={dosesPerDay}
+            onChange={(e) => setDosesPerDay(Number(e.target.value))}
+            min={1}
+          />
+        </div>
+        <div>
+          <Label className="text-xs">Duration (days)</Label>
+          <Input
+            type="number"
+            className="mt-1"
+            value={durationDays}
+            onChange={(e) => setDurationDays(Number(e.target.value))}
+            min={1}
+          />
+        </div>
+      </div>
+
+      {type === 'drug' && (
+        <div>
+          <Label className="text-xs">Route</Label>
+          <Select value={route} onValueChange={setRoute}>
+            <SelectTrigger className="mt-1">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ROUTE_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      <div className="text-xs text-muted-foreground">
+        Qty: {dosesPerDay * durationDays} {selectedMed ? getMedicationBaseUnit(selectedMed) : 'units'} (estimated Le{' '}
+        {((selectedMed ? getMedicationPrice(selectedMed) : 0) * dosesPerDay * durationDays).toLocaleString()})
       </div>
 
       <Button onClick={onAdd} size="sm">

@@ -30,6 +30,14 @@ import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
 import { PatientTimeline } from '@/components/doctor/PatientTimeline';
 import { DoctorTopBar } from '@/components/doctor/DoctorTopBar';
 import { DoctorTreatmentPlanCard } from '@/components/doctor/DoctorTreatmentPlanCard';
+import { MedicationPicker } from '@/components/medications/MedicationPicker';
+import {
+  buildSmartInstruction,
+  buildSmartRegimen,
+  getMedicationBaseUnit,
+  getMedicationPrice,
+  type MedicationLike,
+} from '@/lib/medicationIntelligence';
 
 // Icons
 import {
@@ -114,6 +122,21 @@ interface Medication {
   isActive?: boolean;
   __cafProduct?: boolean;
   __cafBranchId?: string;
+  baseUnit?: string;
+  sellMode?: string;
+  isCafSourced?: boolean;
+  isControlled?: boolean;
+  requiresPrescription?: boolean;
+  brand?: string;
+  sellingPrice?: number;
+  price?: number;
+  basePrice?: number;
+  suggestedRetailPrice?: number;
+  quantityAvailable?: number;
+  stockAvailable?: number;
+  stock?: number;
+  calculatedStock?: number;
+  availableStock?: number;
   packSizes?: Array<{ name: string; unit: string; quantityPerPack: number; sellingPrice: number }>;
 }
 
@@ -317,7 +340,7 @@ export default function DoctorDashboard() {
   });
 
   // Fetch medications for prescription modal
-  const { data: medications = [] } = useQuery({
+  const { data: medications = [], isLoading: medicationsLoading } = useQuery({
     queryKey: ['medications'],
     queryFn: () => medicationService.findAll(),
     staleTime: 5 * 60 * 1000,
@@ -635,7 +658,7 @@ export default function DoctorDashboard() {
 
       const payload: any = {
         patientId,
-        items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, ...item }) => ({
+        items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, ...item }) => ({
           ...item,
           // The frontend no longer sends dosage/frequency/duration (legacy) — backend
           // auto-generates them from strengthPerDose / dosesPerDay / durationDays
@@ -700,7 +723,7 @@ export default function DoctorDashboard() {
     mutationFn: async () => {
       if (!editingPrescription || prescriptionItems.length === 0) return;
       return await prescriptionService.update(editingPrescription._id, {
-        items: prescriptionItems.map(({ unitPrice, ...item }) => ({
+        items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, ...item }) => ({
           ...item,
           instructions: item.instructions?.trim() || undefined,
           pharmacistNote: item.pharmacistNote?.trim() || undefined,
@@ -729,6 +752,30 @@ export default function DoctorDashboard() {
 
   const removeTestFromOrder = (testId: string) => {
     setSelectedTests(selectedTests.filter(t => (t._id || t.code) !== testId));
+  };
+
+  const buildPrescriptionItem = (med: MedicationLike, pharmacistNote = '') => {
+    const regimen = buildSmartRegimen(med);
+    const instructions = buildSmartInstruction(regimen);
+    return {
+      medicationId: med._id,
+      medicationName: med.name,
+      strengthPerDose: regimen.strengthPerDose,
+      dosesPerDay: regimen.dosesPerDay,
+      durationDays: regimen.durationDays,
+      dosage: '',
+      frequency: '',
+      duration: '',
+      quantity: 0,
+      route: regimen.route,
+      unitPrice: getMedicationPrice(med),
+      sellMode: (med as any).sellMode,
+      packSizes: med.packSizes,
+      baseUnit: getMedicationBaseUnit(med),
+      instructions,
+      smartInstruction: instructions,
+      pharmacistNote,
+    };
   };
 
   const addMedicationToPrescription = (med: Medication) => {
@@ -761,33 +808,27 @@ export default function DoctorDashboard() {
     setPrescriptionItems([
       ...prescriptionItems,
       {
-        medicationId: med._id,
-        medicationName: med.name,
-        // Structured regimen (NEW)
-        strengthPerDose: med.strength || '1',
-        dosesPerDay: 1,
-        durationDays: 7,
-        // Free-text overrides (auto-generated from above)
-        dosage: '',
-        frequency: '',
-        duration: '',
-        // Computed in real time from structured fields
-        quantity: 0,
-        route: 'oral',
-        unitPrice: med.unitPrice || 0,
-        // For the doctor's awareness
-        sellMode: med.sellMode,
-        packSizes: med.packSizes,
-        baseUnit: med.baseUnit,
-        instructions: '',
-        pharmacistNote: '',
+        ...buildPrescriptionItem(med),
       },
     ]);
   };
 
   const updatePrescriptionItem = (index: number, field: string, value: any) => {
     const updated = [...prescriptionItems];
+    const previous = updated[index];
     updated[index][field] = value;
+    if (['strengthPerDose', 'dosesPerDay', 'durationDays', 'route'].includes(field)) {
+      const nextInstruction = buildSmartInstruction({
+        strengthPerDose: updated[index].strengthPerDose,
+        dosesPerDay: Number(updated[index].dosesPerDay || 1),
+        durationDays: Number(updated[index].durationDays || 1),
+        route: updated[index].route,
+      });
+      if (!previous.instructions || previous.instructions === previous.smartInstruction) {
+        updated[index].instructions = nextInstruction;
+      }
+      updated[index].smartInstruction = nextInstruction;
+    }
     setPrescriptionItems(updated);
   };
 
@@ -800,25 +841,10 @@ export default function DoctorDashboard() {
     setPrescriptionItems([
       ...prescriptionItems,
       {
-        medicationId: med._id,
-        medicationName: med.name,
-        strengthPerDose: med.strength || '1',
-        dosesPerDay: 1,
-        durationDays: 7,
-        dosage: '',
-        frequency: '',
-        duration: '',
-        quantity: 0,
-        route: 'oral',
-        unitPrice: med.unitPrice || 0,
-        sellMode: med.sellMode,
-        packSizes: med.packSizes,
-        baseUnit: med.baseUnit,
-        instructions: '',
-        pharmacistNote: '',
+        ...buildPrescriptionItem(med, `Allergy override approved: ${allergyOverrideText.trim()}`),
       },
     ]);
-  }, [prescriptionItems]);
+  }, [prescriptionItems, allergyOverrideText]);
 
   // Edit helpers
   const startEditOrder = (order: any) => {
@@ -1801,34 +1827,14 @@ export default function DoctorDashboard() {
             </div>
           )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label className="text-sm font-medium">Search Medications</Label>
-              <Input value={searchMedication} onChange={(e) => setSearchMedication(e.target.value)} placeholder="Search to filter medications..." className="mt-1" />
-              <ScrollArea className="h-80 mt-2 border rounded-lg">
-                {filteredMedications.map((med: Medication) => (
-                  <div key={med._id} className={cn("p-3 border-b last:border-b-0 flex items-center justify-between", (med.stockQuantity || 0) > 0 ? "hover:bg-muted/50 cursor-pointer" : "opacity-60 cursor-not-allowed bg-muted/20")} onClick={() => (med.stockQuantity || 0) > 0 && addMedicationToPrescription(med)}>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm truncate">{med.name}</p>
-                        {med.__cafProduct && <Badge variant="outline" className="text-[10px] flex-shrink-0">CAF</Badge>}
-                      </div>
-                      {med.genericName && <p className="text-xs text-muted-foreground truncate">{med.genericName}</p>}
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                        {med.dosageForm && <span>{med.dosageForm}</span>}
-                        {med.unit && <span>| {med.unit}</span>}
-                        {med.category && <span>| {med.category}</span>}
-                        <span className="font-medium text-foreground">Le {(med.unitPrice || 0).toLocaleString()}</span>
-                      </div>
-                      {med.packSizes && med.packSizes.length > 0 && (
-                        <p className="text-[10px] text-muted-foreground mt-0.5">Packs: {med.packSizes.map((ps) => `${ps.name} (${ps.unitsPerPack ?? ps.quantityPerPack} ${med.baseUnit || ps.unit}) @ Le ${(ps.sellingPrice || 0).toLocaleString()}`).join(' • ')}</p>
-                      )}
-                      <p className={cn("text-xs mt-0.5", (med.stockQuantity || 0) > 0 ? "text-emerald-600" : "text-red-600")}>{(med.stockQuantity || 0) > 0 ? `${med.stockQuantity} in stock` : 'Out of stock'}</p>
-                    </div>
-                    {(med.stockQuantity || 0) > 0 ? <Plus className="w-4 h-4 text-muted-foreground flex-shrink-0" /> : <Badge variant="destructive" className="flex-shrink-0">No stock</Badge>}
-                  </div>
-                ))}
-              </ScrollArea>
-            </div>
+            <MedicationPicker
+              medications={filteredMedications}
+              loading={medicationsLoading}
+              searchTerm={searchMedication}
+              onSearchTermChange={setSearchMedication}
+              onSelect={(med) => addMedicationToPrescription(med as Medication)}
+              title="Search CAF / local drugs"
+            />
             <div>
               <Label className="text-sm font-medium">Prescription Items ({prescriptionItems.length})</Label>
               <ScrollArea className="h-64 mt-2 border rounded-lg">
@@ -1860,7 +1866,7 @@ export default function DoctorDashboard() {
                             </div>
                             <Button variant="ghost" size="sm" onClick={() => removePrescriptionItem(index)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
                           </div>
-                          <div className="grid grid-cols-3 gap-2 mb-2">
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
                             <div>
                               <Label className="text-[10px] text-muted-foreground">Per dose</Label>
                               <Input placeholder="e.g. 500mg or 1 tablet" value={item.strengthPerDose} onChange={(e) => updatePrescriptionItem(index, 'strengthPerDose', e.target.value)} className="h-8 text-xs" />
@@ -1873,12 +1879,36 @@ export default function DoctorDashboard() {
                               <Label className="text-[10px] text-muted-foreground">Days</Label>
                               <Input type="number" min={1} value={item.durationDays} onChange={(e) => updatePrescriptionItem(index, 'durationDays', parseInt(e.target.value) || 1)} className="h-8 text-xs" />
                             </div>
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground">Route</Label>
+                              <Select value={item.route || 'oral'} onValueChange={(value) => updatePrescriptionItem(index, 'route', value)}>
+                                <SelectTrigger className="h-8 text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="oral">Oral</SelectItem>
+                                  <SelectItem value="intravenous">IV</SelectItem>
+                                  <SelectItem value="intramuscular">IM</SelectItem>
+                                  <SelectItem value="subcutaneous">SC</SelectItem>
+                                  <SelectItem value="topical">Topical</SelectItem>
+                                  <SelectItem value="ophthalmic">Eye drops</SelectItem>
+                                  <SelectItem value="otic">Ear drops</SelectItem>
+                                  <SelectItem value="nasal">Nasal</SelectItem>
+                                  <SelectItem value="inhalation">Inhalation</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                           <div className="text-[10px] text-muted-foreground bg-muted/50 px-2 py-1 rounded mb-2">
                             Computed quantity: <strong>{qtyText}</strong>
                             {item.unitPrice ? <> · Est. line: Le {(computedQty * item.unitPrice).toLocaleString()}</> : null}
                           </div>
-                          <Input placeholder="Patient instructions — leave blank to auto-generate" value={item.instructions} onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)} className="h-8 text-xs" />
+                          <div className="flex gap-2">
+                            <Input placeholder="Patient instructions" value={item.instructions} onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)} className="h-8 text-xs" />
+                            <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => updatePrescriptionItem(index, 'instructions', item.smartInstruction || buildSmartInstruction(item))}>
+                              Smart
+                            </Button>
+                          </div>
                           <Input placeholder="Pharmacist note (internal only, not on label)" value={item.pharmacistNote || ''} onChange={(e) => updatePrescriptionItem(index, 'pharmacistNote', e.target.value)} className="h-8 text-xs mt-1" />
                         </div>
                       );
