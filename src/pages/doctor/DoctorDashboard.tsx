@@ -1834,31 +1834,34 @@ export default function DoctorDashboard() {
 
       {/* Prescription Modal */}
       <Dialog open={prescriptionModalOpen} onOpenChange={(open) => { if (!open) cancelEdit(); setPrescriptionModalOpen(open); }}>
-        <DialogContent className="max-w-4xl max-h-[90vh]">
-          <DialogHeader>
+        <DialogContent className="grid h-[100dvh] max-h-[100dvh] w-screen max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none p-0 sm:h-[94vh] sm:w-[96vw] sm:max-w-none sm:rounded-lg lg:w-[94vw] xl:w-[90vw]">
+          <DialogHeader className="border-b px-4 py-3 pr-12 sm:px-5">
             <DialogTitle>{editingPrescription ? 'Edit Prescription' : 'Prescribe Medication'}</DialogTitle>
           </DialogHeader>
-          {contextPatient?.allergies?.length > 0 && (
-            <div className="rounded-lg border border-red-300 bg-red-50 p-3 flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-semibold text-red-800">Allergy alert</p>
-                <p className="text-[11px] text-red-700">Patient allergies: <span className="font-medium">{contextPatient.allergies.join(', ')}</span>. Verify each medication before prescribing.</p>
+          <div className="min-h-0 space-y-3 overflow-hidden p-3 sm:p-4">
+            {contextPatient?.allergies?.length > 0 && (
+              <div className="rounded-lg border border-red-300 bg-red-50 p-3 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-red-800">Allergy alert</p>
+                  <p className="text-[11px] text-red-700">Patient allergies: <span className="font-medium">{contextPatient.allergies.join(', ')}</span>. Verify each medication before prescribing.</p>
+                </div>
               </div>
-            </div>
-          )}
-          <div className="grid grid-cols-1 md:grid-cols-[0.38fr_0.62fr] gap-4">
-            <MedicationPicker
-              medications={filteredMedications}
-              loading={medicationsLoading}
-              searchTerm={searchMedication}
-              onSearchTermChange={setSearchMedication}
-              onSelect={(med) => addMedicationToPrescription(med as Medication)}
-              title="Search CAF / local drugs"
-            />
-            <div>
+            )}
+            <div className="grid h-full min-h-0 grid-cols-1 gap-3 md:grid-cols-[minmax(280px,0.38fr)_minmax(0,0.62fr)]">
+              <MedicationPicker
+                medications={filteredMedications}
+                loading={medicationsLoading}
+                searchTerm={searchMedication}
+                onSearchTermChange={setSearchMedication}
+                onSelect={(med) => addMedicationToPrescription(med as Medication)}
+                title="Search CAF / local drugs"
+                className="min-h-0 overflow-hidden"
+                listClassName="h-[34vh] md:h-[calc(94vh-16.5rem)]"
+              />
+            <div className="flex min-h-0 flex-col">
               <Label className="text-sm font-medium">Prescription Items ({prescriptionItems.length})</Label>
-              <ScrollArea className="h-[28rem] mt-2 border rounded-lg">
+              <ScrollArea className="mt-2 min-h-0 flex-1 rounded-lg border">
                 {prescriptionItems.length === 0 ? (
                   <div className="p-6 text-center text-muted-foreground text-sm">Click medications to add them</div>
                 ) : (
@@ -1974,8 +1977,9 @@ export default function DoctorDashboard() {
                 </div>
               )}
             </div>
+            </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t bg-background px-4 py-3 sm:px-5">
             <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
             <Button onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()} disabled={(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) || prescriptionItems.length === 0 || prescriptionItems.some(i => validateMedicationRegimen(i).length > 0)}>
               {(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}

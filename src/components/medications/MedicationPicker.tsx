@@ -26,6 +26,8 @@ interface MedicationPickerProps {
   compact?: boolean;
   title?: string;
   emptyText?: string;
+  className?: string;
+  listClassName?: string;
 }
 
 const FILTERS: Array<{ key: FilterKey; label: string }> = [
@@ -56,6 +58,8 @@ export function MedicationPicker({
   compact,
   title = 'Medication',
   emptyText = 'No medications found',
+  className,
+  listClassName,
 }: MedicationPickerProps) {
   const [internalSearch, setInternalSearch] = useState('');
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -78,7 +82,7 @@ export function MedicationPicker({
   }, [medications, filter, query, compact]);
 
   return (
-    <div className="rounded-lg border bg-background">
+    <div className={cn("rounded-lg border bg-background", className)}>
       <div className="border-b p-3 space-y-2">
         <div className="flex items-center justify-between gap-3">
           <div>
@@ -115,7 +119,7 @@ export function MedicationPicker({
           ))}
         </div>
       </div>
-      <ScrollArea className={compact ? 'h-72' : 'h-80'}>
+      <ScrollArea className={cn(compact ? 'h-72' : 'h-80', listClassName)}>
         {loading ? (
           <div className="p-6 text-center text-sm text-muted-foreground">Loading medications...</div>
         ) : filtered.length === 0 ? (
