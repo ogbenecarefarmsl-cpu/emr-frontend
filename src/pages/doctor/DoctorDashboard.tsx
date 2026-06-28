@@ -34,8 +34,10 @@ import { MedicationPicker } from '@/components/medications/MedicationPicker';
 import {
   buildSmartInstruction,
   buildSmartRegimen,
+  computeMedicationQuantity,
   getMedicationBaseUnit,
   getMedicationPrice,
+  validateMedicationRegimen,
   type MedicationLike,
 } from '@/lib/medicationIntelligence';
 
@@ -658,8 +660,9 @@ export default function DoctorDashboard() {
 
       const payload: any = {
         patientId,
-        items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, ...item }) => ({
+        items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, computedQuantity, quantityTouched, isControlled, requiresPrescription, ...item }) => ({
           ...item,
+          quantity: Number(item.quantity || computedQuantity || 1),
           // The frontend no longer sends dosage/frequency/duration (legacy) — backend
           // auto-generates them from strengthPerDose / dosesPerDay / durationDays
           instructions: item.instructions?.trim() || undefined,
@@ -723,8 +726,9 @@ export default function DoctorDashboard() {
     mutationFn: async () => {
       if (!editingPrescription || prescriptionItems.length === 0) return;
       return await prescriptionService.update(editingPrescription._id, {
-        items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, ...item }) => ({
+        items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, computedQuantity, quantityTouched, isControlled, requiresPrescription, ...item }) => ({
           ...item,
+          quantity: Number(item.quantity || computedQuantity || 1),
           instructions: item.instructions?.trim() || undefined,
           pharmacistNote: item.pharmacistNote?.trim() || undefined,
         })),
@@ -757,6 +761,7 @@ export default function DoctorDashboard() {
   const buildPrescriptionItem = (med: MedicationLike, pharmacistNote = '') => {
     const regimen = buildSmartRegimen(med);
     const instructions = buildSmartInstruction(regimen);
+    const computedQuantity = computeMedicationQuantity(regimen, med);
     return {
       medicationId: med._id,
       medicationName: med.name,
@@ -766,12 +771,16 @@ export default function DoctorDashboard() {
       dosage: '',
       frequency: '',
       duration: '',
-      quantity: 0,
+      quantity: computedQuantity,
+      computedQuantity,
+      quantityTouched: false,
       route: regimen.route,
       unitPrice: getMedicationPrice(med),
       sellMode: (med as any).sellMode,
       packSizes: med.packSizes,
       baseUnit: getMedicationBaseUnit(med),
+      isControlled: med.isControlled,
+      requiresPrescription: med.requiresPrescription,
       instructions,
       smartInstruction: instructions,
       pharmacistNote,
@@ -815,9 +824,15 @@ export default function DoctorDashboard() {
 
   const updatePrescriptionItem = (index: number, field: string, value: any) => {
     const updated = [...prescriptionItems];
-    const previous = updated[index];
-    updated[index][field] = value;
+    const previous = { ...updated[index] };
+    updated[index] = { ...updated[index], [field]: value };
     if (['strengthPerDose', 'dosesPerDay', 'durationDays', 'route'].includes(field)) {
+      const nextComputedQuantity = computeMedicationQuantity(updated[index], { baseUnit: updated[index].baseUnit });
+      updated[index].computedQuantity = nextComputedQuantity;
+      if (!previous.quantityTouched || Number(previous.quantity || 0) === Number(previous.computedQuantity || 0)) {
+        updated[index].quantity = nextComputedQuantity;
+        updated[index].quantityTouched = false;
+      }
       const nextInstruction = buildSmartInstruction({
         strengthPerDose: updated[index].strengthPerDose,
         dosesPerDay: Number(updated[index].dosesPerDay || 1),
@@ -828,6 +843,10 @@ export default function DoctorDashboard() {
         updated[index].instructions = nextInstruction;
       }
       updated[index].smartInstruction = nextInstruction;
+    }
+    if (field === 'quantity') {
+      updated[index].quantity = Number(value) || 0;
+      updated[index].quantityTouched = Number(value) !== Number(updated[index].computedQuantity || 0);
     }
     setPrescriptionItems(updated);
   };
@@ -868,6 +887,8 @@ export default function DoctorDashboard() {
       frequency: item.frequency,
       duration: item.duration,
       quantity: item.quantity,
+      computedQuantity: item.quantity,
+      quantityTouched: false,
       route: item.route || 'oral',
       unitPrice: 0,
       instructions: item.instructions || '',
@@ -1813,7 +1834,7 @@ export default function DoctorDashboard() {
 
       {/* Prescription Modal */}
       <Dialog open={prescriptionModalOpen} onOpenChange={(open) => { if (!open) cancelEdit(); setPrescriptionModalOpen(open); }}>
-        <DialogContent className="max-w-3xl max-h-[85vh]">
+        <DialogContent className="max-w-4xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{editingPrescription ? 'Edit Prescription' : 'Prescribe Medication'}</DialogTitle>
           </DialogHeader>
@@ -1826,7 +1847,7 @@ export default function DoctorDashboard() {
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-[0.38fr_0.62fr] gap-4">
             <MedicationPicker
               medications={filteredMedications}
               loading={medicationsLoading}
@@ -1837,36 +1858,36 @@ export default function DoctorDashboard() {
             />
             <div>
               <Label className="text-sm font-medium">Prescription Items ({prescriptionItems.length})</Label>
-              <ScrollArea className="h-64 mt-2 border rounded-lg">
+              <ScrollArea className="h-[28rem] mt-2 border rounded-lg">
                 {prescriptionItems.length === 0 ? (
                   <div className="p-6 text-center text-muted-foreground text-sm">Click medications to add them</div>
                 ) : (
                   <div className="divide-y">
                     {prescriptionItems.map((item, index) => {
-                      // Compute quantity preview from structured fields
-                      const unitsPerDose = (() => {
-                        const s = (item.strengthPerDose || '').trim().toLowerCase();
-                        const m = s.match(/^(\d+(?:\.\d+)?)/);
-                        if (!m) return 1;
-                        const n = parseFloat(m[1]);
-                        const rest = s.slice(m[0].length).trim();
-                        const countUnits = ['tablet', 'tablets', 'capsule', 'capsules', 'ampule', 'ampules', 'vial', 'vials', 'patch', 'patches', 'drop', 'drops', 'puff', 'puffs', 'sachet', 'sachets', 'ml'];
-                        return countUnits.some((u) => rest.startsWith(u)) ? n : 1;
-                      })();
-                      const computedQty = unitsPerDose * (item.dosesPerDay || 0) * (item.durationDays || 0);
-                      const qtyText = `${computedQty} ${item.baseUnit || 'unit'}`;
+                      const computedQty = computeMedicationQuantity(item, { baseUnit: item.baseUnit });
+                      const selectedQty = Number(item.quantity || computedQty);
+                      const unitLabel = item.baseUnit || 'unit';
+                      const qtyText = `${computedQty} ${unitLabel}`;
+                      const duplicateCount = prescriptionItems.filter((candidate) => candidate.medicationId === item.medicationId).length;
+                      const isDuplicate = duplicateCount > 1;
+                      const quantityOverridden = Math.abs(selectedQty - computedQty) > 0.001;
+                      const validationErrors = validateMedicationRegimen({ ...item, quantity: selectedQty });
                       return (
                         <div key={index} className="p-3">
                           <div className="flex items-center justify-between mb-2">
                             <div>
-                              <p className="font-medium text-sm">{item.medicationName}</p>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <p className="font-medium text-sm">{item.medicationName}</p>
+                                {item.isControlled && <Badge variant="destructive" className="text-[10px]">Controlled</Badge>}
+                                {isDuplicate && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[10px] text-amber-700">Duplicate</Badge>}
+                              </div>
                               {item.sellMode && item.sellMode !== 'individual' && item.packSizes && item.packSizes.length > 0 && (
                                 <p className="text-[10px] text-muted-foreground">Packs: {item.packSizes.map((ps: any) => `${ps.name} (${ps.unitsPerPack} ${item.baseUnit || 'unit'}) @ Le ${ps.sellingPrice}`).join(' • ')}</p>
                               )}
                             </div>
                             <Button variant="ghost" size="sm" onClick={() => removePrescriptionItem(index)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
                           </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
+                          <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-2">
                             <div>
                               <Label className="text-[10px] text-muted-foreground">Per dose</Label>
                               <Input placeholder="e.g. 500mg or 1 tablet" value={item.strengthPerDose} onChange={(e) => updatePrescriptionItem(index, 'strengthPerDose', e.target.value)} className="h-8 text-xs" />
@@ -1898,18 +1919,43 @@ export default function DoctorDashboard() {
                                 </SelectContent>
                               </Select>
                             </div>
+                            <div>
+                              <Label className="text-[10px] text-muted-foreground">Qty to dispense</Label>
+                              <Input type="number" min={1} step="1" value={selectedQty} onChange={(e) => updatePrescriptionItem(index, 'quantity', e.target.value)} className="h-8 text-xs" />
+                            </div>
                           </div>
                           <div className="text-[10px] text-muted-foreground bg-muted/50 px-2 py-1 rounded mb-2">
                             Computed quantity: <strong>{qtyText}</strong>
-                            {item.unitPrice ? <> · Est. line: Le {(computedQty * item.unitPrice).toLocaleString()}</> : null}
+                            {quantityOverridden && <> · <span className="font-medium text-amber-700">Manual qty: {selectedQty} {unitLabel}</span></>}
+                            {item.unitPrice ? <> · Est. individual line: Le {(selectedQty * item.unitPrice).toLocaleString()}</> : null}
                           </div>
+                          {quantityOverridden && (
+                            <div className="mb-2 flex items-start gap-1.5 rounded border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-800">
+                              <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                              Qty differs from the calculated regimen. Pharmacy will dispense against this manual quantity.
+                            </div>
+                          )}
+                          {validationErrors.length > 0 && (
+                            <div className="mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[10px] text-red-700">
+                              {validationErrors.join(' ')}
+                            </div>
+                          )}
                           <div className="flex gap-2">
                             <Input placeholder="Patient instructions" value={item.instructions} onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)} className="h-8 text-xs" />
                             <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => updatePrescriptionItem(index, 'instructions', item.smartInstruction || buildSmartInstruction(item))}>
-                              Smart
+                              Regenerate
                             </Button>
                           </div>
                           <Input placeholder="Pharmacist note (internal only, not on label)" value={item.pharmacistNote || ''} onChange={(e) => updatePrescriptionItem(index, 'pharmacistNote', e.target.value)} className="h-8 text-xs mt-1" />
+                          <details className="mt-2 rounded border bg-white px-2 py-1 text-[10px]">
+                            <summary className="cursor-pointer font-medium text-muted-foreground">Preview label</summary>
+                            <div className="mt-1 space-y-0.5 text-foreground">
+                              <p className="font-semibold">{item.medicationName}</p>
+                              <p>{item.instructions || buildSmartInstruction(item)}</p>
+                              <p className="text-muted-foreground">Dispense: {selectedQty} {unitLabel}</p>
+                              {item.pharmacistNote && <p className="text-muted-foreground">Pharmacist note: {item.pharmacistNote}</p>}
+                            </div>
+                          </details>
                         </div>
                       );
                     })}
@@ -1919,17 +1965,8 @@ export default function DoctorDashboard() {
               {prescriptionItems.length > 0 && (
                 <div className="mt-3 p-3 bg-muted/50 rounded-lg">
                   <p className="text-sm font-medium">
-                    Total (estimated): Le {prescriptionItems.reduce((sum, item) => {
-                      const unitsPerDose = (() => {
-                        const s = (item.strengthPerDose || '').trim().toLowerCase();
-                        const m = s.match(/^(\d+(?:\.\d+)?)/);
-                        if (!m) return 1;
-                        const n = parseFloat(m[1]);
-                        const rest = s.slice(m[0].length).trim();
-                        const countUnits = ['tablet', 'tablets', 'capsule', 'capsules', 'ampule', 'ampules', 'vial', 'vials'];
-                        return countUnits.some((u) => rest.startsWith(u)) ? n : 1;
-                      })();
-                      const q = unitsPerDose * (item.dosesPerDay || 0) * (item.durationDays || 0);
+                    Est. individual total: Le {prescriptionItems.reduce((sum, item) => {
+                      const q = Number(item.quantity || computeMedicationQuantity(item, { baseUnit: item.baseUnit }));
                       return sum + (q * (item.unitPrice || 0));
                     }, 0).toLocaleString()}
                   </p>
@@ -1940,7 +1977,7 @@ export default function DoctorDashboard() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
-            <Button onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()} disabled={(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) || prescriptionItems.length === 0 || prescriptionItems.some(i => !i.strengthPerDose || !i.dosesPerDay || !i.durationDays)}>
+            <Button onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()} disabled={(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) || prescriptionItems.length === 0 || prescriptionItems.some(i => validateMedicationRegimen(i).length > 0)}>
               {(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
               {editingPrescription ? 'Update Prescription' : 'Create Prescription'}
             </Button>

@@ -62,6 +62,7 @@ export interface CreateTreatmentPlanItemInput {
   strengthPerDose?: string;
   dosesPerDay?: number;
   durationDays?: number;
+  quantity?: number;
   route?: string;
   testCode?: string;
   testName?: string;

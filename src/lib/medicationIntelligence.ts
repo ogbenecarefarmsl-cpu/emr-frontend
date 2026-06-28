@@ -32,6 +32,13 @@ export type MedicationLike = {
   }>;
 };
 
+export type MedicationQuantityInput = {
+  strengthPerDose?: string;
+  dosesPerDay?: number;
+  durationDays?: number;
+  quantity?: number;
+};
+
 export type RouteHint =
   | 'oral'
   | 'intravenous'
@@ -165,6 +172,60 @@ export const buildSmartRegimen = (med: MedicationLike) => {
   }
 
   return { strengthPerDose, dosesPerDay, durationDays, route };
+};
+
+export const parseDoseUnitCount = (strengthPerDose?: string) => {
+  const value = (strengthPerDose || '').trim().toLowerCase();
+  const match = value.match(/^(\d+(?:\.\d+)?)/);
+  if (!match) return 1;
+
+  const count = Number(match[1]);
+  const unitText = value.slice(match[0].length).trim();
+  const countUnits = [
+    'tablet',
+    'tablets',
+    'tab',
+    'tabs',
+    'capsule',
+    'capsules',
+    'cap',
+    'caps',
+    'ampule',
+    'ampules',
+    'ampoule',
+    'ampoules',
+    'vial',
+    'vials',
+    'patch',
+    'patches',
+    'drop',
+    'drops',
+    'puff',
+    'puffs',
+    'sachet',
+    'sachets',
+    'ml',
+  ];
+
+  return countUnits.some((unit) => unitText.startsWith(unit)) ? count : 1;
+};
+
+export const computeMedicationQuantity = (item: MedicationQuantityInput, _med?: MedicationLike) => {
+  const unitsPerDose = parseDoseUnitCount(item.strengthPerDose);
+  const dosesPerDay = Math.max(1, Number(item.dosesPerDay || 1));
+  const durationDays = Math.max(1, Number(item.durationDays || 1));
+  return Math.max(1, Math.round(unitsPerDose * dosesPerDay * durationDays * 100) / 100);
+};
+
+export const validateMedicationRegimen = (item: MedicationQuantityInput) => {
+  const errors: string[] = [];
+  if (!item.strengthPerDose?.trim()) errors.push('Per dose is required.');
+  if (Number(item.dosesPerDay || 0) < 1) errors.push('Doses/day must be at least 1.');
+  if (Number(item.dosesPerDay || 0) > 24) errors.push('Doses/day cannot exceed 24.');
+  if (Number(item.durationDays || 0) < 1) errors.push('Days must be at least 1.');
+  if (Number(item.durationDays || 0) > 365) errors.push('Days cannot exceed 365.');
+  if (Number(item.quantity || 0) < 1) errors.push('Qty to dispense must be at least 1.');
+  return errors;
 };
 
 export const frequencyText = (dosesPerDay: number) => {

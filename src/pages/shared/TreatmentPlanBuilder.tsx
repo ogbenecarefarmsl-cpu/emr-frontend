@@ -10,10 +10,12 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { MedicationPicker } from '@/components/medications/MedicationPicker';
 import {
   buildSmartInstruction,
   buildSmartRegimen,
+  computeMedicationQuantity,
   getMedicationBaseUnit,
   getMedicationPrice,
   getMedicationStock,
@@ -95,9 +97,9 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
   const [selectedLab, setSelectedLab] = useState<any>(null);
 
   // Procedure/Other form state
-  const [procName, setProcName] = useState('');
-  const [procAmount, setProcAmount] = useState(0);
-  const [procNotes, setProcNotes] = useState('');
+  const [procedureForm, setProcedureForm] = useState({ name: '', amount: 0, notes: '' });
+  const [otherForm, setOtherForm] = useState({ description: '', amount: 0, notes: '' });
+  const [sendConfirmOpen, setSendConfirmOpen] = useState(false);
 
   // Fetch visits (only when no preselected patient)
   const { data: visits = [], isLoading: visitsLoading } = useQuery({
@@ -151,31 +153,19 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
   }, [lisCatalog, labSearch]);
 
   // Helper: extract units per dose from strengthPerDose string (e.g., "2 tablets" → 2)
-  const getUnitsPerDose = (strengthPerDose: string): number => {
-    const s = (strengthPerDose || '').trim().toLowerCase();
-    const m = s.match(/^(\d+(?:\.\d+)?)/);
-    if (m) {
-      const n = parseFloat(m[1]);
-      const rest = s.slice(m[0].length).trim();
-      const countUnits = ['tablet', 'tablets', 'capsule', 'capsules', 'ampule', 'ampules', 'vial', 'vials', 'patch', 'patches', 'drop', 'drops', 'puff', 'puffs', 'sachet', 'sachets', 'ml'];
-      if (countUnits.some((u) => rest.startsWith(u))) return n;
-    }
-    return 1;
-  };
-
   // Estimated total
   const estimatedTotal = useMemo(() => {
     return items.reduce((sum, item) => {
       if (item.type === 'drug' || item.type === 'iv') {
         const med = allMedications.find((m: any) => m._id === item.medicationId);
         const unitPrice = med ? getMedicationPrice(med) : 0;
-        const unitsPerDose = getUnitsPerDose(item.strengthPerDose || '');
-        const qty = unitsPerDose * item.dosesPerDay! * item.durationDays!;
+        const qty = computeMedicationQuantity(item, med);
         return sum + unitPrice * qty;
       }
       if (item.type === 'lab') {
         return sum + (item.testPrice || 0);
       }
+      // procedure, other — price is in amount
       return sum + (item.amount || 0);
     }, 0);
   }, [items, allMedications]);
@@ -188,8 +178,8 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
     if (dosesPerDay < 1) return toast.error('Doses per day must be at least 1');
     if (durationDays < 1) return toast.error('Duration must be at least 1 day');
 
-    const unitsPerDose = getUnitsPerDose(strengthPerDose);
-    const qty = unitsPerDose * dosesPerDay * durationDays;
+    const duplicate = items.some((item) => (item.type === 'drug' || item.type === 'iv') && item.medicationId === selectedMed._id);
+    const quantity = computeMedicationQuantity({ strengthPerDose, dosesPerDay, durationDays }, selectedMed);
     const newItem: CreateTreatmentPlanItemInput = {
       type: itemType,
       medicationId: selectedMed._id,
@@ -197,6 +187,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
       strengthPerDose,
       dosesPerDay,
       durationDays,
+      quantity,
       route,
       notes: buildSmartInstruction({ strengthPerDose, dosesPerDay, durationDays, route }),
     };
@@ -206,11 +197,12 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
     setStrengthPerDose('1 tablet');
     setDosesPerDay(3);
     setDurationDays(7);
-    toast.success(`Added ${itemType === 'iv' ? 'IV' : 'drug'}: ${selectedMed.name}`);
+    toast.success(`Added ${itemType === 'iv' ? 'IV' : 'drug'}: ${selectedMed.name}${duplicate ? ' (duplicate)' : ''}`);
   };
 
   const addLabTest = () => {
     if (!selectedLab) return toast.error('Select a lab test');
+    const duplicate = items.some((item) => item.type === 'lab' && (item.testId || item.testCode) === (selectedLab._id || selectedLab.testId || selectedLab.testCode || selectedLab.code));
     const newItem: CreateTreatmentPlanItemInput = {
       type: 'lab',
       testCode: selectedLab.testCode || selectedLab.code,
@@ -221,37 +213,32 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
     setItems((prev) => [...prev, newItem]);
     setSelectedLab(null);
     setLabSearch('');
-    toast.success(`Added lab test: ${newItem.testName}`);
+    toast.success(`Added lab test: ${newItem.testName}${duplicate ? ' (duplicate)' : ''}`);
   };
 
   const addProcedure = () => {
-    if (!procName.trim()) return toast.error('Enter procedure name');
+    if (!procedureForm.name.trim()) return toast.error('Enter procedure name');
     const newItem: CreateTreatmentPlanItemInput = {
       type: 'procedure',
-      testCode: `PROC-${Date.now()}`,
-      testName: procName,
-      testPrice: procAmount,
-      description: procNotes || procName,
+      description: procedureForm.name,
+      amount: procedureForm.amount,
+      notes: procedureForm.notes || procedureForm.name,
     };
     setItems((prev) => [...prev, newItem]);
-    setProcName('');
-    setProcAmount(0);
-    setProcNotes('');
-    toast.success(`Added procedure: ${procName}`);
+    setProcedureForm({ name: '', amount: 0, notes: '' });
+    toast.success(`Added procedure: ${procedureForm.name}`);
   };
 
   const addOther = () => {
-    if (!procName.trim()) return toast.error('Enter description');
+    if (!otherForm.description.trim()) return toast.error('Enter description');
     const newItem: CreateTreatmentPlanItemInput = {
       type: 'other',
-      description: procName,
-      amount: procAmount,
-      notes: procNotes,
+      description: otherForm.description,
+      amount: otherForm.amount,
+      notes: otherForm.notes,
     };
     setItems((prev) => [...prev, newItem]);
-    setProcName('');
-    setProcAmount(0);
-    setProcNotes('');
+    setOtherForm({ description: '', amount: 0, notes: '' });
     toast.success('Added item');
   };
 
@@ -328,17 +315,13 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
       {/* Item type tabs */}
       <Tabs value={activeTab} onValueChange={(value) => {
         setActiveTab(value);
-        if (value === 'drug' || value === 'iv') {
-          setItemType(value);
-          if (value === 'iv') setRoute('intravenous');
+        if (value === 'drug') {
+          setItemType('drug');
         }
       }}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="drug" className="text-xs">
             <Pill className="h-3 w-3 mr-1" /> Drug
-          </TabsTrigger>
-          <TabsTrigger value="iv" className="text-xs">
-            <FlaskConical className="h-3 w-3 mr-1" /> IV
           </TabsTrigger>
           <TabsTrigger value="lab" className="text-xs">
             <Beaker className="h-3 w-3 mr-1" /> Lab
@@ -351,14 +334,14 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
           </TabsTrigger>
         </TabsList>
 
-        {/* Drug / IV tab */}
+        {/* Drug tab */}
         <TabsContent value="drug" className="space-y-3">
           <SmartDrugIvForm
             type="drug"
             allMedications={allMedications}
             medsLoading={medsLoading}
             selectedMed={selectedMed}
-            setSelectedMed={(med) => selectMedicationForPlan(med, 'drug')}
+            setSelectedMed={(med) => selectMedicationForPlan(med)}
             strengthPerDose={strengthPerDose}
             setStrengthPerDose={setStrengthPerDose}
             dosesPerDay={dosesPerDay}
@@ -366,25 +349,6 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
             durationDays={durationDays}
             setDurationDays={setDurationDays}
             route={route}
-            setRoute={setRoute}
-            onAdd={addDrugOrIv}
-          />
-        </TabsContent>
-
-        <TabsContent value="iv" className="space-y-3">
-          <SmartDrugIvForm
-            type="iv"
-            allMedications={allMedications}
-            medsLoading={medsLoading}
-            selectedMed={selectedMed}
-            setSelectedMed={(med) => selectMedicationForPlan(med, 'iv')}
-            strengthPerDose={strengthPerDose}
-            setStrengthPerDose={setStrengthPerDose}
-            dosesPerDay={dosesPerDay}
-            setDosesPerDay={setDosesPerDay}
-            durationDays={durationDays}
-            setDurationDays={setDurationDays}
-            route="intravenous"
             setRoute={setRoute}
             onAdd={addDrugOrIv}
           />
@@ -453,8 +417,8 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
             <Input
               className="mt-1"
               placeholder="e.g. Wound Dressing, Injection, etc."
-              value={procName}
-              onChange={(e) => setProcName(e.target.value)}
+              value={procedureForm.name}
+              onChange={(e) => setProcedureForm((prev) => ({ ...prev, name: e.target.value }))}
             />
           </div>
           <div>
@@ -462,8 +426,8 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
             <Input
               type="number"
               className="mt-1"
-              value={procAmount}
-              onChange={(e) => setProcAmount(Number(e.target.value))}
+              value={procedureForm.amount}
+              onChange={(e) => setProcedureForm((prev) => ({ ...prev, amount: Number(e.target.value) }))}
             />
           </div>
           <div>
@@ -471,11 +435,11 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
             <Input
               className="mt-1"
               placeholder="Additional details..."
-              value={procNotes}
-              onChange={(e) => setProcNotes(e.target.value)}
+              value={procedureForm.notes}
+              onChange={(e) => setProcedureForm((prev) => ({ ...prev, notes: e.target.value }))}
             />
           </div>
-          <Button onClick={addProcedure} disabled={!procName.trim()} size="sm">
+          <Button onClick={addProcedure} disabled={!procedureForm.name.trim()} size="sm">
             <Plus className="h-4 w-4 mr-1" /> Add Procedure
           </Button>
         </TabsContent>
@@ -487,8 +451,8 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
             <Input
               className="mt-1"
               placeholder="e.g. Referral, Follow-up, etc."
-              value={procName}
-              onChange={(e) => setProcName(e.target.value)}
+              value={otherForm.description}
+              onChange={(e) => setOtherForm((prev) => ({ ...prev, description: e.target.value }))}
             />
           </div>
           <div>
@@ -496,8 +460,8 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
             <Input
               type="number"
               className="mt-1"
-              value={procAmount}
-              onChange={(e) => setProcAmount(Number(e.target.value))}
+              value={otherForm.amount}
+              onChange={(e) => setOtherForm((prev) => ({ ...prev, amount: Number(e.target.value) }))}
             />
           </div>
           <div>
@@ -505,11 +469,11 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
             <Input
               className="mt-1"
               placeholder="Additional details..."
-              value={procNotes}
-              onChange={(e) => setProcNotes(e.target.value)}
+              value={otherForm.notes}
+              onChange={(e) => setOtherForm((prev) => ({ ...prev, notes: e.target.value }))}
             />
           </div>
-          <Button onClick={addOther} disabled={!procName.trim()} size="sm">
+          <Button onClick={addOther} disabled={!otherForm.description.trim()} size="sm">
             <Plus className="h-4 w-4 mr-1" /> Add Item
           </Button>
         </TabsContent>
@@ -524,11 +488,13 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
               const meta = TYPE_META[item.type] || TYPE_META.other;
               const Icon = meta.icon;
               const isDrugOrIv = item.type === 'drug' || item.type === 'iv';
-              const unitsPerDose = getUnitsPerDose(item.strengthPerDose || '');
-              const qty = isDrugOrIv ? unitsPerDose * (item.dosesPerDay || 1) * (item.durationDays || 1) : 0;
               const med = isDrugOrIv ? allMedications.find((m: any) => m._id === item.medicationId) : null;
-              const unitPrice = med?.unitPrice || 0;
+              const qty = isDrugOrIv ? Number(item.quantity || computeMedicationQuantity(item, med)) : 0;
+              const unitPrice = med ? getMedicationPrice(med) : 0;
               const lineTotal = isDrugOrIv ? unitPrice * qty : (item.type === 'lab' ? item.testPrice || 0 : item.amount || 0);
+              const isDuplicate =
+                (isDrugOrIv && items.filter((candidate) => (candidate.type === 'drug' || candidate.type === 'iv') && candidate.medicationId === item.medicationId).length > 1) ||
+                (item.type === 'lab' && items.filter((candidate) => candidate.type === 'lab' && (candidate.testId || candidate.testCode) === (item.testId || item.testCode)).length > 1);
 
               return (
                 <div key={idx} className="p-3 bg-muted rounded-lg text-sm space-y-1.5">
@@ -542,6 +508,11 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
                       <span className="font-medium truncate">
                         {isDrugOrIv ? item.medicationName : item.type === 'lab' ? item.testName : item.testName || item.description}
                       </span>
+                      {isDuplicate && (
+                        <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[10px] text-amber-700">
+                          Duplicate
+                        </Badge>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="font-semibold">Le {lineTotal.toLocaleString()}</span>
@@ -563,7 +534,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
                       <span>Route: <span className="text-foreground capitalize">{item.route}</span></span>
                       <span>Frequency: <span className="text-foreground">{item.dosesPerDay}x/day</span></span>
                       <span>Duration: <span className="text-foreground">{item.durationDays} days</span></span>
-                      <span>Qty: <span className="text-foreground">{qty} units</span></span>
+                      <span>Qty: <span className="text-foreground">{qty} {med ? getMedicationBaseUnit(med) : 'units'}</span></span>
                       <span>Unit price: <span className="text-foreground">Le {unitPrice.toLocaleString()}</span></span>
                     </div>
                   )}
@@ -616,7 +587,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
         </Button>
         <Button
           disabled={items.length === 0 || !selectedPatientId || createMutation.isPending}
-          onClick={() => createMutation.mutate(true)}
+          onClick={() => setSendConfirmOpen(true)}
         >
           {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : (
             <Send className="h-4 w-4 mr-1" />
@@ -624,6 +595,41 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
           Send to Reception
         </Button>
       </div>
+      <Dialog open={sendConfirmOpen} onOpenChange={setSendConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send treatment plan to reception?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <p className="text-muted-foreground">
+              Reception will see this plan for payment and fulfilment.
+            </p>
+            <div className="rounded-lg border bg-muted/40 p-3">
+              <div className="flex justify-between">
+                <span>Items</span>
+                <span className="font-medium">{items.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Total estimate</span>
+                <span className="font-semibold">Le {estimatedTotal.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendConfirmOpen(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                setSendConfirmOpen(false);
+                createMutation.mutate(true);
+              }}
+              disabled={createMutation.isPending}
+            >
+              {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
+              Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 

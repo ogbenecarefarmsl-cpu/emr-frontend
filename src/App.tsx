@@ -72,7 +72,6 @@ import ManagementKpisPage from "./pages/admin/ManagementKpisPage";
 
 // Doctor Pages
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
-import PrescriptionForm from "./pages/doctor/PrescriptionForm";
 
 
 // Nurse Pages
@@ -390,7 +389,10 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['doctor', 'specialist', 'admin']}><DoctorDashboard /></RoleGuard>
       } />
       <Route path="/doctor/prescribe/:consultationId" element={
-        <RoleGuard allowedRoles={['doctor', 'specialist', 'admin']}><PrescriptionForm /></RoleGuard>
+        <RoleGuard allowedRoles={['doctor', 'specialist', 'admin']}><Navigate to="/doctor" replace /></RoleGuard>
+      } />
+      <Route path="/doctor/prescription/:consultationId" element={
+        <RoleGuard allowedRoles={['doctor', 'specialist', 'admin']}><Navigate to="/doctor" replace /></RoleGuard>
       } />
       <Route path="/doctor/treatment-plans" element={
         <RoleGuard allowedRoles={['doctor', 'specialist', 'admin']}><DoctorTreatmentPlanPage /></RoleGuard>
