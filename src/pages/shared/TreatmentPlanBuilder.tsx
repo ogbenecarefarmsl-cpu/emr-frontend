@@ -218,15 +218,20 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
 
   const addProcedure = () => {
     if (!procedureForm.name.trim()) return toast.error('Enter procedure name');
+    const procedureName = procedureForm.name.trim();
+    const procedureAmount = Number(procedureForm.amount || 0);
     const newItem: CreateTreatmentPlanItemInput = {
       type: 'procedure',
-      description: procedureForm.name,
-      amount: procedureForm.amount,
-      notes: procedureForm.notes || procedureForm.name,
+      testCode: `PROC-${Date.now()}`,
+      testName: procedureName,
+      testPrice: procedureAmount,
+      description: procedureForm.notes || procedureName,
+      amount: procedureAmount,
+      notes: procedureForm.notes || procedureName,
     };
     setItems((prev) => [...prev, newItem]);
     setProcedureForm({ name: '', amount: 0, notes: '' });
-    toast.success(`Added procedure: ${procedureForm.name}`);
+    toast.success(`Added procedure: ${procedureName}`);
   };
 
   const addOther = () => {
