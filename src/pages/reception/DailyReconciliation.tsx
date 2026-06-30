@@ -49,6 +49,8 @@ import {
   Users,
   Sparkles,
   HelpCircle,
+  Wallet,
+  CreditCard,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -143,6 +145,8 @@ export default function DailyReconciliation() {
   const netExpectedOrange = expected?.expectedOrangeMoney || 0;
   const netExpectedAfri = expected?.expectedAfrimoney || 0;
   const netExpectedTotal = netExpectedCash + netExpectedOrange + netExpectedAfri;
+  const walletDeposits = expected?.incomeWalletDeposits ?? todayData?.walletDeposits ?? 0;
+  const treatmentPlanCollected = expected?.incomeTreatmentPlans ?? todayData?.treatmentPlanPayments ?? 0;
 
   // Variance = expected − actual: positive = shortage, negative = surplus
   const cashVariance = netExpectedCash - actualCashNum;
@@ -297,14 +301,14 @@ export default function DailyReconciliation() {
               Le {(todayData?.totalIncome || 0).toLocaleString()}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              From {todayData?.paymentCount || 0} order payments today
+              From {todayData?.paymentCount || 0} payments today
             </p>
           </div>
         </div>
       </div>
 
       {/* Secondary Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
         <div className="bg-card border rounded-lg p-4">
           <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
             <Banknote className="w-3 h-3" /> Expected Cash
@@ -331,6 +335,24 @@ export default function DailyReconciliation() {
             Le {(cashExpendituresTotal + orangeExpendituresTotal + afriExpendituresTotal).toLocaleString()}
           </p>
           <p className="text-xs text-muted-foreground mt-1">{Array.isArray(expenditures) ? expenditures.length : 0} items</p>
+        </div>
+        <div className="bg-card border rounded-lg p-4">
+          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+            <Wallet className="w-3 h-3 text-sky-600" /> Wallet Deposits
+          </p>
+          <p className="text-xl font-bold text-sky-700 mt-1">
+            Le {walletDeposits.toLocaleString()}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">Included by payment method</p>
+        </div>
+        <div className="bg-card border rounded-lg p-4">
+          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+            <CreditCard className="w-3 h-3 text-violet-600" /> Treatment Plans
+          </p>
+          <p className="text-xl font-bold text-violet-700 mt-1">
+            Le {treatmentPlanCollected.toLocaleString()}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">Paid or partly paid today</p>
         </div>
         <div className="bg-card border rounded-lg p-4">
           <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
