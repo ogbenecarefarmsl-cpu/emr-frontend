@@ -162,16 +162,24 @@ export default function ReceptionDashboard() {
     ? outstandingBalances.reduce((sum: number, o: any) => sum + (o.balance || o.outstanding || 0), 0)
     : 0;
   const cashByMethod = useMemo(() => {
-    const methods: Record<string, number> = { cash: 0, orange_money: 0, afrimoney: 0 };
+    const methods: Record<string, number> = {
+      cash: 0,
+      orange_money: 0,
+      afrimoney: 0,
+      wallet_deposits: paymentStats?.walletDeposits || 0,
+      treatment_plans: paymentStats?.treatmentPlanCollected || 0,
+    };
     if (Array.isArray(dailyIncome)) {
       dailyIncome.forEach((entry: any) => {
         methods.cash += entry.cashPayments || 0;
         methods.orange_money += entry.orangeMoneyPayments || 0;
         methods.afrimoney += entry.afrimoneyPayments || 0;
+        if (!paymentStats?.walletDeposits) methods.wallet_deposits += entry.walletDeposits || 0;
+        if (!paymentStats?.treatmentPlanCollected) methods.treatment_plans += entry.treatmentPlanPayments || 0;
       });
     }
     return methods;
-  }, [dailyIncome]);
+  }, [dailyIncome, paymentStats?.treatmentPlanCollected, paymentStats?.walletDeposits]);
   const totalExpenditures = expenditureSummary?.totalExpenditures || 0;
   const netCashPosition = (paymentStats?.paidRevenue ?? 0) - totalExpenditures;
 
@@ -298,7 +306,7 @@ export default function ReceptionDashboard() {
           </Button>
         </div>
         <div className="p-5">
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
             <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 border border-green-200 dark:border-green-800">
               <div className="flex items-center gap-2 mb-1">
                 <Wallet className="w-3.5 h-3.5 text-green-600" />
@@ -319,6 +327,20 @@ export default function ReceptionDashboard() {
                 <p className="text-xs font-medium text-yellow-700 dark:text-yellow-400">Afrimoney</p>
               </div>
               <p className="text-lg font-bold text-yellow-800 dark:text-yellow-300">Le {cashByMethod.afrimoney.toLocaleString()}</p>
+            </div>
+            <div className="bg-sky-50 dark:bg-sky-950/30 rounded-lg p-3 border border-sky-200 dark:border-sky-800">
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="w-3.5 h-3.5 text-sky-600" />
+                <p className="text-xs font-medium text-sky-700 dark:text-sky-400">Wallet Deposits</p>
+              </div>
+              <p className="text-lg font-bold text-sky-800 dark:text-sky-300">Le {cashByMethod.wallet_deposits.toLocaleString()}</p>
+            </div>
+            <div className="bg-violet-50 dark:bg-violet-950/30 rounded-lg p-3 border border-violet-200 dark:border-violet-800">
+              <div className="flex items-center gap-2 mb-1">
+                <CreditCard className="w-3.5 h-3.5 text-violet-600" />
+                <p className="text-xs font-medium text-violet-700 dark:text-violet-400">Treatment Plans</p>
+              </div>
+              <p className="text-lg font-bold text-violet-800 dark:text-violet-300">Le {cashByMethod.treatment_plans.toLocaleString()}</p>
             </div>
             <div className="bg-red-50 dark:bg-red-950/30 rounded-lg p-3 border border-red-200 dark:border-red-800">
               <div className="flex items-center gap-2 mb-1">
