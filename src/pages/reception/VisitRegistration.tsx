@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCreateVisit, useMarkConsultationPaid } from '@/hooks/useVisits';
 import { useSearchPatients } from '@/hooks/usePatients';
 import { useDoctors } from '@/hooks/useDoctors';
+import { useMyServicePrices } from '@/hooks/useServicePrices';
 import { useAuth } from '@/context/AuthContext';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Button } from '@/components/ui/button';
@@ -76,9 +77,26 @@ export default function VisitRegistration() {
 
   const { data: searchResults = [], isLoading: searchLoading } = useSearchPatients(searchTerm);
   const { data: allPatients = [] } = useSearchPatients('');
+  const { data: servicePrices = [] } = useMyServicePrices();
   const createVisit = useCreateVisit();
   const markConsultationPaid = useMarkConsultationPaid();
-  const selectedService = BILLABLE_SERVICES.find((service) => service.id === selectedServiceId) || BILLABLE_SERVICES[0];
+  const servicePriceMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (Array.isArray(servicePrices)) {
+      servicePrices.forEach((price: any) => {
+        map[price.code] = Number(price.amount || 0);
+      });
+    }
+    return map;
+  }, [servicePrices]);
+  const pricedServices = useMemo(
+    () => BILLABLE_SERVICES.map((service) => ({
+      ...service,
+      fee: servicePriceMap[service.id] ?? service.fee,
+    })),
+    [servicePriceMap],
+  );
+  const selectedService = pricedServices.find((service) => service.id === selectedServiceId) || pricedServices[0];
 
   const recentPatients = useMemo(() => {
     if (!Array.isArray(allPatients)) return [];
@@ -111,10 +129,10 @@ export default function VisitRegistration() {
   useEffect(() => {
     const serviceFee = selectedService.fee;
     let extraFee = 0;
-    if (wantsMalariaTest) extraFee += 50;
-    if (wantsTyphoidTest) extraFee += 50;
+    if (wantsMalariaTest) extraFee += servicePriceMap.rapid_malaria ?? 50;
+    if (wantsTyphoidTest) extraFee += servicePriceMap.rapid_typhoid ?? 50;
     setConsultationFee(String(serviceFee + extraFee));
-  }, [selectedServiceId, wantsMalariaTest, wantsTyphoidTest]);
+  }, [selectedService.fee, servicePriceMap, wantsMalariaTest, wantsTyphoidTest]);
 
   const handleSubmit = async () => {
     if (!selectedPatient) {
@@ -302,7 +320,7 @@ export default function VisitRegistration() {
                   <Select
                     value={selectedServiceId}
                     onValueChange={(value) => {
-                      const service = BILLABLE_SERVICES.find((item) => item.id === value);
+                      const service = pricedServices.find((item) => item.id === value);
                       setSelectedServiceId(value as ServiceId);
                       if (service) {
                         setVisitType(service.visitType);
@@ -313,7 +331,7 @@ export default function VisitRegistration() {
                       <SelectValue placeholder="Select service" />
                     </SelectTrigger>
                     <SelectContent>
-                      {BILLABLE_SERVICES.map((service) => {
+                    {pricedServices.map((service) => {
                         const Icon = service.icon;
                         return (
                           <SelectItem key={service.id} value={service.id}>
@@ -385,13 +403,13 @@ export default function VisitRegistration() {
                     <div className="flex items-center space-x-2">
                       <Checkbox id="rapidMalaria" checked={wantsMalariaTest} onCheckedChange={(c) => setWantsMalariaTest(!!c)} />
                       <label htmlFor="rapidMalaria" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Rapid Malaria (+50)
+                        Rapid Malaria (+{servicePriceMap.rapid_malaria ?? 50})
                       </label>
                     </div>
                     <div className="flex items-center space-x-2">
                       <Checkbox id="rapidTyphoid" checked={wantsTyphoidTest} onCheckedChange={(c) => setWantsTyphoidTest(!!c)} />
                       <label htmlFor="rapidTyphoid" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Rapid Typhoid (+50)
+                        Rapid Typhoid (+{servicePriceMap.rapid_typhoid ?? 50})
                       </label>
                     </div>
                   </div>
@@ -417,8 +435,9 @@ export default function VisitRegistration() {
                     id="consultationFee"
                     type="number"
                     value={consultationFee}
-                    onChange={(e) => setConsultationFee(e.target.value)}
-                    placeholder="Enter consultation fee"
+                    readOnly
+                    className="bg-muted"
+                    placeholder="Configured service fee"
                     min="0"
                   />
                 </div>

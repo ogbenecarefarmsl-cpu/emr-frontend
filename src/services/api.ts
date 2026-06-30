@@ -664,6 +664,25 @@ export const branchesAPI = {
     const response = await api.patch(`/branches/${id}`, data);
     return response.data;
   },
+  batchCreateUsers: async (branchId: string, users: any[]) => {
+    const response = await api.post(`/branches/${branchId}/batch-create-users`, { users });
+    return response.data;
+  },
+};
+
+export const servicePricesAPI = {
+  getMine: async () => {
+    const response = await api.get('/service-prices');
+    return response.data;
+  },
+  getForBranch: async (branchId?: string) => {
+    const response = await api.get('/service-prices/admin', { params: { branchId } });
+    return response.data;
+  },
+  updateForBranch: async (branchId: string, prices: Array<{ code: string; amount: number; isActive?: boolean }>) => {
+    const response = await api.put(`/service-prices/admin/${branchId}`, { prices });
+    return response.data;
+  },
 };
 
 export const reportsAPI = {

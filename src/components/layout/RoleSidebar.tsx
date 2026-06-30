@@ -59,6 +59,7 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
     { to: '/admin/reconciliation', icon: Calculator, label: 'Cash Reconciliation' },
     { to: '/admin/audit-logs', icon: FileCheck, label: 'Audit Logs' },
     { to: '/admin/test-catalog', icon: FlaskConical, label: 'Lab Test Pricing' },
+    { to: '/admin/service-pricing', icon: Tag, label: 'Service Pricing' },
     { to: '/admin/results', icon: FileText, label: 'Released Lab Results' },
     { to: '/admin/report-template', icon: FileEdit, label: 'Report Templates' },
     { to: '/admin/machines', icon: Cpu, label: 'Lab Machines' },

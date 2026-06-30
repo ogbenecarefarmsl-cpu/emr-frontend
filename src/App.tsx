@@ -69,6 +69,7 @@ import DoctorsPage from "./pages/admin/DoctorsPage";
 import RoomsPage from "./pages/admin/RoomsPage";
 import ConnectionSettings from "./pages/admin/ConnectionSettings";
 import ManagementKpisPage from "./pages/admin/ManagementKpisPage";
+import ServicePricingPage from "./pages/admin/ServicePricingPage";
 
 // Doctor Pages
 import DoctorDashboard from "./pages/doctor/DoctorDashboard";
@@ -370,6 +371,9 @@ function AppRoutes() {
       } />
       <Route path="/admin/branches" element={
         <RoleGuard allowedRoles={['admin']}><BranchManagementPage /></RoleGuard>
+      } />
+      <Route path="/admin/service-pricing" element={
+        <RoleGuard allowedRoles={['admin']}><ServicePricingPage /></RoleGuard>
       } />
       <Route path="/admin/doctors" element={
         <RoleGuard allowedRoles={['admin']}><DoctorsPage /></RoleGuard>
