@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { NurseMetrics } from '@/components/nurse/NurseMetrics';
 import { useAwaitingTriage } from '@/hooks/useVisits';
 import { useAdmissionsDashboard } from '@/hooks/useAdmissions';
+import { prescriptionService } from '@/services/prescriptionService';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -19,6 +21,7 @@ import {
   HeartPulse,
   Pill,
   Stethoscope,
+  Clock,
 } from 'lucide-react';
 
 const workspaces = [
@@ -78,6 +81,12 @@ export default function NurseDashboard() {
   const navigate = useNavigate();
   const { data: triageQueue = [] } = useAwaitingTriage();
   const { data: dashboard } = useAdmissionsDashboard(false);
+  const { data: marWorklist = [] } = useQuery({
+    queryKey: ['prescriptions', 'mar-worklist'],
+    queryFn: () => prescriptionService.getMarWorklist(),
+    refetchInterval: 15_000,
+    staleTime: 10_000,
+  });
   const activeAdmissions = dashboard?.activeAdmissions || [];
   const stats = dashboard?.stats || { activeTotal: 0, todayAdmissions: 0, todayDischarges: 0, byWard: [] };
 
@@ -105,19 +114,19 @@ export default function NurseDashboard() {
     lastSeenTriageIds.current = new Set(criticalIds);
   }, [triageQueue]);
 
-  // Calculate dueMeds count from active admissions' medicationLog
-  // TODO: once medicationOrders/marOrders include scheduled administration times, compare against current time.
-  const dueMedsCount = useMemo(() => {
-    let count = 0;
-    for (const adm of activeAdmissions) {
-      const orders = adm.medicationOrders || adm.marOrders || [];
-      if (!orders.length) continue;
-      const lastLog = (adm.medicationLog || []).slice(-1)[0];
-      // Without scheduled times we cannot accurately determine dues; avoid false positives.
-      if (!lastLog) count += orders.length;
-    }
-    return count;
-  }, [activeAdmissions]);
+  const dueNowMeds = useMemo(() => (
+    Array.isArray(marWorklist)
+      ? marWorklist.filter((rx: any) => rx.status !== 'completed' && rx.nextDueAt && new Date(rx.nextDueAt) <= new Date())
+      : []
+  ), [marWorklist]);
+
+  const upcomingMedsCount = useMemo(() => (
+    Array.isArray(marWorklist)
+      ? marWorklist.filter((rx: any) => rx.status !== 'completed' && rx.nextDueAt && new Date(rx.nextDueAt) > new Date()).length
+      : 0
+  ), [marWorklist]);
+
+  const dueMedsCount = dueNowMeds.length;
 
   const abnormalVitalsCount = useMemo(() => {
     let count = 0;
@@ -178,8 +187,61 @@ export default function NurseDashboard() {
             </div>
             <div className="mt-4 space-y-3">
               <QueueLine label="Awaiting triage" value={triageQueue.length} action={() => navigate('/nurse/triage')} tone="warning" />
+              <QueueLine label="MAR due now" value={dueMedsCount} action={() => navigate('/nurse/mar')} tone={dueMedsCount > 0 ? 'critical' : undefined} unit="dose" />
+              <QueueLine label="Abnormal vitals" value={abnormalVitalsCount} action={() => navigate('/nurse/admissions')} tone={abnormalVitalsCount > 0 ? 'critical' : undefined} />
               <QueueLine label="Active admissions" value={activeAdmissions.length} action={() => navigate('/nurse/admissions')} />
               <QueueLine label="ICU patients" value={stats.byWard?.find((ward: any) => ward._id === 'icu')?.count || 0} action={() => navigate('/nurse/admissions')} tone="critical" />
+            </div>
+          </div>
+
+          <div className="bg-card border rounded-xl p-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm text-muted-foreground">Medication Rounds</p>
+                <h3 className="font-semibold mt-1">Due now</h3>
+              </div>
+              <Badge variant={dueMedsCount > 0 ? 'destructive' : 'outline'}>
+                {dueMedsCount} due
+              </Badge>
+            </div>
+            <div className="mt-4 space-y-3">
+              {dueNowMeds.slice(0, 3).map((rx: any) => {
+                const patient = rx.patientId;
+                const firstItem = rx.items?.[0];
+                return (
+                  <button
+                    key={rx._id || rx.id}
+                    type="button"
+                    onClick={() => navigate('/nurse/mar')}
+                    className="w-full rounded-lg border p-3 text-left hover:bg-muted/40 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {patient?.firstName} {patient?.lastName}
+                        </p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {firstItem?.medicationName || 'Medication'} - {firstItem?.strengthPerDose || firstItem?.dosage || 'dose'}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="shrink-0 text-[10px]">
+                        {firstItem?.route || 'route'}
+                      </Badge>
+                    </div>
+                  </button>
+                );
+              })}
+              {dueMedsCount === 0 && (
+                <div className="rounded-lg border border-dashed p-4 text-center">
+                  <Clock className="mx-auto h-4 w-4 text-muted-foreground" />
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    No doses due now. {upcomingMedsCount} upcoming.
+                  </p>
+                </div>
+              )}
+              <Button variant="outline" size="sm" className="w-full" onClick={() => navigate('/nurse/mar')}>
+                Open MAR
+              </Button>
             </div>
           </div>
 
@@ -212,17 +274,19 @@ function QueueLine({
   value,
   action,
   tone,
+  unit = 'patient',
 }: {
   label: string;
   value: number;
   action: () => void;
   tone?: 'warning' | 'critical';
+  unit?: string;
 }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <div>
         <p className="text-sm font-medium">{label}</p>
-        <p className="text-xs text-muted-foreground">{value} patient{value === 1 ? '' : 's'}</p>
+        <p className="text-xs text-muted-foreground">{value} {unit}{value === 1 ? '' : 's'}</p>
       </div>
       <Button size="sm" variant={tone === 'critical' ? 'destructive' : tone === 'warning' ? 'default' : 'outline'} onClick={action}>
         Open
