@@ -9,6 +9,8 @@ export interface User {
   fullName: string;
   department?: string;
   avatarUrl?: string;
+  branchId?: string;
+  branch?: { _id: string; name: string; code: string } | null;
   isActive: boolean;
 }
 
@@ -18,6 +20,8 @@ export interface Profile {
   full_name: string;
   department?: string;
   avatar_url?: string;
+  branchId?: string;
+  branch?: { _id: string; name: string; code: string } | null;
 }
 
 interface AuthContextType {
@@ -74,6 +78,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fullName: data.fullName,
         department: data.department,
         avatarUrl: data.avatarUrl,
+        branchId: data.branchId,
+        branch: data.branch,
         isActive: true,
       };
       setUser(userData);
@@ -83,6 +89,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         full_name: data.fullName,
         department: data.department,
         avatar_url: data.avatarUrl,
+        branchId: data.branchId,
+        branch: data.branch,
       });
       setRoles(data.roles || []);
     } catch (error: unknown) {
@@ -118,6 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fullName: data.user.fullName,
         department: data.user.department,
         avatarUrl: data.user.avatarUrl,
+        branchId: data.user.branchId,
+        branch: data.user.branch,
         isActive: true,
       };
       setUser(userData);
@@ -127,6 +137,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         full_name: data.user.fullName,
         department: data.user.department,
         avatar_url: data.user.avatarUrl,
+        branchId: data.user.branchId,
+        branch: data.user.branch,
       });
       setRoles(data.user.roles || []);
       return { error: null };

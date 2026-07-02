@@ -691,7 +691,7 @@ export const servicePricesAPI = {
     const response = await api.get('/service-prices/admin', { params: { branchId } });
     return response.data;
   },
-  updateForBranch: async (branchId: string, prices: Array<{ code: string; amount: number; isActive?: boolean }>) => {
+  updateForBranch: async (branchId: string, prices: Array<{ code: string; label?: string; category?: string; description?: string; amount: number; isActive?: boolean; isCustom?: boolean }>) => {
     const response = await api.put(`/service-prices/admin/${branchId}`, { prices });
     return response.data;
   },
@@ -1194,8 +1194,8 @@ export const prescriptionsAPI = {
 };
 
 export const adminAPI = {
-  getDashboard: async (date?: string) => {
-    const response = await api.get('/admin/dashboard', { params: date ? { date } : {} });
+  getDashboard: async (date?: string, branchId?: string) => {
+    const response = await api.get('/admin/dashboard', { params: { ...(date ? { date } : {}), ...(branchId ? { branchId } : {}) } });
     return response.data;
   },
   getManagementKpis: async (startDate?: string, endDate?: string) => {

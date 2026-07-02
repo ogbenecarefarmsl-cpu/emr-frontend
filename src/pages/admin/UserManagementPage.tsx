@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useUsers, useAssignRole, useRemoveRole, useUpdateUser, useResetPassword, useDeleteUser } from '@/hooks/useUsers';
+import { useAllBranches } from '@/hooks/useBranch';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
@@ -10,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { UserPlus, Shield, Trash2, Loader2, Mail, Pencil, KeyRound, Power } from 'lucide-react';
+import { Building2, UserPlus, Shield, Trash2, Loader2, Mail, Pencil, KeyRound, Power } from 'lucide-react';
 import { usersAPI } from '@/services/api';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -19,6 +20,7 @@ type AppRole = Database['public']['Enums']['app_role'];
 export default function UserManagementPage() {
   const { profile } = useAuth();
   const { data: users, isLoading } = useUsers();
+  const { data: branches = [] } = useAllBranches();
   const assignRole = useAssignRole();
   const removeRole = useRemoveRole();
   const updateUser = useUpdateUser();
@@ -38,11 +40,14 @@ export default function UserManagementPage() {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserName, setNewUserName] = useState('');
   const [newUserRole, setNewUserRole] = useState<AppRole>('receptionist');
+  const [newUserBranchId, setNewUserBranchId] = useState('unassigned');
+  const [branchFilter, setBranchFilter] = useState('all');
 
   // Edit user form state
   const [editFullName, setEditFullName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editDepartment, setEditDepartment] = useState('');
+  const [editBranchId, setEditBranchId] = useState('unassigned');
   const [editIsActive, setEditIsActive] = useState(true);
 
   // Reset password form state
@@ -70,6 +75,13 @@ export default function UserManagementPage() {
     pharmacist: 'Pharmacist',
     inventory_manager: 'Inventory Manager',
   };
+
+  const branchById = new Map(branches.map((branch: any) => [branch._id, branch]));
+  const visibleUsers = (users || []).filter((user) => {
+    if (branchFilter === 'all') return true;
+    if (branchFilter === 'unassigned') return !user.branchId;
+    return user.branchId === branchFilter;
+  });
 
   const handleAssignRole = async () => {
     if (!selectedUser) return;
@@ -122,7 +134,8 @@ export default function UserManagementPage() {
       const newUser = await usersAPI.create({
         email: newUserEmail,
         password: newUserPassword,
-        fullName: newUserName
+        fullName: newUserName,
+        branchId: newUserBranchId === 'unassigned' ? undefined : newUserBranchId,
       });
 
       await usersAPI.assignRole(newUser.id, newUserRole);
@@ -133,6 +146,7 @@ export default function UserManagementPage() {
       setNewUserPassword('');
       setNewUserName('');
       setNewUserRole('receptionist');
+      setNewUserBranchId('unassigned');
       setShowCreateDialog(false);
 
     } catch (error: unknown) {
@@ -153,6 +167,7 @@ export default function UserManagementPage() {
     setEditFullName(user.full_name);
     setEditEmail(user.email);
     setEditDepartment(user.department || '');
+    setEditBranchId(user.branchId || 'unassigned');
     setEditIsActive(true);
     setShowEditDialog(true);
   };
@@ -177,6 +192,7 @@ export default function UserManagementPage() {
           fullName: editFullName.trim(),
           email: editEmail.trim(),
           department: editDepartment.trim() || undefined,
+          branchId: editBranchId === 'unassigned' ? null : editBranchId,
         },
       });
       toast.success(`User ${editFullName} updated`);
@@ -238,7 +254,7 @@ export default function UserManagementPage() {
       <div className="grid grid-cols-4 gap-4 mb-6">
         <div className="bg-card border rounded-lg p-4">
           <p className="text-sm text-muted-foreground">Total Users</p>
-          <p className="text-2xl font-bold">{users?.length || 0}</p>
+          <p className="text-2xl font-bold">{visibleUsers.length}</p>
         </div>
         <div className="bg-card border rounded-lg p-4">
           <p className="text-sm text-muted-foreground">Administrators</p>
@@ -262,6 +278,24 @@ export default function UserManagementPage() {
 
       {/* Users Table */}
       <div className="bg-card border rounded-lg overflow-hidden">
+        <div className="border-b p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <h3 className="font-semibold">System Users</h3>
+            <p className="text-sm text-muted-foreground">Create users, assign roles, and attach staff to a branch.</p>
+          </div>
+          <Select value={branchFilter} onValueChange={setBranchFilter}>
+            <SelectTrigger className="w-full md:w-64">
+              <SelectValue placeholder="Filter by branch" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All branches</SelectItem>
+              <SelectItem value="unassigned">Unassigned users</SelectItem>
+              {branches.map((branch: any) => (
+                <SelectItem key={branch._id} value={branch._id}>{branch.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -273,13 +307,14 @@ export default function UserManagementPage() {
                 <th>User</th>
                 <th>Email</th>
                 <th>Department</th>
+                <th>Branch</th>
                 <th>Roles</th>
                 <th>Joined</th>
                 <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {users?.map(user => (
+              {visibleUsers.map(user => (
                 <tr key={user.id}>
                   <td>
                     <div className="flex items-center gap-3">
@@ -303,6 +338,16 @@ export default function UserManagementPage() {
                     </div>
                   </td>
                   <td>{user.department || '-'}</td>
+                  <td>
+                    {user.branchId ? (
+                      <Badge variant="outline" className="gap-1">
+                        <Building2 className="h-3 w-3" />
+                        {branchById.get(user.branchId)?.name || 'Assigned'}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Unassigned</Badge>
+                    )}
+                  </td>
                   <td>
                     <div className="flex flex-wrap gap-1">
                       {user.user_roles.length > 0 ? (
@@ -375,9 +420,9 @@ export default function UserManagementPage() {
                   </td>
                 </tr>
               ))}
-              {(!users || users.length === 0) && (
+              {visibleUsers.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-muted-foreground">
+                  <td colSpan={7} className="text-center py-12 text-muted-foreground">
                     No users found
                   </td>
                 </tr>
@@ -421,6 +466,21 @@ export default function UserManagementPage() {
                 value={editDepartment}
                 onChange={(e) => setEditDepartment(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Branch</Label>
+              <Select value={editBranchId} onValueChange={setEditBranchId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Assign branch" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned</SelectItem>
+                  {branches.map((branch: any) => (
+                    <SelectItem key={branch._id} value={branch._id}>{branch.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">Branch changes apply to new logins and refreshed sessions.</p>
             </div>
             <div className="flex items-center justify-between rounded-lg border p-3">
               <div>
@@ -697,6 +757,21 @@ export default function UserManagementPage() {
                       Inventory Manager
                     </div>
                   </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Assign Branch</Label>
+              <Select value={newUserBranchId} onValueChange={setNewUserBranchId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="unassigned">Unassigned for now</SelectItem>
+                  {branches.map((branch: any) => (
+                    <SelectItem key={branch._id} value={branch._id}>{branch.name}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

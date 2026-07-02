@@ -21,7 +21,7 @@ export function useBranchServicePrices(branchId?: string) {
 export function useUpdateBranchServicePrices() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ branchId, prices }: { branchId: string; prices: Array<{ code: string; amount: number; isActive?: boolean }> }) =>
+    mutationFn: ({ branchId, prices }: { branchId: string; prices: Array<{ code: string; label?: string; category?: string; description?: string; amount: number; isActive?: boolean; isCustom?: boolean }> }) =>
       servicePricesAPI.updateForBranch(branchId, prices),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['service-prices', 'branch', variables.branchId] });

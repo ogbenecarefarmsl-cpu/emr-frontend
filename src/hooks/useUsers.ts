@@ -101,7 +101,7 @@ export function useDeleteUserRole() {
 export function useUpdateUser() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: { fullName?: string; email?: string; department?: string; isActive?: boolean } }) => {
+    mutationFn: async ({ id, data }: { id: string; data: { fullName?: string; email?: string; department?: string; branchId?: string | null; isActive?: boolean } }) => {
       return await usersAPI.update(id, data);
     },
     onSuccess: () => {

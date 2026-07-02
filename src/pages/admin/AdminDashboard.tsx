@@ -4,19 +4,21 @@ import { useAuth } from '@/context/AuthContext';
 import { useRealtimeOrders } from '@/hooks/useRealtimeOrders';
 import { useRealtimeResults } from '@/hooks/useRealtimeResults';
 import { useRealtimePatients } from '@/hooks/useRealtimePatients';
+import { useAllBranches } from '@/hooks/useBranch';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api, { adminAPI } from '@/services/api';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
   Users, ClipboardList, DollarSign, AlertTriangle, Stethoscope, Pill,
   FlaskConical, BedDouble, TrendingUp, Package, Shield, BarChart3,
-  Cpu, Printer, Settings, ArrowRight, Loader2, Activity, UserCog,
+  Printer, Settings, ArrowRight, Loader2, Activity, UserCog,
   Calendar, FileText, FileSearch, Clock, Skull, Database, Trash2,
-  HardDriveDownload, Download, Play, RefreshCw,
+  HardDriveDownload, Download, Play, RefreshCw, Building2, Tags,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -73,22 +75,18 @@ function fmtLe(n: number) {
 export default function AdminDashboard() {
   const { profile } = useAuth();
   const navigate = useNavigate();
+  const [selectedBranchId, setSelectedBranchId] = useState('all');
+  const { data: branches = [] } = useAllBranches();
 
   useRealtimeOrders();
   useRealtimeResults();
   useRealtimePatients();
 
   const { data, isLoading } = useQuery<AdminDashboardData>({
-    queryKey: ['admin', 'dashboard'],
-    queryFn: () => adminAPI.getDashboard(),
+    queryKey: ['admin', 'dashboard', selectedBranchId],
+    queryFn: () => adminAPI.getDashboard(undefined, selectedBranchId === 'all' ? undefined : selectedBranchId),
     refetchInterval: 30 * 1000,
     staleTime: 15 * 1000,
-  });
-
-  const { data: admissionsStats } = useQuery({
-    queryKey: ['admissions', 'stats'],
-    queryFn: async () => (await api.get('/admissions/stats')).data,
-    refetchInterval: 60 * 1000,
   });
 
   const { data: recentAuditLogs = [] } = useQuery({
@@ -101,7 +99,7 @@ export default function AdminDashboard() {
   });
 
   const { data: weeklyRevenue = [] } = useQuery({
-    queryKey: ['revenue', 'weekly'],
+    queryKey: ['revenue', 'weekly', selectedBranchId],
     queryFn: async () => {
       const end = new Date();
       const start = new Date(end);
@@ -110,6 +108,7 @@ export default function AdminDashboard() {
         params: {
           startDate: start.toISOString().slice(0, 10),
           endDate: end.toISOString().slice(0, 10),
+          ...(selectedBranchId === 'all' ? {} : { branchId: selectedBranchId }),
         },
       });
       return res.data || [];
@@ -150,6 +149,26 @@ export default function AdminDashboard() {
       role="admin"
       userName={profile?.fullName}
     >
+      <div className="mb-6 flex flex-col gap-3 rounded-xl border bg-card p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+        <div>
+          <h3 className="text-sm font-semibold">Dashboard Scope</h3>
+          <p className="text-sm text-muted-foreground">
+            View all branches or focus this dashboard on one outlet.
+          </p>
+        </div>
+        <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
+          <SelectTrigger className="w-full md:w-72">
+            <SelectValue placeholder="Choose branch" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All branches</SelectItem>
+            {branches.map((branch: any) => (
+              <SelectItem key={branch._id} value={branch._id}>{branch.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
       {/* ───────── Top banner: revenue + throughput ───────── */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-3 mb-6">
         <div className="lg:col-span-2 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground rounded-xl p-6 shadow-sm">
@@ -229,9 +248,9 @@ export default function AdminDashboard() {
         />
         <MetricCard
           title="Active Admissions"
-          value={admissionsStats?.activeTotal || 0}
+          value={s?.visitsAdmitted || 0}
           icon={BedDouble}
-          variant={(admissionsStats?.activeTotal || 0) > 0 ? 'primary' : 'default'}
+          variant={(s?.visitsAdmitted || 0) > 0 ? 'primary' : 'default'}
         />
         <MetricCard
           title="Active Staff"
@@ -391,18 +410,13 @@ export default function AdminDashboard() {
         <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">System Administration</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <AdminTool icon={Shield} label="Staff & Roles" to="/admin/users" navigate={navigate} highlight />
+          <AdminTool icon={Building2} label="Branches & APIs" to="/admin/branches" navigate={navigate} highlight />
+          <AdminTool icon={Tags} label="Service Pricing" to="/admin/service-pricing" navigate={navigate} highlight />
           <AdminTool icon={UserCog} label="Doctors" to="/admin/doctors" navigate={navigate} />
-          <AdminTool icon={FlaskConical} label="Lab Test Pricing" to="/admin/test-catalog" navigate={navigate} />
-          <AdminTool icon={Package} label="Inventory" to="/inventory" navigate={navigate} />
+          <AdminTool icon={BedDouble} label="Rooms & Beds" to="/admin/rooms" navigate={navigate} />
           <AdminTool icon={FileText} label="Report Templates" to="/admin/report-template" navigate={navigate} />
-          <AdminTool icon={Cpu} label="Lab Machines" to="/admin/machines" navigate={navigate} />
           <AdminTool icon={Printer} label="Printers" to="/admin/printers" navigate={navigate} />
-          <AdminTool icon={BarChart3} label="Revenue Reports" to="/admin/reports" navigate={navigate} />
-          <AdminTool icon={TrendingUp} label="Daily Summary" to="/admin/daily-report" navigate={navigate} />
-          <AdminTool icon={BedDouble} label="Room Management" to="/admin/rooms" navigate={navigate} />
-          <AdminTool icon={DollarSign} label="Cash Reconciliation" to="/admin/reconciliation" navigate={navigate} />
           <AdminTool icon={ClipboardList} label="Audit Logs" to="/admin/audit-logs" navigate={navigate} />
-          <AdminTool icon={Stethoscope} label="Doctor Activity" to="/admin/doctor-referral-report" navigate={navigate} />
           <AdminTool icon={Settings} label="Settings" to="/admin/settings" navigate={navigate} />
         </div>
       </div>
