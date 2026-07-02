@@ -668,6 +668,18 @@ export const branchesAPI = {
     const response = await api.post(`/branches/${branchId}/batch-create-users`, { users });
     return response.data;
   },
+  testCaf: async (branchId: string) => {
+    const response = await api.post(`/branches/${branchId}/test-caf`);
+    return response.data;
+  },
+  testLis: async (branchId: string) => {
+    const response = await api.post(`/branches/${branchId}/test-lis`);
+    return response.data;
+  },
+  provisionCaf: async (branchId: string, data: any = {}) => {
+    const response = await api.post(`/branches/${branchId}/provision-caf`, data);
+    return response.data;
+  },
 };
 
 export const servicePricesAPI = {
@@ -1339,6 +1351,15 @@ export const admissionsAPI = {
   },
   discharge: async (id: string, data: { dischargeNotes?: string; dischargeDiagnosis?: string; dischargeInstructions?: string }) => {
     const response = await api.patch(`/admissions/${id}/discharge`, data);
+    return response.data;
+  },
+  // Oxygen therapy
+  startOxygen: async (id: string, data: { litersPerMinute: number; hoursPerDay: number; days: number; ratePerHour?: number; notes?: string }) => {
+    const response = await api.post(`/admissions/${id}/oxygen`, data);
+    return response.data;
+  },
+  stopOxygen: async (id: string, index: number) => {
+    const response = await api.patch(`/admissions/${id}/oxygen/${index}/stop`);
     return response.data;
   },
 };

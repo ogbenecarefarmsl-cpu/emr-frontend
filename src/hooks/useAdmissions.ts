@@ -154,3 +154,24 @@ export function useDischargeAdmission(admissionId?: string) {
     },
   });
 }
+
+export function useStartOxygenTherapy(admissionId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: { litersPerMinute: number; hoursPerDay: number; days: number; ratePerHour?: number; notes?: string }) =>
+      admissionsAPI.startOxygen(admissionId!, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admissions', admissionId] });
+    },
+  });
+}
+
+export function useStopOxygenTherapy(admissionId?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (index: number) => admissionsAPI.stopOxygen(admissionId!, index),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['admissions', admissionId] });
+    },
+  });
+}

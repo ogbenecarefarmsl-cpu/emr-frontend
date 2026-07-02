@@ -17,7 +17,10 @@ import {
   useReportIncident,
   useTransferAdmission,
   useDischargeAdmission,
+  useStartOxygenTherapy,
+  useStopOxygenTherapy,
 } from '@/hooks/useAdmissions';
+import { useMyServicePrices } from '@/hooks/useServicePrices';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -38,6 +41,7 @@ import {
   Activity, Pill, Droplet, FileText, ClipboardList, AlertTriangle,
   LogOut, ArrowRightLeft, Heart, Plus, Loader2, Save, Send, User,
   CheckCircle, Clock, Stethoscope, BedDouble, Handshake, Printer,
+  Wind, Square,
 } from 'lucide-react';
 
 interface Props {
@@ -62,6 +66,9 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
   const reportIncident = useReportIncident(admissionId);
   const transfer = useTransferAdmission(admissionId);
   const discharge = useDischargeAdmission(admissionId);
+  const startOxygen = useStartOxygenTherapy(admissionId);
+  const stopOxygen = useStopOxygenTherapy(admissionId);
+  const { data: servicePrices = [] } = useMyServicePrices();
 
   const [tab, setTab] = useState<TabKey>('overview');
 
@@ -75,6 +82,7 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
   const [incidentOpen, setIncidentOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [dischargeOpen, setDischargeOpen] = useState(false);
+  const [oxygenOpen, setOxygenOpen] = useState(false);
 
   // Forms
   const [vitalsForm, setVitalsForm] = useState({
@@ -109,8 +117,12 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
   });
   const [transferForm, setTransferForm] = useState({ wardType: '', bedNumber: '', notes: '' });
   const [dischargeForm, setDischargeForm] = useState({ dischargeDiagnosis: '', dischargeInstructions: '', dischargeNotes: '' });
+  const [oxygenForm, setOxygenForm] = useState({ litersPerMinute: 5, hoursPerDay: 8, days: 7, notes: '' });
   const patientId = admission?.patientId?._id;
   const visitId = admission?.visitId;
+  const oxygenHourlyRate = Array.isArray(servicePrices)
+    ? Number(servicePrices.find((price: any) => price.code === 'oxygen_hour')?.amount || 200)
+    : 200;
 
   const { data: patientPrescriptions = [] } = useQuery({
     queryKey: ['prescriptions', 'patient', patientId],
@@ -299,6 +311,33 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
     } catch { toast.error('Failed to discharge'); }
   };
 
+  const submitOxygen = async () => {
+    try {
+      const totalHours = oxygenForm.hoursPerDay * oxygenForm.days;
+      const totalCost = totalHours * oxygenHourlyRate;
+      await startOxygen.mutateAsync({
+        litersPerMinute: oxygenForm.litersPerMinute,
+        hoursPerDay: oxygenForm.hoursPerDay,
+        days: oxygenForm.days,
+        notes: oxygenForm.notes || undefined,
+      });
+      toast.success(`Oxygen therapy started — Le ${totalCost.toLocaleString()} (${totalHours}h × Le ${oxygenHourlyRate.toLocaleString()}/h)`);
+      setOxygenOpen(false);
+      setOxygenForm({ litersPerMinute: 5, hoursPerDay: 8, days: 7, notes: '' });
+    } catch { toast.error('Failed to start oxygen therapy'); }
+  };
+
+  const handleStopOxygen = async (index: number) => {
+    try {
+      await stopOxygen.mutateAsync(index);
+      toast.success('Oxygen therapy stopped');
+    } catch { toast.error('Failed to stop oxygen therapy'); }
+  };
+
+  const oxygenTherapies = admission?.oxygenTherapy || [];
+  const activeOxygen = oxygenTherapies.filter((t: any) => t.status === 'active');
+  const totalOxygenCost = oxygenTherapies.reduce((sum: number, t: any) => sum + (t.totalCost || 0), 0);
+
   return (
     <div className="bg-card border rounded-xl shadow-sm">
       {/* Header: patient banner */}
@@ -454,7 +493,67 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
             <Button size="sm" variant="outline" onClick={() => setHandoverOpen(true)}><Handshake className="w-3.5 h-3.5 mr-1.5" />Shift Handover</Button>
             <Button size="sm" variant="outline" onClick={() => setCarePlanOpen(true)}><ClipboardList className="w-3.5 h-3.5 mr-1.5" />Add Care Plan</Button>
             <Button size="sm" variant="outline" onClick={() => setIncidentOpen(true)}><AlertTriangle className="w-3.5 h-3.5 mr-1.5" />Report Incident</Button>
+            <Button size="sm" variant="outline" onClick={() => setOxygenOpen(true)}><Wind className="w-3.5 h-3.5 mr-1.5" />Oxygen Therapy</Button>
           </div>
+
+          {/* Oxygen therapy summary */}
+          {oxygenTherapies.length > 0 && (
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-semibold flex items-center gap-1.5">
+                  <Wind className="w-4 h-4 text-blue-500" />Oxygen Therapy
+                  {activeOxygen.length > 0 && <Badge className="bg-blue-500 ml-1">{activeOxygen.length} active</Badge>}
+                </p>
+                <span className="text-sm font-medium">Total: Le {totalOxygenCost.toLocaleString()}</span>
+              </div>
+              <div className="space-y-2">
+                {oxygenTherapies.map((t: any, i: number) => (
+                  <div key={i} className={cn('flex items-center justify-between text-sm p-2 rounded', t.status === 'active' ? 'bg-blue-50' : 'bg-muted/50')}>
+                    <div>
+                      <span className="font-medium">{t.litersPerMinute} L/min</span>
+                      <span className="text-muted-foreground mx-1.5">·</span>
+                      <span>{t.hoursPerDay}h/day × {t.days} days</span>
+                      <span className="text-muted-foreground mx-1.5">·</span>
+                      <span className="font-medium">Le {(t.totalCost || 0).toLocaleString()}</span>
+                      {t.status === 'stopped' && <Badge variant="secondary" className="ml-2">Stopped</Badge>}
+                    </div>
+                    {t.status === 'active' && (
+                      <Button size="sm" variant="ghost" className="h-7 text-red-600" onClick={() => handleStopOxygen(i)}>
+                        <Square className="w-3 h-3 mr-1" />Stop
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {totalOxygenCost > 0 && (
+            <div className="border rounded-lg p-4 bg-amber-50">
+              <p className="text-sm font-semibold mb-2 flex items-center gap-1.5">
+                <Wind className="w-4 h-4 text-amber-600" />Charges Summary
+              </p>
+              <div className="space-y-1 text-sm">
+                {oxygenTherapies.filter((t: any) => t.status === 'active').length > 0 && (
+                  <div className="flex justify-between">
+                    <span>Oxygen Therapy ({oxygenTherapies.filter((t: any) => t.status === 'active').length} active)</span>
+                    <span className="font-medium">Le {oxygenTherapies.filter((t: any) => t.status === 'active').reduce((s: number, t: any) => s + (t.totalCost || 0), 0).toLocaleString()}</span>
+                  </div>
+                )}
+                {oxygenTherapies.filter((t: any) => t.status !== 'active').length > 0 && (
+                  <div className="flex justify-between text-muted-foreground">
+                    <span>Oxygen Therapy (completed/stopped)</span>
+                    <span>Le {oxygenTherapies.filter((t: any) => t.status !== 'active').reduce((s: number, t: any) => s + (t.totalCost || 0), 0).toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-base border-t pt-1 mt-1">
+                  <span>Total O2 Cost</span>
+                  <span>Le {totalOxygenCost.toLocaleString()}</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">Charges will be billed at reception upon discharge. O2 rate: Le {oxygenHourlyRate.toLocaleString()}/hour.</p>
+            </div>
+          )}
 
           {activeCarePlanItems.length > 0 && (
             <div className="border rounded-lg p-4">
@@ -1240,11 +1339,65 @@ export function AdmissionWorkspace({ admissionId, onClose, onDischarged }: Props
             <div><Label>Discharge Diagnosis</Label><Input value={dischargeForm.dischargeDiagnosis} onChange={(e) => setDischargeForm({...dischargeForm, dischargeDiagnosis: e.target.value})} /></div>
             <div><Label>Discharge Instructions (for patient)</Label><Textarea value={dischargeForm.dischargeInstructions} onChange={(e) => setDischargeForm({...dischargeForm, dischargeInstructions: e.target.value})} rows={4} placeholder="Medication, follow-up, activity restrictions, warning signs..." /></div>
             <div><Label>Internal Notes</Label><Textarea value={dischargeForm.dischargeNotes} onChange={(e) => setDischargeForm({...dischargeForm, dischargeNotes: e.target.value})} rows={2} /></div>
+            {totalOxygenCost > 0 && (
+              <div className="bg-amber-50 p-3 rounded-lg border border-amber-200">
+                <p className="text-sm font-semibold text-amber-800 flex items-center gap-1.5">
+                  <Wind className="w-4 h-4" />Oxygen Therapy Charges: Le {totalOxygenCost.toLocaleString()}
+                </p>
+                <p className="text-xs text-amber-700 mt-1">Bill at reception upon discharge. O2 rate: Le {oxygenHourlyRate.toLocaleString()}/hour.</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDischargeOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={submitDischarge} disabled={discharge.isPending}>
               {discharge.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <LogOut className="w-4 h-4 mr-2" />}Discharge
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Oxygen Therapy */}
+      <Dialog open={oxygenOpen} onOpenChange={setOxygenOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Wind className="w-5 h-5 text-blue-500" />Start Oxygen Therapy
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Flow Rate (L/min)</Label>
+                <Input type="number" min="0.1" step="0.1" value={oxygenForm.litersPerMinute} onChange={(e) => setOxygenForm({...oxygenForm, litersPerMinute: parseFloat(e.target.value) || 0})} />
+              </div>
+              <div>
+                <Label>Hours/Day</Label>
+                <Input type="number" min="1" max="24" step="0.5" value={oxygenForm.hoursPerDay} onChange={(e) => setOxygenForm({...oxygenForm, hoursPerDay: parseFloat(e.target.value) || 0})} />
+              </div>
+              <div>
+                <Label>Days</Label>
+                <Input type="number" min="0.5" step="0.5" value={oxygenForm.days} onChange={(e) => setOxygenForm({...oxygenForm, days: parseFloat(e.target.value) || 0})} />
+              </div>
+            </div>
+            <div className="bg-blue-50 p-3 rounded-lg text-sm">
+              <div className="flex justify-between">
+                <span>Total hours: <strong>{oxygenForm.hoursPerDay * oxygenForm.days}h</strong></span>
+                <span>Rate: <strong>Le {oxygenHourlyRate.toLocaleString()}/hour</strong></span>
+              </div>
+              <div className="text-lg font-bold text-blue-700 mt-1">
+                Estimated cost: Le {(oxygenForm.hoursPerDay * oxygenForm.days * oxygenHourlyRate).toLocaleString()}
+              </div>
+            </div>
+            <div>
+              <Label>Notes (optional)</Label>
+              <Textarea value={oxygenForm.notes} onChange={(e) => setOxygenForm({...oxygenForm, notes: e.target.value})} rows={2} placeholder="e.g., Post-surgical O2 support, pneumonia..." />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOxygenOpen(false)}>Cancel</Button>
+            <Button onClick={submitOxygen} disabled={startOxygen.isPending || oxygenForm.litersPerMinute <= 0 || oxygenForm.hoursPerDay <= 0 || oxygenForm.hoursPerDay > 24 || oxygenForm.days <= 0}>
+              {startOxygen.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Wind className="w-4 h-4 mr-2" />}Start O2 Therapy
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -13,6 +13,18 @@ export interface Branch {
   website: string;
   footerText: string;
   operatingHours: string;
+  cafEnabled?: boolean;
+  cafBaseUrl?: string;
+  cafUsername?: string;
+  cafPassword?: string;
+  hasCafPassword?: boolean;
+  cafBranchId?: string;
+  cafTerminalId?: string;
+  lisEnabled?: boolean;
+  lisBaseUrl?: string;
+  labApiKey?: string;
+  hasLabApiKey?: boolean;
+  labFacilityId?: string;
   isActive: boolean;
 }
 
@@ -80,6 +92,42 @@ export function useAssignUserBranch() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['my-branch'] });
+    },
+  });
+}
+
+export function useBatchCreateUsers() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ branchId, users }: { branchId: string; users: any[] }) => {
+      return await branchesAPI.batchCreateUsers(branchId, users);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['branches'] });
+    },
+  });
+}
+
+export function useTestBranchCaf() {
+  return useMutation({
+    mutationFn: async (branchId: string) => branchesAPI.testCaf(branchId),
+  });
+}
+
+export function useTestBranchLis() {
+  return useMutation({
+    mutationFn: async (branchId: string) => branchesAPI.testLis(branchId),
+  });
+}
+
+export function useProvisionBranchCaf() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ branchId, data = {} }: { branchId: string; data?: any }) => branchesAPI.provisionCaf(branchId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['branches'] });
       queryClient.invalidateQueries({ queryKey: ['my-branch'] });
     },
   });
