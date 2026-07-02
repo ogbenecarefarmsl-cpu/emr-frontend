@@ -6,6 +6,7 @@ interface UserWithRoles {
   id: string;
   email: string;
   full_name: string;
+  branchId?: string | null;
   department: string | null;
   avatar_url: string | null;
   created_at: string;
@@ -27,6 +28,7 @@ export function useUsers() {
         id: user.id,
         email: user.email,
         full_name: user.fullName,
+        branchId: user.branchId || null,
         department: user.department || null,
         avatar_url: user.avatarUrl || null,
         created_at: user.createdAt,

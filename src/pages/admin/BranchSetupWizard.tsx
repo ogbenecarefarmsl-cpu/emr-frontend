@@ -123,7 +123,7 @@ export default function BranchSetupWizard({ open, onOpenChange }: BranchSetupWiz
     setIsSubmitting(true);
     setUserErrors([]);
     try {
-      const branch = await createBranch.mutateAsync({
+      const result = await createBranch.mutateAsync({
         name: form.name,
         code: form.code.toUpperCase(),
         tagline: form.tagline,
@@ -146,8 +146,13 @@ export default function BranchSetupWizard({ open, onOpenChange }: BranchSetupWiz
         labApiKey: form.labApiKey || undefined,
         labFacilityId: form.labFacilityId || undefined,
       });
+      const branch = result?.branch || result;
 
       setCreatedBranchId(branch._id);
+
+      if (result?.generatedPassword) {
+        toast.success(`CAF provisioned. Username: ${result.cafUsername}. Password: ${result.generatedPassword}`);
+      }
 
       if (form.users.length > 0) {
         const result = await batchCreateUsers.mutateAsync({

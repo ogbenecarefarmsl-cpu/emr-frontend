@@ -18,6 +18,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
+const NO_LINKED_USER = '__none__';
+
 export default function DoctorsPage() {
   const { profile } = useAuth();
   const { pathname } = useLocation();
@@ -93,12 +95,12 @@ export default function DoctorsPage() {
           </div>
           <div className="space-y-2">
             <Label>Linked login user (optional)</Label>
-            <Select value={userId} onValueChange={setUserId}>
+            <Select value={userId || NO_LINKED_USER} onValueChange={(value) => setUserId(value === NO_LINKED_USER ? '' : value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select doctor login account" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">None (external/referral only)</SelectItem>
+                <SelectItem value={NO_LINKED_USER}>None (external/referral only)</SelectItem>
                 {doctorUsers.map((u: any) => (
                   <SelectItem key={u.id} value={u.id}>
                     <div className="flex items-center gap-2">

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
-import { useUsers, useUpdateUser } from '@/hooks/useUsers';
+import { useUsers } from '@/hooks/useUsers';
 import { useAllBranches, useUpdateBranch, useAssignUserBranch, useTestBranchCaf, useTestBranchLis, useProvisionBranchCaf } from '@/hooks/useBranch';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +25,6 @@ export default function BranchManagementPage() {
   const { data: users = [], isLoading: usersLoading } = useUsers();
   const updateBranch = useUpdateBranch();
   const assignUserBranch = useAssignUserBranch();
-  const updateUser = useUpdateUser();
   const testCaf = useTestBranchCaf();
   const testLis = useTestBranchLis();
   const provisionCaf = useProvisionBranchCaf();
@@ -33,9 +32,7 @@ export default function BranchManagementPage() {
   const [editingBranch, setEditingBranch] = useState<any | null>(null);
   const [editForm, setEditForm] = useState<any>({});
   const [showWizard, setShowWizard] = useState(false);
-  const [showUserBranchDialog, setShowUserBranchDialog] = useState<any | null>(null);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
-  const [userSearch, setUserSearch] = useState('');
 
   const openEdit = (branch: any) => {
     setEditingBranch(branch);
@@ -108,6 +105,7 @@ export default function BranchManagementPage() {
     try {
       await assignUserBranch.mutateAsync({ userId, branchId });
       toast.success(branchId ? 'User assigned to branch' : 'User unassigned from branch');
+      setSelectedUserId(null);
     } catch (e: any) {
       toast.error(e?.response?.data?.message || e?.message || 'Failed to assign user');
     }
@@ -121,14 +119,6 @@ export default function BranchManagementPage() {
     if (!usersByBranch[bid]) usersByBranch[bid] = [];
     usersByBranch[bid].push(u);
   }
-
-  const filteredUsers = userSearch
-    ? users.filter(
-        (u) =>
-          u.fullName?.toLowerCase().includes(userSearch.toLowerCase()) ||
-          u.email?.toLowerCase().includes(userSearch.toLowerCase()),
-      )
-    : [];
 
   return (
     <RoleLayout
@@ -480,13 +470,13 @@ export default function BranchManagementPage() {
   );
 }
 
-function UserRow({ user, onAssign, branches }: { user: any; onAssign: () => void; branches: any[] }) {
+function UserRow({ user, onAssign }: { user: any; onAssign: () => void; branches?: any[] }) {
   return (
     <div className="flex items-center justify-between py-1">
       <div>
-        <p className="text-sm font-medium">{user.fullName}</p>
+        <p className="text-sm font-medium">{user.full_name || user.fullName || user.email}</p>
         <p className="text-xs text-muted-foreground">
-          {user.email} · {user.roles?.join(', ') || 'no role'}
+          {user.email} · {(user.user_roles || []).map((roleItem: any) => roleItem.role).join(', ') || 'no role'}
         </p>
       </div>
       <Button size="sm" variant="ghost" onClick={onAssign}>
