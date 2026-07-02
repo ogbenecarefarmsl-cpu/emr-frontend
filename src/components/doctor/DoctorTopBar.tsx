@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   UserCheck, Search, Bell, Clock, AlertTriangle, FlaskConical,
-  ChevronDown, X, Stethoscope
+  ChevronDown, X, Stethoscope, LogOut
 } from 'lucide-react';
 
 interface Patient {
@@ -54,6 +54,9 @@ interface DoctorTopBarProps {
   onAcceptVisit: (visit: Visit) => void;
   onSelectPatient: (patient: Patient) => void;
   onAcceptNext: () => void;
+  onOpenResults?: () => void;
+  onOpenAllPatients?: () => void;
+  onLogout?: () => void;
   acceptPending?: boolean;
 }
 
@@ -100,6 +103,9 @@ export function DoctorTopBar({
   onAcceptVisit,
   onSelectPatient,
   onAcceptNext,
+  onOpenResults,
+  onOpenAllPatients,
+  onLogout,
   acceptPending,
 }: DoctorTopBarProps) {
   const [queueOpen, setQueueOpen] = useState(false);
@@ -219,7 +225,7 @@ export function DoctorTopBar({
   const activeOverflow = activePatients.length > 4;
 
   return (
-    <div className="fixed top-0 left-0 right-0 h-12 bg-slate-900 text-white z-[60] flex items-center justify-between gap-3 px-3 shadow-md">
+    <div className="fixed top-0 left-0 right-0 h-14 bg-slate-900 text-white z-[60] flex items-center justify-between gap-3 px-4 shadow-md">
       {/* Left: logo + active patients */}
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex items-center gap-2 shrink-0">
@@ -332,6 +338,28 @@ export function DoctorTopBar({
         </div>
 
         {/* Notifications dropdown */}
+        {onOpenResults && (
+          <button
+            type="button"
+            onClick={onOpenResults}
+            disabled={resultsReady.length === 0}
+            className={cn(
+              "hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors",
+              resultsReady.length > 0 ? "text-white hover:bg-slate-800" : "text-slate-500 cursor-default"
+            )}
+            title={`${resultsReady.length} results ready`}
+          >
+            <FlaskConical className="w-3.5 h-3.5" />
+            Results
+            {resultsReady.length > 0 && (
+              <Badge className="h-4 min-w-4 text-[10px] bg-slate-700 hover:bg-slate-700 text-white px-1">
+                {resultsReady.length}
+              </Badge>
+            )}
+          </button>
+        )}
+
+        {/* Notifications dropdown */}
         <div className="relative" ref={notifRef}>
           <button
             onClick={() => setNotifOpen((o) => !o)}
@@ -436,6 +464,18 @@ export function DoctorTopBar({
           )}
         </div>
 
+        {onOpenAllPatients && (
+          <button
+            type="button"
+            onClick={onOpenAllPatients}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            title="All My Patients"
+          >
+            <UserCheck className="w-3.5 h-3.5" />
+            Patients
+          </button>
+        )}
+
         {/* Accept next */}
         <Button
           size="sm"
@@ -454,6 +494,16 @@ export function DoctorTopBar({
             <span className="text-[10px] font-bold">{profile?.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
           </div>
           <span className="text-xs truncate max-w-24">{profile?.fullName}</span>
+          {onLogout && (
+            <button
+              type="button"
+              onClick={onLogout}
+              className="ml-1 rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+              title="Logout"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       </div>
     </div>

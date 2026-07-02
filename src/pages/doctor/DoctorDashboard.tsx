@@ -46,7 +46,7 @@ import {
   Loader2, CheckCircle, User, FileText, FlaskConical, Pill,
   ChevronDown, AlertTriangle, Search, Plus, Trash2, Save,
   Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
-  Pencil, AlertCircle, TestTube, Stethoscope, Calendar, LogOut
+  Pencil, AlertCircle, TestTube, Stethoscope, Calendar
 } from 'lucide-react';
 
 // Types
@@ -1117,85 +1117,25 @@ export default function DoctorDashboard() {
         onAcceptVisit={handleAcceptPatient}
         onSelectPatient={handleSelectSearchPatient}
         onAcceptNext={() => { if (waitingQueue.length > 0) handleAcceptPatient(waitingQueue[0]); }}
+        onOpenResults={() => { if (resultsReady.length > 0) { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); } }}
+        onOpenAllPatients={() => { setAllPatientsOpen(true); setAllPatientsPage(1); setAllPatientsSearch(''); setAllPatientsDaysBack(undefined); }}
+        onLogout={handleLogout}
         acceptPending={acceptPatient.isPending}
       />
 
-      {/* Header */}
-      <header className="fixed top-12 left-0 right-0 h-14 bg-white border-b border-border z-50 flex items-center justify-between gap-3 px-4">
-        <div className="flex items-center gap-4 min-w-0">
-          <div className="flex items-center gap-2 shrink-0 md:hidden">
-            <img src="/harbour-emr-logo.svg" alt="Harbour EMR Logo" className="h-8 w-auto object-contain" />
-            <span className="font-bold text-primary text-lg">Harbour EMR</span>
-          </div>
-          <nav className="hidden md:flex items-center gap-1 overflow-x-auto">
-            {[
-              { label: 'Consult', value: 'soap', shortcut: '1' },
-              { label: 'Results', value: 'lab-results', shortcut: '2' },
-              { label: 'Timeline', value: 'timeline', shortcut: '3' },
-            ].map((tab) => (
-              <button
-                key={tab.value}
-                onClick={() => guardNavigation(() => setActiveTab(tab.value), 'tab', tab.value)}
-                className={cn(
-                  "px-3 py-1.5 text-sm font-medium rounded-md transition-colors",
-                  activeTab === tab.value ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                )}
-                title={`${tab.label} (${tab.shortcut})`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => { if (resultsReady.length > 0) { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); } }}
-              disabled={resultsReady.length === 0}
-              className="relative p-2 rounded-lg hover:bg-muted/50 transition-colors disabled:opacity-50"
-              title={`${resultsReady.length} results ready`}
-            >
-              <FlaskConical className="w-4 h-4 text-muted-foreground" />
-              {resultsReady.length > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 h-4 min-w-4 rounded-full bg-primary text-[9px] font-bold text-white flex items-center justify-center px-1">{resultsReady.length}</span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => { setAllPatientsOpen(true); setAllPatientsPage(1); setAllPatientsSearch(''); setAllPatientsDaysBack(undefined); }}
-              className="relative p-2 rounded-lg hover:bg-muted/50 transition-colors"
-              title="All My Patients"
-            >
-              <UserCheck className="w-4 h-4 text-muted-foreground" />
-            </button>
-          </div>
-          <div className="w-px h-6 bg-border" />
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-xs font-bold text-primary">{profile?.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
-            </div>
-            <span className="text-sm font-medium hidden lg:block truncate max-w-40">{profile?.fullName}</span>
-            <Button size="sm" variant="ghost" className="h-8 w-8 p-0" onClick={handleLogout} title="Logout">
-              <LogOut className="w-4 h-4 text-muted-foreground" />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex flex-1 pt-[104px] h-full">
+      <div className="flex flex-1 pt-14 h-full">
         {/* Main Workspace */}
-        <main className="flex-1 h-[calc(100vh-104px)] flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row gap-6 p-4 md:p-6">
+        <main className="flex-1 h-[calc(100vh-56px)] flex flex-col overflow-hidden">
+          <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row gap-4 bg-slate-100/80 p-3 md:p-4">
             {/* Left Editor Area */}
-            <div className="flex-1 flex flex-col gap-5 min-w-0">
+            <div className="flex-1 flex flex-col gap-4 min-w-0">
               {selectedVisit || searchedPatient ? (
                 <>
                   {/* Calm Patient Header */}
-                  <section className="bg-white border-b border-border px-4 md:px-5 py-3">
+                  <section className="rounded-xl border border-border bg-white px-4 py-3 shadow-sm md:px-5">
                     <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                       <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                           <span className="text-xs font-bold text-primary">
                             {contextPatient?.firstName?.[0]}{contextPatient?.lastName?.[0]}
                           </span>
@@ -1221,32 +1161,37 @@ export default function DoctorDashboard() {
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                             <span className="font-mono">{contextPatient?.patientId || 'PID N/A'}</span>
-                            <span>{patientAgeLabel(contextPatient)} ? {contextPatient?.gender || 'N/A'}</span>
+                            <span>{patientAgeLabel(contextPatient)} / {contextPatient?.gender || 'N/A'}</span>
                             {selectedVisit && <span className="font-mono">{selectedVisit.visitNumber}</span>}
                             {selectedVisit && <span className="capitalize">{statusLabel(selectedVisit.status)}</span>}
+                            {!selectedVisit && searchedPatient && <span className="font-medium text-amber-700">Chart review only - no active visit</span>}
                             <span>Wallet: Le {selectedWalletBalance.toLocaleString()}</span>
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 overflow-x-auto pb-1 xl:pb-0">
-                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }} disabled={!contextPatient}>
-                          <FlaskConical className="w-3.5 h-3.5" /> Order Lab
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); }} disabled={!contextPatient}>
-                          <Pill className="w-3.5 h-3.5" /> Prescribe
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" onClick={() => setTreatmentPlanOpen(true)} disabled={!contextPatient}>
-                          <ClipboardList className="w-3.5 h-3.5" /> Treatment Plan
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-8 gap-1.5 text-xs" onClick={() => { setReferralOpen(true); setReferralForm({ specialistId: '', reason: '', notes: '' }); }} disabled={!selectedVisit}>
-                          <Send className="w-3.5 h-3.5" /> Refer
-                        </Button>
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-muted-foreground sm:grid-cols-4 xl:min-w-[520px]">
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide">Visit</p>
+                          <p className="font-mono text-foreground">{selectedVisit?.visitNumber || 'No active visit'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide">Status</p>
+                          <p className="capitalize text-foreground">{selectedVisit ? statusLabel(selectedVisit.status) : 'chart review'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide">Room</p>
+                          <p className="text-foreground">{selectedVisit?.room || '-'}</p>
+                        </div>
+                        <div>
+                          <p className="text-[10px] font-semibold uppercase tracking-wide">Wallet</p>
+                          <p className="font-semibold text-emerald-700">Le {selectedWalletBalance.toLocaleString()}</p>
+                        </div>
                       </div>
                     </div>
                   </section>
 
                   {(selectedVisit?.triageAlert || consultationPaymentBlocksWriting || (isDirty && canWriteConsultation)) && (
-                    <div className="border-b border-border bg-white px-4 md:px-5 py-2">
+                    <div className="rounded-lg border border-amber-200 bg-white px-4 py-2 shadow-sm md:px-5">
                       <div className="flex flex-wrap items-center gap-2 text-xs">
                         {selectedVisit?.triageAlert && (
                           <span className="inline-flex items-center gap-1.5 rounded-md bg-red-50 px-2 py-1 font-medium text-red-700">
@@ -1267,7 +1212,7 @@ export default function DoctorDashboard() {
                     </div>
                   )}
 
-                  <div className="grid flex-1 min-h-0 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_320px] bg-white">
+                  <div className="grid flex-1 min-h-0 overflow-hidden rounded-xl border border-border bg-white shadow-sm xl:grid-cols-[minmax(0,1fr)_320px]">
                     <section className="min-w-0 border-r border-border/80">
                       <Tabs value={activeTab} onValueChange={(val) => guardNavigation(() => setActiveTab(val), 'tab', val)} className="flex h-full flex-col">
                         <div className="border-b border-border px-4 md:px-5">
@@ -1283,34 +1228,50 @@ export default function DoctorDashboard() {
 
                         <TabsContent value="soap" className="m-0 flex-1 overflow-y-auto p-4 md:p-5">
                           <div className="mx-auto max-w-5xl space-y-5">
-                            {(selectedVisit?.temperature || selectedVisit?.bloodPressure || selectedVisit?.heartRate || selectedVisit?.oxygenSaturation || selectedVisit?.triagePriority) && (
-                              <div className="rounded-lg border border-blue-100 bg-blue-50/50 px-3 py-2">
-                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-                                  <span className="font-semibold text-blue-800">Triage</span>
-                                  {selectedVisit.temperature && <span><span className="text-muted-foreground">Temp</span> {selectedVisit.temperature} C</span>}
-                                  {selectedVisit.bloodPressure && <span><span className="text-muted-foreground">BP</span> {selectedVisit.bloodPressure}</span>}
-                                  {selectedVisit.heartRate && <span><span className="text-muted-foreground">HR</span> {selectedVisit.heartRate}</span>}
-                                  {selectedVisit.respiratoryRate && <span><span className="text-muted-foreground">RR</span> {selectedVisit.respiratoryRate}</span>}
-                                  {selectedVisit.oxygenSaturation && <span><span className="text-muted-foreground">SpO2</span> {selectedVisit.oxygenSaturation}%</span>}
-                                  {selectedVisit.triagePriority && <span className="capitalize text-blue-800">{selectedVisit.triagePriority.replace('esi_', 'ESI ').replace(/_/g, ' ')}</span>}
+                            <div className="grid gap-2 rounded-lg border border-border bg-white p-3 sm:grid-cols-3 lg:grid-cols-6">
+                              {[
+                                { label: 'BP', value: vitalsForm.bloodPressure || selectedVisit?.bloodPressure || '-', unit: 'mmHg' },
+                                { label: 'HR', value: vitalsForm.heartRate || selectedVisit?.heartRate || '-', unit: 'bpm' },
+                                { label: 'RR', value: vitalsForm.respiratoryRate || selectedVisit?.respiratoryRate || '-', unit: '/min' },
+                                { label: 'Temp', value: vitalsForm.temperature || selectedVisit?.temperature || '-', unit: 'C' },
+                                { label: 'SpO2', value: vitalsForm.oxygenSaturation || selectedVisit?.oxygenSaturation || '-', unit: '%' },
+                                { label: 'Weight', value: vitalsForm.weight || selectedVisit?.weight || '-', unit: 'kg' },
+                              ].map((vital) => (
+                                <div key={vital.label} className="rounded-md bg-slate-50 px-3 py-2">
+                                  <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{vital.label}</p>
+                                  <p className="mt-0.5 text-base font-semibold text-slate-900">{vital.value}</p>
+                                  <p className="text-[10px] text-muted-foreground">{vital.unit}</p>
                                 </div>
-                                {selectedVisit.triageNotes && <p className="mt-1 text-xs italic text-blue-700">{selectedVisit.triageNotes}</p>}
+                              ))}
+                            </div>
+                            {selectedVisit?.triageNotes && (
+                              <div className="rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2 text-xs text-blue-800">
+                                <span className="font-semibold">Triage note:</span> {selectedVisit.triageNotes}
                               </div>
                             )}
 
                             <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
                               <div className="space-y-4">
-                                <div className="space-y-2">
-                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Chief Complaint</Label>
-                                  <Textarea value={chiefComplaintForm} onChange={(e) => setChiefComplaintForm(e.target.value)} placeholder="What brings the patient in today?" rows={2} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3">
+                                  <div className="pt-7 text-center text-xl font-bold text-teal-700">C</div>
+                                  <div className="space-y-2">
+                                    <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Chief Complaint</Label>
+                                    <Textarea value={chiefComplaintForm} onChange={(e) => setChiefComplaintForm(e.target.value)} placeholder="What brings the patient in today?" rows={2} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                  </div>
                                 </div>
-                                <div className="space-y-2">
-                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Subjective</Label>
-                                  <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({ ...soapForm, subjective: e.target.value })} placeholder="Patient history, symptoms, relevant negatives..." rows={8} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t pt-4">
+                                  <div className="pt-7 text-center text-xl font-bold text-teal-700">S</div>
+                                  <div className="space-y-2">
+                                    <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Subjective</Label>
+                                    <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({ ...soapForm, subjective: e.target.value })} placeholder="Patient history, symptoms, relevant negatives..." rows={8} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                  </div>
                                 </div>
-                                <div className="space-y-2">
-                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Objective</Label>
-                                  <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({ ...soapForm, objective: e.target.value })} placeholder="Exam findings, observations, reviewed results..." rows={6} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t pt-4">
+                                  <div className="pt-7 text-center text-xl font-bold text-teal-700">O</div>
+                                  <div className="space-y-2">
+                                    <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Objective</Label>
+                                    <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({ ...soapForm, objective: e.target.value })} placeholder="Exam findings, observations, reviewed results..." rows={6} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                  </div>
                                 </div>
                               </div>
 
@@ -1348,13 +1309,19 @@ export default function DoctorDashboard() {
                                   <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Diagnosis</Label>
                                   <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({ ...soapForm, diagnosis: e.target.value })} placeholder="Primary diagnosis" className="h-9 border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
                                 </div>
-                                <div className="space-y-2">
-                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Assessment</Label>
-                                  <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({ ...soapForm, assessment: e.target.value })} placeholder="Clinical impression and differential..." rows={5} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3">
+                                  <div className="pt-7 text-center text-xl font-bold text-teal-700">A</div>
+                                  <div className="space-y-2">
+                                    <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Assessment</Label>
+                                    <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({ ...soapForm, assessment: e.target.value })} placeholder="Clinical impression and differential..." rows={5} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                  </div>
                                 </div>
-                                <div className="space-y-2">
-                                  <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Plan</Label>
-                                  <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({ ...soapForm, plan: e.target.value })} placeholder="Treatment plan, follow-up, counselling..." rows={5} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t pt-4">
+                                  <div className="pt-7 text-center text-xl font-bold text-teal-700">P</div>
+                                  <div className="space-y-2">
+                                    <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Plan</Label>
+                                    <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({ ...soapForm, plan: e.target.value })} placeholder="Treatment plan, follow-up, counselling..." rows={5} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                  </div>
                                 </div>
                               </div>
                             </div>
@@ -1405,18 +1372,45 @@ export default function DoctorDashboard() {
                       </Tabs>
                     </section>
 
-                    <aside className="bg-slate-50/60 px-4 py-4 xl:h-[calc(100vh-157px)] xl:overflow-y-auto">
+                    <aside className="bg-slate-50/80 px-4 py-4 xl:max-h-[calc(100vh-186px)] xl:overflow-y-auto">
                       <div className="space-y-5">
-                        <div>
+                        <div className="rounded-lg border border-teal-100 bg-white p-3 shadow-sm">
                           <div className="mb-2 flex items-center justify-between">
                             <h3 className="text-sm font-semibold">Encounter</h3>
                             {selectedVisit && <span className="text-[10px] capitalize text-muted-foreground">{statusLabel(selectedVisit.status)}</span>}
+                          </div>
+                          <div className="mb-3 text-xs text-muted-foreground">
+                            <p className="font-medium text-foreground">Next step</p>
+                            <p>Finalize this encounter and move to the next patient.</p>
                           </div>
                           <Button className="w-full justify-center bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
                             {completeVisit.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                             Complete & Next
                           </Button>
                           {closureBlockers.length > 0 && <p className="mt-2 text-xs text-amber-700">{closureBlockers[0]}</p>}
+                        </div>
+
+                        <div className="grid grid-cols-4 gap-2 border-t border-border pt-4">
+                          {[
+                            { label: 'Order Lab', icon: FlaskConical, disabled: !contextPatient, onClick: () => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); } },
+                            { label: 'Prescribe', icon: Pill, disabled: !contextPatient, onClick: () => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); } },
+                            { label: 'Plan', icon: ClipboardList, disabled: !contextPatient, onClick: () => setTreatmentPlanOpen(true) },
+                            { label: 'Refer', icon: Send, disabled: !selectedVisit, onClick: () => { setReferralOpen(true); setReferralForm({ specialistId: '', reason: '', notes: '' }); } },
+                          ].map((action) => {
+                            const Icon = action.icon;
+                            return (
+                              <button
+                                key={action.label}
+                                type="button"
+                                onClick={action.onClick}
+                                disabled={action.disabled}
+                                className="flex min-h-[58px] flex-col items-center justify-center gap-1 rounded-lg border border-transparent text-[10px] font-medium text-slate-700 transition-colors hover:border-border hover:bg-white disabled:cursor-not-allowed disabled:opacity-40"
+                              >
+                                <Icon className="h-4 w-4 text-slate-700" />
+                                <span>{action.label}</span>
+                              </button>
+                            );
+                          })}
                         </div>
 
                         <div className="border-t border-border pt-4">
