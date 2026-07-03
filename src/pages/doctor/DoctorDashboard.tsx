@@ -1212,9 +1212,9 @@ export default function DoctorDashboard() {
                     </div>
                   )}
 
-                  <div className="grid flex-1 min-h-0 overflow-hidden rounded-xl border border-border bg-white shadow-sm xl:grid-cols-[minmax(0,1fr)_320px]">
+                  <div className="grid overflow-visible rounded-xl border border-border bg-white shadow-sm xl:grid-cols-[minmax(0,1fr)_320px]">
                     <section className="min-w-0 border-r border-border/80">
-                      <Tabs value={activeTab} onValueChange={(val) => guardNavigation(() => setActiveTab(val), 'tab', val)} className="flex h-full flex-col">
+                      <Tabs value={activeTab} onValueChange={(val) => guardNavigation(() => setActiveTab(val), 'tab', val)} className="flex flex-col">
                         <div className="border-b border-border px-4 md:px-5">
                           <TabsList className="h-11 bg-transparent p-0">
                             <TabsTrigger value="soap" className="rounded-none border-b-2 border-transparent px-0 mr-6 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Consult</TabsTrigger>
