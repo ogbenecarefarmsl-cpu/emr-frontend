@@ -12,7 +12,6 @@ import { patientService } from '@/services/patientService';
 import { SoapNoteTypeEnum } from '@/types/soap-note';
 import { useDoctorDashboard, useDoctorPatients, useAcceptPatient, useUpdateVisit, useCompleteVisit, usePatientVisits, useReferToSpecialist } from '@/hooks/useVisits';
 import { useResults } from '@/hooks/useResults';
-import { useMyServicePrices } from '@/hooks/useServicePrices';
 
 // UI Components
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +24,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 
 // Dashboard components
 import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
@@ -50,7 +48,7 @@ import {
   ChevronDown, AlertTriangle, Search, Plus, Trash2, Save,
   Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
   Pencil, AlertCircle, TestTube, Stethoscope, Calendar, Clock, Eye, Printer,
-  RefreshCw, ShieldCheck, HeartPulse
+  RefreshCw, ShieldCheck
 } from 'lucide-react';
 
 // Types
@@ -278,13 +276,6 @@ export default function DoctorDashboard() {
     diagnosis: '',
     notes: '',
   });
-  const [observationOpen, setObservationOpen] = useState(false);
-  const [observationForm, setObservationForm] = useState({
-    hours: '4',
-    includeOxygen: false,
-    reason: '',
-    notes: '',
-  });
 
   // Treatment plan modal state
   const [treatmentPlanOpen, setTreatmentPlanOpen] = useState(false);
@@ -372,7 +363,6 @@ export default function DoctorDashboard() {
     queryFn: () => medicationService.findAll(),
     staleTime: 5 * 60 * 1000,
   });
-  const { data: servicePrices = [] } = useMyServicePrices();
 
   // Fetch patient's previous visits when a patient is selected
   const patientId = selectedVisit?.patientId?._id || selectedVisit?.patientId || searchedPatient?._id || '';
@@ -431,15 +421,6 @@ export default function DoctorDashboard() {
     if (!latest) return candidate;
     return new Date(candidate).getTime() > new Date(latest).getTime() ? candidate : latest;
   }, undefined);
-  const getServicePrice = useCallback((code: string, fallback: number) => {
-    const found = Array.isArray(servicePrices) ? servicePrices.find((price: any) => price.code === code && price.isActive !== false) : null;
-    return Number(found?.amount ?? fallback);
-  }, [servicePrices]);
-  const observationHours = Math.max(1, Number(observationForm.hours || 4));
-  const observationBaseRate = getServicePrice('observation_4h', 100);
-  const oxygenHourlyRate = getServicePrice('oxygen_hour', 200);
-  const observationBlocks = Math.max(1, Math.ceil(observationHours / 4));
-  const observationTotal = observationBlocks * observationBaseRate + (observationForm.includeOxygen ? observationHours * oxygenHourlyRate : 0);
 
   // m8: Sorted lab results
   const sortedLabResults = useMemo(() => {
@@ -695,54 +676,6 @@ export default function DoctorDashboard() {
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || err?.message || 'Failed to create lab order';
-      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
-    },
-  });
-
-  const createObservationOrder = useMutation({
-    mutationFn: async () => {
-      const patientId = contextPatient?._id;
-      if (!patientId || !selectedVisit) return;
-      const hours = Math.max(1, Number(observationForm.hours || 4));
-      const blocks = Math.max(1, Math.ceil(hours / 4));
-      const tests = [
-        {
-          testCode: `OBSERVATION_${hours}H`,
-          testName: `Observation monitoring (${hours} hour${hours === 1 ? '' : 's'})`,
-          price: blocks * observationBaseRate,
-        },
-      ];
-      if (observationForm.includeOxygen) {
-        tests.push({
-          testCode: `OXYGEN_${hours}H`,
-          testName: `Oxygen administration (${hours} hour${hours === 1 ? '' : 's'})`,
-          price: hours * oxygenHourlyRate,
-        });
-      }
-
-      return ordersAPI.create({
-        patientId,
-        visitId: selectedVisit._id || selectedVisit.id,
-        orderType: 'procedure',
-        tests,
-        priority: observationForm.includeOxygen ? 'urgent' : 'routine',
-        notes: [
-          observationForm.reason ? `Reason: ${observationForm.reason}` : '',
-          observationForm.notes ? `Instructions: ${observationForm.notes}` : '',
-          `Observation duration: ${hours} hour${hours === 1 ? '' : 's'}`,
-          observationForm.includeOxygen ? 'Oxygen administration requested' : '',
-        ].filter(Boolean).join('\n'),
-      });
-    },
-    onSuccess: () => {
-      toast.success('Observation bill created. Patient should pay at reception before observation starts.');
-      setObservationOpen(false);
-      setObservationForm({ hours: '4', includeOxygen: false, reason: '', notes: '' });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['visits'] });
-    },
-    onError: (err: any) => {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to create observation bill';
       toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
     },
   });
@@ -1037,7 +970,7 @@ export default function DoctorDashboard() {
 
     const activeClinicalOrders = currentVisitOrders.filter((order: any) => {
       const type = order.orderType || order.order_type;
-      return ['lab', 'pharmacy', 'procedure', 'admission', 'other'].includes(type);
+      return type === 'lab' || type === 'pharmacy';
     });
     const hasUnpaidClinical = activeClinicalOrders.some((order: any) => (order.paymentStatus || order.payment_status) !== 'paid');
     const hasUnreleasedLab = activeClinicalOrders.some((order: any) => (order.orderType || order.order_type) === 'lab' && (order.status || '') !== 'completed');
@@ -1597,11 +1530,10 @@ export default function DoctorDashboard() {
                           {closureBlockers.length > 0 && <p className="mt-2 text-xs text-amber-700">{closureBlockers[0]}</p>}
                         </div>
 
-                        <div className="grid grid-cols-5 gap-2 border-t border-border pt-4">
+                        <div className="grid grid-cols-4 gap-2 border-t border-border pt-4">
                           {[
                             { label: 'Order Lab', icon: FlaskConical, disabled: !contextPatient, onClick: () => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); } },
                             { label: 'Prescribe', icon: Pill, disabled: !contextPatient, onClick: () => { setEditingPrescription(null); setPrescriptionItems([]); setPrescriptionModalOpen(true); } },
-                            { label: 'Observe', icon: HeartPulse, disabled: !selectedVisit, onClick: () => setObservationOpen(true) },
                             { label: 'Plan', icon: ClipboardList, disabled: !contextPatient, onClick: () => setTreatmentPlanOpen(true) },
                             { label: 'Refer', icon: Send, disabled: !selectedVisit, onClick: () => { setReferralOpen(true); setReferralForm({ specialistId: '', reason: '', notes: '' }); } },
                           ].map((action) => {
@@ -1658,7 +1590,7 @@ export default function DoctorDashboard() {
                         <div className="border-t border-border pt-4">
                           <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Handoff</h4>
                           <div className="flex items-center justify-between gap-3 text-xs">
-                            <span className="text-muted-foreground">{selectedVisit?.status === 'admitted' ? 'Admitted' : 'Admit sends patient to inpatient nursing board'}</span>
+                            <span className="text-muted-foreground">{selectedVisit?.status === 'admitted' ? 'Admitted' : 'Not admitted'}</span>
                             <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAdmitOpen(true)} disabled={!selectedVisit}>Admit</Button>
                           </div>
                         </div>
@@ -2287,83 +2219,6 @@ export default function DoctorDashboard() {
             <Button variant="outline" onClick={() => setReferralOpen(false)}>Cancel</Button>
             <Button onClick={async () => { if (!selectedVisit) return; try { await referToSpecialist.mutateAsync({ visitId: selectedVisit._id || selectedVisit.id || '', data: referralForm }); toast.success('Patient referred to specialist'); setReferralOpen(false); setReferralForm({ specialistId: '', reason: '', notes: '' }); setSelectedVisit(null); } catch { toast.error('Failed to refer patient'); } }} disabled={referToSpecialist.isPending || !referralForm.specialistId || !referralForm.reason}>
               {referToSpecialist.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserCheck className="w-4 h-4 mr-2" />}Refer
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Observation Order Modal */}
-      <Dialog open={observationOpen} onOpenChange={setObservationOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Place Patient Under Observation</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-md border bg-muted/30 p-3 text-sm">
-              <p className="font-medium">{patientDisplayName(selectedVisit)}</p>
-              <p className="mt-1 text-xs text-muted-foreground">Creates an unpaid service bill for reception. Nursing observation starts after payment.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Hours</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  step={1}
-                  value={observationForm.hours}
-                  onChange={(e) => setObservationForm({ ...observationForm, hours: e.target.value })}
-                  placeholder="4"
-                />
-              </div>
-              <div className="flex items-end">
-                <div className="flex h-10 w-full items-center justify-between rounded-md border px-3">
-                  <Label className="text-sm">Oxygen</Label>
-                  <Switch
-                    checked={observationForm.includeOxygen}
-                    onCheckedChange={(checked) => setObservationForm({ ...observationForm, includeOxygen: checked })}
-                  />
-                </div>
-              </div>
-            </div>
-            <div>
-              <Label>Reason</Label>
-              <Input
-                value={observationForm.reason}
-                onChange={(e) => setObservationForm({ ...observationForm, reason: e.target.value })}
-                placeholder="e.g., Dehydration, asthma monitoring, post-treatment review"
-              />
-            </div>
-            <div>
-              <Label>Instructions</Label>
-              <Textarea
-                value={observationForm.notes}
-                onChange={(e) => setObservationForm({ ...observationForm, notes: e.target.value })}
-                rows={3}
-                placeholder="Vitals frequency, fluid/oxygen instructions, review trigger..."
-              />
-            </div>
-            <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-900">
-              <div className="flex justify-between gap-3">
-                <span>Observation ({observationBlocks} x 4h block)</span>
-                <span>Le {(observationBlocks * observationBaseRate).toLocaleString()}</span>
-              </div>
-              {observationForm.includeOxygen && (
-                <div className="mt-1 flex justify-between gap-3">
-                  <span>Oxygen ({observationHours}h)</span>
-                  <span>Le {(observationHours * oxygenHourlyRate).toLocaleString()}</span>
-                </div>
-              )}
-              <div className="mt-2 flex justify-between border-t border-cyan-200 pt-2 font-semibold">
-                <span>Total due</span>
-                <span>Le {observationTotal.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setObservationOpen(false)}>Cancel</Button>
-            <Button onClick={() => createObservationOrder.mutate()} disabled={createObservationOrder.isPending || !selectedVisit || observationHours < 1}>
-              {createObservationOrder.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <HeartPulse className="w-4 h-4 mr-2" />}
-              Create Bill
             </Button>
           </DialogFooter>
         </DialogContent>

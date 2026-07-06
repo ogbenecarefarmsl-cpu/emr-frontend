@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle, HeartPulse } from 'lucide-react';
+import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle } from 'lucide-react';
 import { prescriptionService } from '@/services/prescriptionService';
 
 export function PendingOrders() {
@@ -16,7 +16,6 @@ export function PendingOrders() {
   const { data: allOrders = [], isLoading, refetch } = usePendingClinicalOrders();
   const { data: labOrders = [] } = usePendingClinicalOrders('lab');
   const { data: pharmacyOrders = [] } = usePendingClinicalOrders('pharmacy');
-  const { data: serviceOrders = [] } = usePendingClinicalOrders('procedure');
   const { data: pendingPrescriptions = [], isLoading: prescriptionsLoading } = useQuery({
     queryKey: ['prescriptions', 'pending-payment'],
     queryFn: () => prescriptionService.findPendingPayment(),
@@ -71,15 +70,6 @@ export function PendingOrders() {
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
             <Pill className="h-3 w-3 mr-1" />
             Pharmacy Order
-          </Badge>
-        );
-      case 'procedure':
-      case 'admission':
-      case 'other':
-        return (
-          <Badge variant="outline" className="bg-cyan-50 text-cyan-700 border-cyan-200">
-            <HeartPulse className="h-3 w-3 mr-1" />
-            Service
           </Badge>
         );
       default:
@@ -145,7 +135,7 @@ export function PendingOrders() {
                   )}
                   {!isPrescription && item.order_tests && item.order_tests.length > 0 && (
                     <div className="text-sm text-muted-foreground mt-1">
-                      {item.orderType === 'lab' ? 'Tests' : 'Items'}:{' '}
+                      Tests:{' '}
                       <span className="font-medium text-foreground">
                         {item.order_tests.map((test: any) => test.testCode).join(', ')}
                       </span>
@@ -226,7 +216,7 @@ export function PendingOrders() {
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="all">
               All ({allPaymentItems.length})
             </TabsTrigger>
@@ -235,9 +225,6 @@ export function PendingOrders() {
             </TabsTrigger>
             <TabsTrigger value="prescription">
               Prescriptions ({pendingPrescriptions.length})
-            </TabsTrigger>
-            <TabsTrigger value="services">
-              Services ({serviceOrders.length})
             </TabsTrigger>
             <TabsTrigger value="pharmacy">
               Pharmacy Orders ({pharmacyOrders.length})
@@ -251,9 +238,6 @@ export function PendingOrders() {
           </TabsContent>
           <TabsContent value="prescription" className="mt-4">
             {renderOrderList(pendingPrescriptions.map((rx: any) => ({ ...rx, _paymentKind: 'prescription' })))}
-          </TabsContent>
-          <TabsContent value="services" className="mt-4">
-            {renderOrderList(serviceOrders.map((order: any) => ({ ...order, _paymentKind: 'order' })))}
           </TabsContent>
           <TabsContent value="pharmacy" className="mt-4">
             {renderOrderList(pharmacyOrders.map((order: any) => ({ ...order, _paymentKind: 'order' })))}
