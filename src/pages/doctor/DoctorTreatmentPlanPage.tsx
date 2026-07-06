@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { RoleLayout } from '@/components/layout/RoleLayout';
@@ -9,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
 import type { TreatmentPlan } from '@/types/treatment-plan';
-import { Loader2, Send, Eye, Plus, Trash2, Pencil, FileText } from 'lucide-react';
+import { LayoutDashboard, Loader2, Send, Eye, Plus, Trash2, Pencil, FileText } from 'lucide-react';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'bg-gray-100 text-gray-700' },
@@ -21,6 +22,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 
 export default function DoctorTreatmentPlanPage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [viewPlan, setViewPlan] = useState<TreatmentPlan | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
 
@@ -57,7 +59,10 @@ export default function DoctorTreatmentPlanPage() {
     <RoleLayout title="Treatment Plans" subtitle="Create and manage treatment plans" role="doctor">
       <div className="space-y-6">
         {/* Create button */}
-        <div className="flex justify-end">
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <Button variant="outline" onClick={() => navigate('/doctor')} className="gap-2">
+            <LayoutDashboard className="h-4 w-4" /> Doctor Dashboard
+          </Button>
           <Button onClick={() => setBuilderOpen(true)} className="gap-2">
             <Plus className="h-4 w-4" /> New Treatment Plan
           </Button>

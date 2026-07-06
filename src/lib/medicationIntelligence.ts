@@ -39,6 +39,17 @@ export type MedicationQuantityInput = {
   quantity?: number;
 };
 
+export type MedicationDispenseEstimate = {
+  baseQuantity: number;
+  sellQuantity: number;
+  sellUnitLabel: string;
+  pricePerSellUnit: number;
+  lineTotal: number;
+  mode: 'individual' | 'pack';
+  packName?: string;
+  packUnits?: number;
+};
+
 export type RouteHint =
   | 'oral'
   | 'intravenous'
@@ -98,6 +109,22 @@ export const getMedicationPrice = (med: MedicationLike) => {
     ) || 0
   );
 };
+
+const getPackUnits = (pack?: MedicationLike['packSizes'][number]) =>
+  Number(pack?.unitsPerPack ?? pack?.quantityPerPack ?? 0) || 0;
+
+const getPackPrice = (pack?: MedicationLike['packSizes'][number]) =>
+  Number(pack?.sellingPrice ?? 0) || 0;
+
+const getSortedPacks = (med?: MedicationLike) =>
+  [...(med?.packSizes || [])]
+    .map((pack) => ({
+      pack,
+      units: getPackUnits(pack),
+      price: getPackPrice(pack),
+    }))
+    .filter((entry) => entry.units > 0 && entry.price > 0)
+    .sort((a, b) => a.units - b.units || a.price - b.price);
 
 export const inferMedicationRoute = (med: MedicationLike): RouteHint => {
   const text = textFor(med);
@@ -204,7 +231,6 @@ export const parseDoseUnitCount = (strengthPerDose?: string) => {
     'puffs',
     'sachet',
     'sachets',
-    'ml',
   ];
 
   return countUnits.some((unit) => unitText.startsWith(unit)) ? count : 1;
@@ -215,6 +241,58 @@ export const computeMedicationQuantity = (item: MedicationQuantityInput, _med?: 
   const dosesPerDay = Math.max(1, Number(item.dosesPerDay || 1));
   const durationDays = Math.max(1, Number(item.durationDays || 1));
   return Math.max(1, Math.round(unitsPerDose * dosesPerDay * durationDays * 100) / 100);
+};
+
+export const estimateMedicationDispense = (
+  item: MedicationQuantityInput,
+  med?: MedicationLike,
+): MedicationDispenseEstimate => {
+  const baseQuantity = Number(item.quantity || computeMedicationQuantity(item, med) || 1);
+  const packs = getSortedPacks(med);
+  const baseUnit = med ? getMedicationBaseUnit(med) : 'unit';
+  const shouldUsePack = !!med && med.sellMode !== 'individual' && packs.length > 0;
+
+  if (shouldUsePack) {
+    const exact = packs.find((entry) => entry.units === baseQuantity);
+    const coveringPacks = packs
+      .map((entry) => ({
+        ...entry,
+        sellQuantity: Math.max(1, Math.ceil(baseQuantity / entry.units)),
+      }))
+      .map((entry) => ({
+        ...entry,
+        coveredUnits: entry.sellQuantity * entry.units,
+        lineTotal: entry.sellQuantity * entry.price,
+      }))
+      .filter((entry) => entry.coveredUnits >= baseQuantity)
+      .sort((a, b) => a.coveredUnits - b.coveredUnits || a.lineTotal - b.lineTotal);
+    const selected = exact
+      ? { ...exact, sellQuantity: 1, coveredUnits: exact.units, lineTotal: exact.price }
+      : coveringPacks[0];
+
+    if (selected) {
+      return {
+        baseQuantity,
+        sellQuantity: selected.sellQuantity,
+        sellUnitLabel: selected.pack.name || selected.pack.unit || 'pack',
+        pricePerSellUnit: selected.price,
+        lineTotal: selected.lineTotal,
+        mode: 'pack',
+        packName: selected.pack.name,
+        packUnits: selected.units,
+      };
+    }
+  }
+
+  const pricePerSellUnit = med ? getMedicationPrice(med) : 0;
+  return {
+    baseQuantity,
+    sellQuantity: baseQuantity,
+    sellUnitLabel: baseUnit,
+    pricePerSellUnit,
+    lineTotal: baseQuantity * pricePerSellUnit,
+    mode: 'individual',
+  };
 };
 
 export const validateMedicationRegimen = (item: MedicationQuantityInput) => {

@@ -206,7 +206,7 @@ export default function ReceptionDispensePage() {
       .sort((a, b) => a.baseUnits - b.baseUnits || a.units - b.units);
 
     const best = candidates[0];
-    if (!best || med.sellMode === 'both') {
+    if (!best) {
       return computeLineTotals({
         ...line,
         dispenseMode: 'individual',

@@ -35,6 +35,7 @@ import {
   buildSmartInstruction,
   buildSmartRegimen,
   computeMedicationQuantity,
+  estimateMedicationDispense,
   getMedicationBaseUnit,
   getMedicationPrice,
   validateMedicationRegimen,
@@ -46,7 +47,8 @@ import {
   Loader2, CheckCircle, User, FileText, FlaskConical, Pill,
   ChevronDown, AlertTriangle, Search, Plus, Trash2, Save,
   Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
-  Pencil, AlertCircle, TestTube, Stethoscope, Calendar
+  Pencil, AlertCircle, TestTube, Stethoscope, Calendar, Clock, Eye, Printer,
+  RefreshCw, ShieldCheck
 } from 'lucide-react';
 
 // Types
@@ -194,6 +196,19 @@ const visitStatusTone = (status?: string) => cn(
 const CLINICAL_LABEL = 'text-[10px] font-bold uppercase tracking-wider text-muted-foreground';
 const CLINICAL_CARD = 'bg-white border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.02)]';
 
+const formatClinicalDateTime = (value?: string) => {
+  if (!value) return 'Not recorded';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return 'Not recorded';
+  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+const getResultRiskTone = (flag?: string) => {
+  if (flag === 'critical_high' || flag === 'critical_low') return 'border-red-200 bg-red-50 text-red-700';
+  if (flag === 'high' || flag === 'low') return 'border-amber-200 bg-amber-50 text-amber-700';
+  return 'border-emerald-200 bg-emerald-50 text-emerald-700';
+};
+
 export default function DoctorDashboard() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
@@ -286,6 +301,7 @@ export default function DoctorDashboard() {
   // m8: Lab results sort
   const [labSortField, setLabSortField] = useState<'testName' | 'value' | 'flag' | null>(null);
   const [labSortDir, setLabSortDir] = useState<'asc' | 'desc'>('asc');
+  const [reviewedResultIds, setReviewedResultIds] = useState<Set<string>>(new Set());
   const createAdmission = useMutation({
     mutationFn: async () => {
       if (!selectedVisit) return;
@@ -398,6 +414,13 @@ export default function DoctorDashboard() {
     selectedVisit?.consultationOrderId;
   const { data: labResults = [] } = useResults(labOrderId);
   const abnormalLabResults = labResults.filter((result: LabResult) => result.flag && result.flag !== 'normal');
+  const criticalLabResults = labResults.filter((result: LabResult) => result.flag === 'critical_high' || result.flag === 'critical_low');
+  const latestResultAt = labResults.reduce<string | undefined>((latest, result: LabResult) => {
+    const candidate = result.resulted_at || result.createdAt;
+    if (!candidate) return latest;
+    if (!latest) return candidate;
+    return new Date(candidate).getTime() > new Date(latest).getTime() ? candidate : latest;
+  }, undefined);
 
   // m8: Sorted lab results
   const sortedLabResults = useMemo(() => {
@@ -612,6 +635,11 @@ export default function DoctorDashboard() {
     }
   };
 
+  const getPrescriptionEstimate = (item: any) => estimateMedicationDispense(item, item as MedicationLike);
+
+  const getPrescriptionEstimateTotal = (items: any[]) =>
+    items.reduce((sum, item) => sum + getPrescriptionEstimate(item).lineTotal, 0);
+
   // Lab order creation
   const createLabOrder = useMutation({
     mutationFn: async () => {
@@ -662,13 +690,13 @@ export default function DoctorDashboard() {
         patientId,
         items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, computedQuantity, quantityTouched, isControlled, requiresPrescription, ...item }) => ({
           ...item,
-          quantity: Number(computedQuantity || computeMedicationQuantity(item, { baseUnit }) || 1),
+          quantity: Number(item.quantity || computedQuantity || computeMedicationQuantity(item, { baseUnit }) || 1),
           // The frontend no longer sends dosage/frequency/duration (legacy) — backend
           // auto-generates them from strengthPerDose / dosesPerDay / durationDays
           instructions: item.instructions?.trim() || undefined,
           pharmacistNote: item.pharmacistNote?.trim() || undefined,
         })),
-        // totalAmount is now auto-computed on the backend
+        totalAmount: getPrescriptionEstimateTotal(prescriptionItems),
       };
       if (selectedVisit) {
         payload.visitId = selectedVisit._id || selectedVisit.id;
@@ -728,11 +756,11 @@ export default function DoctorDashboard() {
       return await prescriptionService.update(editingPrescription._id, {
         items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, computedQuantity, quantityTouched, isControlled, requiresPrescription, ...item }) => ({
           ...item,
-          quantity: Number(computedQuantity || computeMedicationQuantity(item, { baseUnit }) || 1),
+          quantity: Number(item.quantity || computedQuantity || computeMedicationQuantity(item, { baseUnit }) || 1),
           instructions: item.instructions?.trim() || undefined,
           pharmacistNote: item.pharmacistNote?.trim() || undefined,
         })),
-        // totalAmount is auto-computed on the backend
+        totalAmount: getPrescriptionEstimateTotal(prescriptionItems),
       });
     },
     onSuccess: () => {
@@ -1117,6 +1145,7 @@ export default function DoctorDashboard() {
         onAcceptVisit={handleAcceptPatient}
         onSelectPatient={handleSelectSearchPatient}
         onAcceptNext={() => { if (waitingQueue.length > 0) handleAcceptPatient(waitingQueue[0]); }}
+        onOpenDashboard={() => { setSelectedVisit(null); setSearchedPatient(null); setActiveTab('soap'); }}
         onOpenResults={() => { if (resultsReady.length > 0) { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); } }}
         onOpenAllPatients={() => { setAllPatientsOpen(true); setAllPatientsPage(1); setAllPatientsSearch(''); setAllPatientsDaysBack(undefined); }}
         onLogout={handleLogout}
@@ -1328,32 +1357,143 @@ export default function DoctorDashboard() {
                           </div>
                         </TabsContent>
 
-                        <TabsContent value="lab-results" className="m-0 flex-1 overflow-y-auto p-4 md:p-5">
+                        <TabsContent value="lab-results" className="m-0 flex-1 overflow-y-auto bg-slate-50/60 p-3 md:p-5">
                           {selectedVisit ? (
-                            <div className="mx-auto max-w-5xl space-y-3">
-                              <div className="flex items-center justify-between">
-                                <h3 className="text-sm font-semibold">Lab Results</h3>
-                                {sortedLabResults.length > 0 && <span className="text-xs text-muted-foreground">{sortedLabResults.length} result{sortedLabResults.length !== 1 ? 's' : ''}</span>}
+                            <div className="mx-auto max-w-6xl space-y-4">
+                              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                                  <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                      <h3 className="text-base font-semibold text-slate-950">Results review</h3>
+                                      {criticalLabResults.length > 0 && (
+                                        <Badge className="bg-red-600 text-white">{criticalLabResults.length} critical</Badge>
+                                      )}
+                                      {abnormalLabResults.length > 0 && criticalLabResults.length === 0 && (
+                                        <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">{abnormalLabResults.length} abnormal</Badge>
+                                      )}
+                                    </div>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                      Current visit LIS results for {patientDisplayName(selectedVisit)}. Last result: {formatClinicalDateTime(latestResultAt)}.
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={() => queryClient.invalidateQueries({ queryKey: ['results', labOrderId] })}>
+                                      <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
+                                    </Button>
+                                    <Button type="button" size="sm" variant="outline" className="h-8 text-xs" disabled={sortedLabResults.length === 0}>
+                                      <Printer className="mr-1.5 h-3.5 w-3.5" /> Print
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      className="h-8 bg-[#0d9488] text-xs text-white hover:bg-[#0f766e]"
+                                      disabled={sortedLabResults.length === 0}
+                                      onClick={() => {
+                                        setReviewedResultIds(new Set(sortedLabResults.map((r: LabResult) => r._id)));
+                                        toast.success('Results marked reviewed');
+                                      }}
+                                    >
+                                      <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Mark reviewed
+                                    </Button>
+                                  </div>
+                                </div>
+
+                                <div className="mt-4 grid grid-cols-2 gap-2 md:grid-cols-4">
+                                  {[
+                                    { label: 'Total', value: sortedLabResults.length, tone: 'bg-slate-100 text-slate-700' },
+                                    { label: 'Critical', value: criticalLabResults.length, tone: 'bg-red-50 text-red-700' },
+                                    { label: 'Abnormal', value: abnormalLabResults.length, tone: 'bg-amber-50 text-amber-700' },
+                                    { label: 'Reviewed', value: sortedLabResults.filter((r: LabResult) => reviewedResultIds.has(r._id)).length, tone: 'bg-emerald-50 text-emerald-700' },
+                                  ].map((item) => (
+                                    <div key={item.label} className="rounded-lg border border-slate-200 bg-white px-3 py-2">
+                                      <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{item.label}</p>
+                                      <p className={cn('mt-1 inline-flex min-w-10 rounded-md px-2 py-0.5 text-lg font-bold', item.tone)}>{item.value}</p>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                              {sortedLabResults.length === 0 ? (
-                                <div className="py-14 text-center text-sm text-muted-foreground">No lab results yet for this visit.</div>
-                              ) : (
-                                <div className="divide-y rounded-lg border border-border bg-white">
-                                  {sortedLabResults.map((result: LabResult) => (
-                                    <div key={result._id} className="flex items-center justify-between gap-4 px-4 py-3">
-                                      <div className="min-w-0">
-                                        <div className="flex items-center gap-2">
-                                          <p className="truncate text-sm font-medium">{result.testName}</p>
-                                          <span className="font-mono text-[10px] text-muted-foreground">{result.testCode}</span>
+
+                              {abnormalLabResults.length > 0 && (
+                                <div className="grid gap-3 lg:grid-cols-2">
+                                  {abnormalLabResults.slice(0, 2).map((result: LabResult) => (
+                                    <div key={result._id} className={cn('rounded-xl border p-3 shadow-sm', getResultRiskTone(result.flag))}>
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <p className="text-[10px] font-bold uppercase tracking-wide">Needs review</p>
+                                          <p className="mt-1 truncate text-sm font-semibold">{result.testName}</p>
+                                          <p className="text-xs opacity-80">Ref: {result.referenceRange || result.reference_range || 'N/A'}</p>
                                         </div>
-                                        <p className="mt-0.5 text-xs text-muted-foreground">Ref: {result.referenceRange || result.reference_range || 'N/A'}</p>
-                                      </div>
-                                      <div className="flex items-center gap-3 shrink-0">
-                                        <span className="text-sm font-semibold">{result.value}{result.unit ? ' ' + result.unit : ''}</span>
-                                        <Badge variant="outline" className={cn('text-[10px]', getFlagColor(result.flag))}>{getFlagLabel(result.flag)}</Badge>
+                                        <div className="text-right">
+                                          <p className="text-lg font-bold">{result.value}{result.unit ? ` ${result.unit}` : ''}</p>
+                                          <p className="text-[10px] font-semibold uppercase">{getFlagLabel(result.flag)}</p>
+                                        </div>
                                       </div>
                                     </div>
                                   ))}
+                                </div>
+                              )}
+
+                              {sortedLabResults.length === 0 ? (
+                                <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center text-sm text-muted-foreground">
+                                  No released lab results yet for this visit.
+                                </div>
+                              ) : (
+                                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                                  <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(110px,0.8fr)_minmax(110px,0.8fr)_96px_118px] gap-3 border-b bg-slate-50 px-4 py-2 text-[10px] font-bold uppercase tracking-wide text-muted-foreground max-lg:hidden">
+                                    <button type="button" className="text-left" onClick={() => toggleLabSort('testName')}>Test</button>
+                                    <button type="button" className="text-left" onClick={() => toggleLabSort('value')}>Value</button>
+                                    <span>Reference</span>
+                                    <button type="button" className="text-left" onClick={() => toggleLabSort('flag')}>Flag</button>
+                                    <span className="text-right">Review</span>
+                                  </div>
+                                  <div className="divide-y divide-slate-100">
+                                    {sortedLabResults.map((result: LabResult) => {
+                                      const reviewed = reviewedResultIds.has(result._id);
+                                      return (
+                                        <div key={result._id} className="grid gap-3 px-4 py-3 lg:grid-cols-[minmax(0,1.6fr)_minmax(110px,0.8fr)_minmax(110px,0.8fr)_96px_118px] lg:items-center">
+                                          <div className="min-w-0">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <p className="truncate text-sm font-semibold text-slate-950">{result.testName}</p>
+                                              <span className="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-500">{result.testCode}</span>
+                                            </div>
+                                            <p className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                                              <Clock className="h-3 w-3" /> {formatClinicalDateTime(result.resulted_at || result.createdAt)}
+                                            </p>
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground lg:hidden">Value</p>
+                                            <p className="text-sm font-bold text-slate-950">{result.value}{result.unit ? ` ${result.unit}` : ''}</p>
+                                          </div>
+                                          <div>
+                                            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground lg:hidden">Reference</p>
+                                            <p className="text-xs text-muted-foreground">{result.referenceRange || result.reference_range || 'N/A'}</p>
+                                          </div>
+                                          <div>
+                                            <Badge variant="outline" className={cn('border text-[10px]', getResultRiskTone(result.flag))}>{getFlagLabel(result.flag)}</Badge>
+                                          </div>
+                                          <div className="flex items-center justify-start gap-2 lg:justify-end">
+                                            <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs">
+                                              <Eye className="mr-1 h-3.5 w-3.5" /> Compare
+                                            </Button>
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              variant={reviewed ? 'outline' : 'default'}
+                                              className={cn('h-7 px-2 text-xs', !reviewed && 'bg-slate-900 text-white hover:bg-slate-800')}
+                                              onClick={() => setReviewedResultIds((prev) => {
+                                                const next = new Set(prev);
+                                                if (next.has(result._id)) next.delete(result._id);
+                                                else next.add(result._id);
+                                                return next;
+                                              })}
+                                            >
+                                              {reviewed ? 'Reviewed' : 'Review'}
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               )}
                             </div>
@@ -1364,7 +1504,7 @@ export default function DoctorDashboard() {
 
                         <TabsContent value="timeline" className="m-0 flex-1 overflow-y-auto">
                           {patientId ? (
-                            <PatientTimeline patientId={patientId} patientChart={patientChart} patientVisits={patientVisits} patientOrders={currentVisitOrders} patientPrescriptions={currentVisitPrescriptions} chartLoading={chartLoading} />
+                            <PatientTimeline patientId={patientId} patientChart={patientChart} patientVisits={patientVisits} patientOrders={patientOrders} patientPrescriptions={patientPrescriptions} chartLoading={chartLoading} onNavigate={setActiveTab} />
                           ) : (
                             <div className="py-12 text-center text-sm text-muted-foreground">Select a patient to view timeline</div>
                           )}
@@ -1828,13 +1968,32 @@ export default function DoctorDashboard() {
 
       {/* Prescription Modal */}
       <Dialog open={prescriptionModalOpen} onOpenChange={(open) => { if (!open) cancelEdit(); setPrescriptionModalOpen(open); }}>
-        <DialogContent className="grid h-[100dvh] max-h-[100dvh] w-screen max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none p-0 sm:h-[94vh] sm:w-[96vw] sm:max-w-none sm:rounded-lg lg:w-[94vw] xl:w-[90vw]">
-          <DialogHeader className="border-b px-4 py-3 pr-12 sm:px-5">
-            <DialogTitle>{editingPrescription ? 'Edit Prescription' : 'Prescribe Medication'}</DialogTitle>
+        <DialogContent className="grid h-[100dvh] max-h-[100dvh] w-screen max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none bg-slate-50 p-0 sm:h-[94vh] sm:w-[96vw] sm:max-w-none sm:rounded-lg lg:w-[94vw] xl:w-[92vw]">
+          <DialogHeader className="border-b bg-white px-4 py-3 pr-12 sm:px-5">
+            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <DialogTitle className="text-base">{editingPrescription ? 'Edit Prescription' : 'Prescribe Medication'}</DialogTitle>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {patientDisplayName(selectedVisit || ({ patientId: contextPatient } as Visit))} {contextPatient?.patientId ? `- ${contextPatient.patientId}` : ''} - doctor estimate only; reception finalizes packs.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {contextPatient?.allergies?.length > 0 ? (
+                  <Badge variant="destructive" className="h-7 px-2.5 text-xs">
+                    <AlertTriangle className="mr-1.5 h-3.5 w-3.5" /> Allergy: {contextPatient.allergies.slice(0, 2).join(', ')}
+                  </Badge>
+                ) : (
+                  <Badge variant="outline" className="h-7 border-emerald-200 bg-emerald-50 px-2.5 text-xs text-emerald-700">
+                    <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> No allergies recorded
+                  </Badge>
+                )}
+                <Badge variant="outline" className="h-7 bg-white px-2.5 text-xs">{prescriptionItems.length} item{prescriptionItems.length !== 1 ? 's' : ''}</Badge>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="min-h-0 space-y-3 overflow-hidden p-3 sm:p-4">
+          <div className="min-h-0 overflow-hidden p-3 sm:p-4">
             {contextPatient?.allergies?.length > 0 && (
-              <div className="rounded-lg border border-red-300 bg-red-50 p-3 flex items-start gap-2">
+              <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
                 <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs font-semibold text-red-800">Allergy alert</p>
@@ -1842,7 +2001,7 @@ export default function DoctorDashboard() {
                 </div>
               </div>
             )}
-            <div className="grid h-full min-h-0 grid-cols-1 gap-3 md:grid-cols-[minmax(280px,0.38fr)_minmax(0,0.62fr)]">
+            <div className="grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(280px,0.32fr)_minmax(420px,1fr)_minmax(260px,0.3fr)]">
               <MedicationPicker
                 medications={filteredMedications}
                 loading={medicationsLoading}
@@ -1850,119 +2009,180 @@ export default function DoctorDashboard() {
                 onSearchTermChange={setSearchMedication}
                 onSelect={(med) => addMedicationToPrescription(med as Medication)}
                 title="Search CAF / local drugs"
-                className="min-h-0 overflow-hidden"
-                listClassName="h-[34vh] md:h-[calc(94vh-16.5rem)]"
+                className="min-h-[260px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:min-h-0"
+                listClassName="h-[32vh] lg:h-[calc(94vh-15rem)]"
               />
-            <div className="flex min-h-0 flex-col">
-              <Label className="text-sm font-medium">Prescription Items ({prescriptionItems.length})</Label>
-              <ScrollArea className="mt-2 min-h-0 flex-1 rounded-lg border">
-                {prescriptionItems.length === 0 ? (
-                  <div className="p-6 text-center text-muted-foreground text-sm">Click medications to add them</div>
-                ) : (
-                  <div className="divide-y">
-                    {prescriptionItems.map((item, index) => {
-                      const computedQty = computeMedicationQuantity(item, { baseUnit: item.baseUnit });
-                      const unitLabel = item.baseUnit || 'unit';
-                      const qtyText = `${computedQty} ${unitLabel}`;
-                      const duplicateCount = prescriptionItems.filter((candidate) => candidate.medicationId === item.medicationId).length;
-                      const isDuplicate = duplicateCount > 1;
-                      const validationErrors = validateMedicationRegimen({ ...item, quantity: computedQty });
-                      return (
-                        <div key={index} className="p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <div>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <p className="font-medium text-sm">{item.medicationName}</p>
-                                {item.isControlled && <Badge variant="destructive" className="text-[10px]">Controlled</Badge>}
-                                {isDuplicate && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[10px] text-amber-700">Duplicate</Badge>}
-                              </div>
-                              {item.sellMode && item.sellMode !== 'individual' && item.packSizes && item.packSizes.length > 0 && (
-                                <p className="text-[10px] text-muted-foreground">Packs: {item.packSizes.map((ps: any) => `${ps.name} (${ps.unitsPerPack} ${item.baseUnit || 'unit'}) @ Le ${ps.sellingPrice}`).join(' • ')}</p>
-                              )}
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={() => removePrescriptionItem(index)}><Trash2 className="w-4 h-4 text-red-500" /></Button>
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2">
-                            <div>
-                              <Label className="text-[10px] text-muted-foreground">Per dose</Label>
-                              <Input placeholder="e.g. 500mg or 1 tablet" value={item.strengthPerDose} onChange={(e) => updatePrescriptionItem(index, 'strengthPerDose', e.target.value)} className="h-8 text-xs" />
-                            </div>
-                            <div>
-                              <Label className="text-[10px] text-muted-foreground">Doses/day</Label>
-                              <Input type="number" min={1} value={item.dosesPerDay} onChange={(e) => updatePrescriptionItem(index, 'dosesPerDay', parseInt(e.target.value) || 1)} className="h-8 text-xs" />
-                            </div>
-                            <div>
-                              <Label className="text-[10px] text-muted-foreground">Days</Label>
-                              <Input type="number" min={1} value={item.durationDays} onChange={(e) => updatePrescriptionItem(index, 'durationDays', parseInt(e.target.value) || 1)} className="h-8 text-xs" />
-                            </div>
-                            <div>
-                              <Label className="text-[10px] text-muted-foreground">Route</Label>
-                              <Select value={item.route || 'oral'} onValueChange={(value) => updatePrescriptionItem(index, 'route', value)}>
-                                <SelectTrigger className="h-8 text-xs">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="oral">Oral</SelectItem>
-                                  <SelectItem value="intravenous">IV</SelectItem>
-                                  <SelectItem value="intramuscular">IM</SelectItem>
-                                  <SelectItem value="subcutaneous">SC</SelectItem>
-                                  <SelectItem value="topical">Topical</SelectItem>
-                                  <SelectItem value="ophthalmic">Eye drops</SelectItem>
-                                  <SelectItem value="otic">Ear drops</SelectItem>
-                                  <SelectItem value="nasal">Nasal</SelectItem>
-                                  <SelectItem value="inhalation">Inhalation</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          <div className="text-[10px] text-muted-foreground bg-muted/50 px-2 py-1 rounded mb-2">
-                            Clinical quantity estimate: <strong>{qtyText}</strong>
-                            {item.unitPrice ? <> · Est. individual line: Le {(computedQty * item.unitPrice).toLocaleString()}</> : null}
-                          </div>
-                          {validationErrors.length > 0 && (
-                            <div className="mb-2 rounded border border-red-200 bg-red-50 px-2 py-1 text-[10px] text-red-700">
-                              {validationErrors.join(' ')}
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <Input placeholder="Patient instructions" value={item.instructions} onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)} className="h-8 text-xs" />
-                            <Button type="button" variant="outline" size="sm" className="h-8 px-2 text-xs" onClick={() => updatePrescriptionItem(index, 'instructions', item.smartInstruction || buildSmartInstruction(item))}>
-                              Regenerate
-                            </Button>
-                          </div>
-                          <Input placeholder="Pharmacist note (internal only, not on label)" value={item.pharmacistNote || ''} onChange={(e) => updatePrescriptionItem(index, 'pharmacistNote', e.target.value)} className="h-8 text-xs mt-1" />
-                          <details className="mt-2 rounded border bg-white px-2 py-1 text-[10px]">
-                            <summary className="cursor-pointer font-medium text-muted-foreground">Preview label</summary>
-                            <div className="mt-1 space-y-0.5 text-foreground">
-                              <p className="font-semibold">{item.medicationName}</p>
-                              <p>{item.instructions || buildSmartInstruction(item)}</p>
-                              <p className="text-muted-foreground">Needed: {computedQty} {unitLabel}. Cashier/pharmacy chooses the final dispense pack.</p>
-                              {item.pharmacistNote && <p className="text-muted-foreground">Pharmacist note: {item.pharmacistNote}</p>}
-                            </div>
-                          </details>
-                        </div>
-                      );
-                    })}
+              <div className="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex items-center justify-between border-b px-4 py-3">
+                  <div>
+                    <Label className="text-sm font-semibold text-slate-950">Regimen editor</Label>
+                    <p className="text-[11px] text-muted-foreground">Dose math, route, dispense quantity, and patient-facing directions.</p>
                   </div>
-                )}
-              </ScrollArea>
-              {prescriptionItems.length > 0 && (
-                <div className="mt-3 p-3 bg-muted/50 rounded-lg">
-                  <p className="text-sm font-medium">
-                    Est. individual total: Le {prescriptionItems.reduce((sum, item) => {
-                      const q = Number(item.quantity || computeMedicationQuantity(item, { baseUnit: item.baseUnit }));
-                      return sum + (q * (item.unitPrice || 0));
-                    }, 0).toLocaleString()}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-1">Final bill is set at reception dispense based on actual pack / individual selection.</p>
+                  <Badge variant="outline" className="bg-slate-50 text-[10px]">Est. individual pricing</Badge>
                 </div>
-              )}
-            </div>
+                <ScrollArea className="min-h-0 flex-1">
+                  {prescriptionItems.length === 0 ? (
+                    <div className="flex h-full min-h-[280px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
+                      Select a medication from the left to start the prescription.
+                    </div>
+                  ) : (
+                    <div className="space-y-3 p-3">
+                      {prescriptionItems.map((item, index) => {
+                        const computedQty = computeMedicationQuantity(item, { baseUnit: item.baseUnit });
+                        const dispenseQty = Number(item.quantity || computedQty || 1);
+                        const estimate = getPrescriptionEstimate({ ...item, quantity: dispenseQty });
+                        const unitLabel = item.baseUnit || 'unit';
+                        const duplicateCount = prescriptionItems.filter((candidate) => candidate.medicationId === item.medicationId).length;
+                        const isDuplicate = duplicateCount > 1;
+                        const quantityDiffers = dispenseQty !== computedQty;
+                        const validationErrors = validateMedicationRegimen({ ...item, quantity: dispenseQty });
+                        return (
+                          <div key={index} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <p className="truncate text-sm font-semibold text-slate-950">{item.medicationName}</p>
+                                  {item.isControlled && <Badge variant="destructive" className="text-[10px]">Controlled</Badge>}
+                                  {isDuplicate && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[10px] text-amber-700">Duplicate</Badge>}
+                                  {(item.route === 'intravenous' || item.route === 'intramuscular') && <Badge variant="outline" className="border-blue-200 bg-blue-50 text-[10px] text-blue-700">{item.route === 'intravenous' ? 'IV' : 'IM'}</Badge>}
+                                </div>
+                                {item.sellMode && item.sellMode !== 'individual' && item.packSizes && item.packSizes.length > 0 && (
+                                  <p className="mt-1 text-[10px] text-muted-foreground">
+                                    Packs: {item.packSizes.slice(0, 2).map((ps: any) => `${ps.name} (${ps.unitsPerPack || ps.quantityPerPack || '?'} ${unitLabel}) @ Le ${Number(ps.sellingPrice || 0).toLocaleString()}`).join(' - ')}
+                                  </p>
+                                )}
+                              </div>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={() => removePrescriptionItem(index)}>
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </Button>
+                            </div>
+
+                            <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-5">
+                              <div className="xl:col-span-2">
+                                <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Per dose</Label>
+                                <Input placeholder="e.g. 500mg or 1 tablet" value={item.strengthPerDose} onChange={(e) => updatePrescriptionItem(index, 'strengthPerDose', e.target.value)} className="mt-1 h-8 text-xs" />
+                              </div>
+                              <div>
+                                <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Doses/day</Label>
+                                <Input type="number" min={1} value={item.dosesPerDay} onChange={(e) => updatePrescriptionItem(index, 'dosesPerDay', parseInt(e.target.value) || 1)} className="mt-1 h-8 text-xs" />
+                              </div>
+                              <div>
+                                <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Days</Label>
+                                <Input type="number" min={1} value={item.durationDays} onChange={(e) => updatePrescriptionItem(index, 'durationDays', parseInt(e.target.value) || 1)} className="mt-1 h-8 text-xs" />
+                              </div>
+                              <div>
+                                <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Route</Label>
+                                <Select value={item.route || 'oral'} onValueChange={(value) => updatePrescriptionItem(index, 'route', value)}>
+                                  <SelectTrigger className="mt-1 h-8 text-xs"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="oral">Oral</SelectItem>
+                                    <SelectItem value="intravenous">IV</SelectItem>
+                                    <SelectItem value="intramuscular">IM</SelectItem>
+                                    <SelectItem value="subcutaneous">SC</SelectItem>
+                                    <SelectItem value="topical">Topical</SelectItem>
+                                    <SelectItem value="ophthalmic">Eye drops</SelectItem>
+                                    <SelectItem value="otic">Ear drops</SelectItem>
+                                    <SelectItem value="nasal">Nasal</SelectItem>
+                                    <SelectItem value="inhalation">Inhalation</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 grid gap-2 md:grid-cols-[160px_minmax(0,1fr)_auto]">
+                              <div>
+                                <Label className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Qty to dispense</Label>
+                                <Input type="number" min={1} value={dispenseQty} onChange={(e) => updatePrescriptionItem(index, 'quantity', Number(e.target.value) || 0)} className={cn('mt-1 h-8 text-xs font-semibold', quantityDiffers && 'border-amber-300 bg-amber-50')} />
+                              </div>
+                              <div className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-muted-foreground">
+                                <span>Computed: <strong className="text-slate-800">{computedQty} {unitLabel}</strong></span>
+                                <span className="mx-2">-</span>
+                                <span>
+                                  Estimate: <strong className="text-slate-800">
+                                    {estimate.mode === 'pack'
+                                      ? `${estimate.sellQuantity} ${estimate.sellUnitLabel}${estimate.sellQuantity === 1 ? '' : 's'}`
+                                      : `${estimate.sellQuantity} ${estimate.sellUnitLabel}${estimate.sellQuantity === 1 ? '' : 's'}`}
+                                  </strong>
+                                  {' '}= <strong className="text-slate-800">Le {estimate.lineTotal.toLocaleString()}</strong>
+                                </span>
+                                {estimate.mode === 'pack' && estimate.packUnits && (
+                                  <p className="mt-1 text-slate-600">
+                                    Covers {estimate.sellQuantity * estimate.packUnits} {unitLabel}; charging by {estimate.sellUnitLabel}, not by days.
+                                  </p>
+                                )}
+                                {quantityDiffers && <p className="mt-1 font-medium text-amber-700">Manual quantity differs from computed regimen. Keep only if clinically intentional.</p>}
+                              </div>
+                              <Button type="button" variant="outline" size="sm" className="h-8 self-end text-xs" onClick={() => updatePrescriptionItem(index, 'quantity', computedQty)}>
+                                Reset qty
+                              </Button>
+                            </div>
+
+                            {validationErrors.length > 0 && (
+                              <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+                                {validationErrors.join(' ')}
+                              </div>
+                            )}
+
+                            <div className="mt-3 grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
+                              <Input placeholder="Patient instructions" value={item.instructions} onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)} className="h-9 text-xs" />
+                              <Button type="button" variant="outline" size="sm" className="h-9 text-xs" onClick={() => updatePrescriptionItem(index, 'instructions', item.smartInstruction || buildSmartInstruction(item))}>
+                                Regenerate instructions
+                              </Button>
+                            </div>
+                            <Input placeholder="Pharmacist note (internal only, not on label)" value={item.pharmacistNote || ''} onChange={(e) => updatePrescriptionItem(index, 'pharmacistNote', e.target.value)} className="mt-2 h-8 text-xs" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+
+              <div className="flex min-h-0 flex-col gap-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Prescription summary</p>
+                  <p className="mt-2 text-2xl font-bold text-slate-950">
+                    Le {getPrescriptionEstimateTotal(prescriptionItems).toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-[11px] text-muted-foreground">Smart estimate from base-unit need and available cards/packs. Reception can still adjust at dispense.</p>
+                </div>
+
+                <div className="min-h-0 flex-1 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="mb-3 flex items-center justify-between">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Label preview</p>
+                    <Badge variant="outline" className="text-[10px]">{prescriptionItems.length} labels</Badge>
+                  </div>
+                  <ScrollArea className="h-[34vh] lg:h-[calc(94vh-25.5rem)]">
+                    {prescriptionItems.length === 0 ? (
+                      <p className="py-10 text-center text-xs text-muted-foreground">Added medicines will preview here.</p>
+                    ) : (
+                      <div className="space-y-2 pr-2">
+                        {prescriptionItems.map((item, index) => {
+                          const computedQty = computeMedicationQuantity(item, { baseUnit: item.baseUnit });
+                          const dispenseQty = Number(item.quantity || computedQty || 1);
+                          const estimate = getPrescriptionEstimate({ ...item, quantity: dispenseQty });
+                          const unitLabel = item.baseUnit || 'unit';
+                          return (
+                            <div key={`${item.medicationId}-${index}`} className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-xs">
+                              <p className="font-semibold text-slate-950">{item.medicationName}</p>
+                              <p className="mt-1 text-slate-700">{item.instructions || buildSmartInstruction(item)}</p>
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                Need: {dispenseQty} {unitLabel}. Suggested dispense: {estimate.mode === 'pack' ? `${estimate.sellQuantity} ${estimate.sellUnitLabel}` : `${estimate.sellQuantity} ${estimate.sellUnitLabel}`}. Route: {statusLabel(item.route)}.
+                              </p>
+                              {item.pharmacistNote && <p className="mt-1 text-[11px] text-muted-foreground">Pharmacist: {item.pharmacistNote}</p>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </div>
+              </div>
             </div>
           </div>
-          <DialogFooter className="border-t bg-background px-4 py-3 sm:px-5">
+          <DialogFooter className="border-t bg-white px-4 py-3 sm:px-5">
             <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
-            <Button onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()} disabled={(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) || prescriptionItems.length === 0 || prescriptionItems.some(i => validateMedicationRegimen(i).length > 0)}>
+            <Button className="bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()} disabled={(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) || prescriptionItems.length === 0 || prescriptionItems.some(i => validateMedicationRegimen(i).length > 0)}>
               {(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
               {editingPrescription ? 'Update Prescription' : 'Create Prescription'}
             </Button>

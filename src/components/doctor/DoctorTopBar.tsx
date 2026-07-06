@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   UserCheck, Search, Bell, Clock, AlertTriangle, FlaskConical,
-  ChevronDown, X, Stethoscope, LogOut
+  ChevronDown, X, Stethoscope, LogOut, LayoutDashboard
 } from 'lucide-react';
 
 interface Patient {
@@ -54,6 +54,7 @@ interface DoctorTopBarProps {
   onAcceptVisit: (visit: Visit) => void;
   onSelectPatient: (patient: Patient) => void;
   onAcceptNext: () => void;
+  onOpenDashboard?: () => void;
   onOpenResults?: () => void;
   onOpenAllPatients?: () => void;
   onLogout?: () => void;
@@ -103,6 +104,7 @@ export function DoctorTopBar({
   onAcceptVisit,
   onSelectPatient,
   onAcceptNext,
+  onOpenDashboard,
   onOpenResults,
   onOpenAllPatients,
   onLogout,
@@ -338,6 +340,19 @@ export function DoctorTopBar({
         </div>
 
         {/* Notifications dropdown */}
+        {onOpenDashboard && (
+          <button
+            type="button"
+            onClick={onOpenDashboard}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            title="Doctor dashboard"
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            Dashboard
+          </button>
+        )}
+
+        {/* Results shortcut */}
         {onOpenResults && (
           <button
             type="button"

@@ -16,6 +16,7 @@ import {
   buildSmartInstruction,
   buildSmartRegimen,
   computeMedicationQuantity,
+  estimateMedicationDispense,
   getMedicationBaseUnit,
   getMedicationPrice,
   getMedicationStock,
@@ -158,9 +159,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
     return items.reduce((sum, item) => {
       if (item.type === 'drug' || item.type === 'iv') {
         const med = allMedications.find((m: any) => m._id === item.medicationId);
-        const unitPrice = med ? getMedicationPrice(med) : 0;
-        const qty = computeMedicationQuantity(item, med);
-        return sum + unitPrice * qty;
+        return sum + estimateMedicationDispense(item, med).lineTotal;
       }
       if (item.type === 'lab') {
         return sum + (item.testPrice || 0);
@@ -180,6 +179,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
 
     const duplicate = items.some((item) => (item.type === 'drug' || item.type === 'iv') && item.medicationId === selectedMed._id);
     const quantity = computeMedicationQuantity({ strengthPerDose, dosesPerDay, durationDays }, selectedMed);
+    const estimate = estimateMedicationDispense({ strengthPerDose, dosesPerDay, durationDays, quantity }, selectedMed);
     const newItem: CreateTreatmentPlanItemInput = {
       type: itemType,
       medicationId: selectedMed._id,
@@ -188,6 +188,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
       dosesPerDay,
       durationDays,
       quantity,
+      amount: estimate.lineTotal,
       route,
       notes: buildSmartInstruction({ strengthPerDose, dosesPerDay, durationDays, route }),
     };
@@ -495,8 +496,8 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
               const isDrugOrIv = item.type === 'drug' || item.type === 'iv';
               const med = isDrugOrIv ? allMedications.find((m: any) => m._id === item.medicationId) : null;
               const qty = isDrugOrIv ? Number(item.quantity || computeMedicationQuantity(item, med)) : 0;
-              const unitPrice = med ? getMedicationPrice(med) : 0;
-              const lineTotal = isDrugOrIv ? unitPrice * qty : (item.type === 'lab' ? item.testPrice || 0 : item.amount || 0);
+              const estimate = isDrugOrIv ? estimateMedicationDispense({ ...item, quantity: qty }, med) : null;
+              const lineTotal = isDrugOrIv ? estimate?.lineTotal || 0 : (item.type === 'lab' ? item.testPrice || 0 : item.amount || 0);
               const isDuplicate =
                 (isDrugOrIv && items.filter((candidate) => (candidate.type === 'drug' || candidate.type === 'iv') && candidate.medicationId === item.medicationId).length > 1) ||
                 (item.type === 'lab' && items.filter((candidate) => candidate.type === 'lab' && (candidate.testId || candidate.testCode) === (item.testId || item.testCode)).length > 1);
@@ -540,7 +541,14 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
                       <span>Frequency: <span className="text-foreground">{item.dosesPerDay}x/day</span></span>
                       <span>Duration: <span className="text-foreground">{item.durationDays} days</span></span>
                       <span>Qty: <span className="text-foreground">{qty} {med ? getMedicationBaseUnit(med) : 'units'}</span></span>
-                      <span>Unit price: <span className="text-foreground">Le {unitPrice.toLocaleString()}</span></span>
+                      <span>
+                        Estimate:{' '}
+                        <span className="text-foreground">
+                          {estimate?.mode === 'pack'
+                            ? `${estimate.sellQuantity} ${estimate.sellUnitLabel}`
+                            : `${estimate?.sellQuantity || qty} ${estimate?.sellUnitLabel || (med ? getMedicationBaseUnit(med) : 'units')}`}
+                        </span>
+                      </span>
                     </div>
                   )}
                   {item.type === 'lab' && (
@@ -807,8 +815,16 @@ function DrugIvForm({
 
       {/* Quantity preview */}
       <div className="text-xs text-muted-foreground">
-        Qty: {dosesPerDay * durationDays} {selectedMed?.baseUnit || 'units'} (estimated Le{' '}
-        {((selectedMed?.unitPrice || 0) * dosesPerDay * durationDays).toLocaleString()})
+        {(() => {
+          const quantity = computeMedicationQuantity({ strengthPerDose, dosesPerDay, durationDays }, selectedMed || undefined);
+          const estimate = estimateMedicationDispense({ strengthPerDose, dosesPerDay, durationDays, quantity }, selectedMed || undefined);
+          return (
+            <>
+              Need: {quantity} {selectedMed ? getMedicationBaseUnit(selectedMed) : 'units'}; estimate:{' '}
+              {estimate.mode === 'pack' ? `${estimate.sellQuantity} ${estimate.sellUnitLabel}` : `${estimate.sellQuantity} ${estimate.sellUnitLabel}`} = Le {estimate.lineTotal.toLocaleString()}
+            </>
+          );
+        })()}
       </div>
 
       <Button onClick={onAdd} size="sm">
@@ -913,8 +929,16 @@ function SmartDrugIvForm({
       )}
 
       <div className="text-xs text-muted-foreground">
-        Qty: {dosesPerDay * durationDays} {selectedMed ? getMedicationBaseUnit(selectedMed) : 'units'} (estimated Le{' '}
-        {((selectedMed ? getMedicationPrice(selectedMed) : 0) * dosesPerDay * durationDays).toLocaleString()})
+        {(() => {
+          const quantity = computeMedicationQuantity({ strengthPerDose, dosesPerDay, durationDays }, selectedMed || undefined);
+          const estimate = estimateMedicationDispense({ strengthPerDose, dosesPerDay, durationDays, quantity }, selectedMed || undefined);
+          return (
+            <>
+              Need: {quantity} {selectedMed ? getMedicationBaseUnit(selectedMed) : 'units'}; estimate:{' '}
+              {estimate.mode === 'pack' ? `${estimate.sellQuantity} ${estimate.sellUnitLabel}` : `${estimate.sellQuantity} ${estimate.sellUnitLabel}`} = Le {estimate.lineTotal.toLocaleString()}
+            </>
+          );
+        })()}
       </div>
 
       <Button onClick={onAdd} size="sm">
