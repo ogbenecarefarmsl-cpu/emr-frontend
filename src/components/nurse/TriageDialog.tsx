@@ -4,15 +4,17 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useDoctors } from '@/hooks/useDoctors';
 import { useCompleteTriage } from '@/hooks/useVisits';
-import { admissionsAPI } from '@/services/api';
+import { useMyServicePrices } from '@/hooks/useServicePrices';
+import { admissionsAPI, ordersAPI } from '@/services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { Activity, AlertCircle, BedDouble, Heart, Loader2, Send } from 'lucide-react';
+import { Activity, AlertCircle, BedDouble, Heart, HeartPulse, Loader2, Send } from 'lucide-react';
 import { ESI_LEVELS, checkAbnormalVitals, patientName, triagePriorityFromEsi } from './nurseUtils';
 
 interface TriageDialogProps {
@@ -36,6 +38,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
   const qc = useQueryClient();
   const completeTriage = useCompleteTriage();
   const { data: doctors = [], isLoading: doctorsLoading } = useDoctors();
+  const { data: servicePrices = [] } = useMyServicePrices();
   const [vitals, setVitals] = useState(EMPTY_VITALS);
   const [triageEsiLevel, setTriageEsiLevel] = useState('3');
   const [triageNotes, setTriageNotes] = useState('');
@@ -43,11 +46,19 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
   const [doctorId, setDoctorId] = useState('');
   const [admitOpen, setAdmitOpen] = useState(false);
   const [isAdmitting, setIsAdmitting] = useState(false);
+  const [observationOpen, setObservationOpen] = useState(false);
+  const [isOrderingObservation, setIsOrderingObservation] = useState(false);
   const [admitForm, setAdmitForm] = useState({
     wardType: 'general',
     bedNumber: '',
     admissionReason: '',
     diagnosis: '',
+    notes: '',
+  });
+  const [observationForm, setObservationForm] = useState({
+    hours: '4',
+    includeOxygen: false,
+    reason: '',
     notes: '',
   });
 
@@ -60,6 +71,8 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
     setVitals(EMPTY_VITALS);
     setAdmitOpen(false);
     setIsAdmitting(false);
+    setObservationOpen(false);
+    setIsOrderingObservation(false);
     setAdmitForm({
       wardType: 'general',
       bedNumber: '',
@@ -67,10 +80,25 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
       diagnosis: '',
       notes: '',
     });
+    setObservationForm({
+      hours: '4',
+      includeOxygen: false,
+      reason: visit.chiefComplaint || '',
+      notes: '',
+    });
   }, [visit, open]);
 
   const availableDoctors = doctors.filter((d: any) => d.isActive !== false);
   const alerts = checkAbnormalVitals(vitals);
+  const getServicePrice = (code: string, fallback: number) => {
+    const found = Array.isArray(servicePrices) ? servicePrices.find((price: any) => price.code === code && price.isActive !== false) : null;
+    return Number(found?.amount ?? fallback);
+  };
+  const observationHours = Math.max(1, Number(observationForm.hours || 4));
+  const observationBaseRate = getServicePrice('observation_4h', 100);
+  const oxygenHourlyRate = getServicePrice('oxygen_hour', 200);
+  const observationBlocks = Math.max(1, Math.ceil(observationHours / 4));
+  const observationTotal = observationBlocks * observationBaseRate + (observationForm.includeOxygen ? observationHours * oxygenHourlyRate : 0);
 
   const submitTriage = async () => {
     if (!visit) return;
@@ -161,6 +189,56 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
       toast.error(e?.response?.data?.message || 'Failed to admit patient');
     } finally {
       setIsAdmitting(false);
+    }
+  };
+
+  const orderObservation = async () => {
+    if (!visit) return;
+    const patientId = visit.patientId?._id || visit.patientId;
+    if (!patientId) {
+      toast.error('Patient record is missing from this visit');
+      return;
+    }
+
+    const hours = Math.max(1, Number(observationForm.hours || 4));
+    const blocks = Math.max(1, Math.ceil(hours / 4));
+    const tests = [
+      {
+        testCode: `OBSERVATION_${hours}H`,
+        testName: `Observation monitoring (${hours} hour${hours === 1 ? '' : 's'})`,
+        price: blocks * observationBaseRate,
+      },
+    ];
+    if (observationForm.includeOxygen) {
+      tests.push({
+        testCode: `OXYGEN_${hours}H`,
+        testName: `Oxygen administration (${hours} hour${hours === 1 ? '' : 's'})`,
+        price: hours * oxygenHourlyRate,
+      });
+    }
+
+    setIsOrderingObservation(true);
+    try {
+      await ordersAPI.create({
+        patientId,
+        visitId: visit._id || visit.id,
+        orderType: 'procedure',
+        tests,
+        priority: observationForm.includeOxygen || alerts.length > 0 ? 'urgent' : 'routine',
+        notes: [
+          observationForm.reason ? `Reason: ${observationForm.reason}` : '',
+          observationForm.notes ? `Instructions: ${observationForm.notes}` : '',
+          alerts.length > 0 ? `Triage alerts: ${alerts.join('; ')}` : '',
+        ].filter(Boolean).join('\n'),
+      });
+      toast.success('Observation bill created for reception payment');
+      qc.invalidateQueries({ queryKey: ['orders'] });
+      qc.invalidateQueries({ queryKey: ['visits'] });
+      setObservationOpen(false);
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Failed to create observation bill');
+    } finally {
+      setIsOrderingObservation(false);
     }
   };
 
@@ -269,10 +347,16 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
           </div>
         </div>
         <DialogFooter className="gap-2 sm:justify-between">
-          <Button variant="outline" onClick={() => setAdmitOpen(true)}>
-            <BedDouble className="w-4 h-4 mr-2" />
-            Admit Patient
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => setObservationOpen(true)}>
+              <HeartPulse className="w-4 h-4 mr-2" />
+              Observation
+            </Button>
+            <Button variant="outline" onClick={() => setAdmitOpen(true)}>
+              <BedDouble className="w-4 h-4 mr-2" />
+              Admit Patient
+            </Button>
+          </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
             <Button onClick={submitTriage} disabled={completeTriage.isPending || doctorsLoading || !doctorId || availableDoctors.length === 0}>
@@ -283,6 +367,62 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+      <Dialog open={observationOpen} onOpenChange={setObservationOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Place Under Observation</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Creates an unpaid bill for {patientName(visit?.patientId)}. Reception must confirm payment before observation starts.
+            </p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Hours</Label>
+                <Input type="number" min={1} step={1} value={observationForm.hours} onChange={(e) => setObservationForm({ ...observationForm, hours: e.target.value })} />
+              </div>
+              <div className="flex items-end">
+                <div className="flex h-10 w-full items-center justify-between rounded-md border px-3">
+                  <Label className="text-sm">Oxygen</Label>
+                  <Switch checked={observationForm.includeOxygen} onCheckedChange={(checked) => setObservationForm({ ...observationForm, includeOxygen: checked })} />
+                </div>
+              </div>
+            </div>
+            <div>
+              <Label>Reason</Label>
+              <Input value={observationForm.reason} onChange={(e) => setObservationForm({ ...observationForm, reason: e.target.value })} placeholder="Reason for monitoring" />
+            </div>
+            <div>
+              <Label>Instructions</Label>
+              <Textarea value={observationForm.notes} onChange={(e) => setObservationForm({ ...observationForm, notes: e.target.value })} rows={3} placeholder="Vitals frequency, oxygen instructions, escalation triggers..." />
+            </div>
+            <div className="rounded-md border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-900">
+              <div className="flex justify-between gap-3">
+                <span>Observation ({observationBlocks} x 4h block)</span>
+                <span>Le {(observationBlocks * observationBaseRate).toLocaleString()}</span>
+              </div>
+              {observationForm.includeOxygen && (
+                <div className="mt-1 flex justify-between gap-3">
+                  <span>Oxygen ({observationHours}h)</span>
+                  <span>Le {(observationHours * oxygenHourlyRate).toLocaleString()}</span>
+                </div>
+              )}
+              <div className="mt-2 flex justify-between border-t border-cyan-200 pt-2 font-semibold">
+                <span>Total due</span>
+                <span>Le {observationTotal.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setObservationOpen(false)}>Cancel</Button>
+            <Button onClick={orderObservation} disabled={isOrderingObservation || observationHours < 1}>
+              {isOrderingObservation ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <HeartPulse className="w-4 h-4 mr-2" />}
+              Create Bill
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={admitOpen} onOpenChange={setAdmitOpen}>
         <DialogContent className="max-w-md">
