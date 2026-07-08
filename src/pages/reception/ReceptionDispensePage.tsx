@@ -58,14 +58,22 @@ const isSingleUseMedication = (med?: Medication) => {
   return /\b(vial|ampoule|ampule|infusion|bag)\b/.test(text);
 };
 
-const suggestManualUnit = (name = '') => {
-  const text = name.toLowerCase();
+const suggestManualUnit = (name = '', instruction = '') => {
+  const text = `${name} ${instruction}`.toLowerCase();
   if (/\b(cream|ointment|gel|lotion)\b/.test(text)) return 'tube';
   if (/\b(syrup|suspension|solution|drops?)\b/.test(text)) return 'bottle';
-  if (/\b(vial|ampoule|ampule)\b/.test(text)) return 'ampule';
+  if (/\b(vial|ampoule|ampule|injection|intravenous|iv|infusion)\b/.test(text)) return 'vial';
   if (/\b(capsule|caps)\b/.test(text)) return 'card';
-  if (/\b(tablet|tab)\b/.test(text)) return 'card';
+  if (/\b(tablet|tab|paracetamol|cipro|azithromycin)\b/.test(text)) return 'card';
   return 'unit';
+};
+
+const getManualUnitPriceFallback = (prescription: Prescription, item: any) => {
+  const itemCount = Math.max(1, prescription.items?.length || 1);
+  const lineTotal = Number(item.lineTotalAtDispense || item.totalAmount || 0)
+    || Number(prescription.actualTotalAmount || prescription.totalAmount || 0) / itemCount;
+  const sellUnits = Math.max(1, Number(item.quantity || 1));
+  return Math.max(0, Math.round((lineTotal / sellUnits) * 100) / 100);
 };
 
 export default function ReceptionDispensePage() {
@@ -114,6 +122,8 @@ export default function ReceptionDispensePage() {
     const initialLines: DispenseLine[] = rxBundle.flatMap((prescription) =>
       (prescription.items || []).map((item: any, idx: number) => {
         const medId = typeof item.medicationId === 'object' ? item.medicationId._id : item.medicationId;
+        const instruction = item.instructions || item.dosage || '';
+        const fallbackUnitPrice = getManualUnitPriceFallback(prescription, item);
         return {
           lineId: `${prescription._id}-${medId}-${idx}`,
           prescriptionId: prescription._id,
@@ -125,12 +135,12 @@ export default function ReceptionDispensePage() {
           sellUnits: item.quantity,
           baseUnits: item.quantity,
           dispenseMode: 'individual',
-          pricePerSellUnit: 0,
-          lineTotal: 0,
-          manualSellUnitLabel: suggestManualUnit(item.medicationName),
-          manualPricePerSellUnit: 0,
+          pricePerSellUnit: fallbackUnitPrice,
+          lineTotal: fallbackUnitPrice * Math.max(1, Number(item.quantity || 1)),
+          manualSellUnitLabel: suggestManualUnit(item.medicationName, instruction),
+          manualPricePerSellUnit: fallbackUnitPrice,
           manualBaseUnitsPerSellUnit: 1,
-          doctorInstruction: item.instructions || item.dosage || '',
+          doctorInstruction: instruction,
           pharmacistNote: item.pharmacistNote || '',
           isSubstitute: false,
         };
