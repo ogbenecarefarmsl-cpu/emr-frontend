@@ -355,3 +355,223 @@ export const buildSmartInstruction = ({
 
   return `${prefix} ${frequency} for ${days} ${days === 1 ? 'day' : 'days'}.`;
 };
+
+// ── Shorthand parser ──────────────────────────────────────────────────────────
+// Parses clinical shorthand like "BD 5/7", "TDS 14d", "500mg OD 7days",
+// "1tab QID 5/7 IV", "2 caps BD 2w", "500mg PRN", "TDS PRN 5/7" into structured regimen fields.
+
+export type ShorthandParseResult = {
+  strengthPerDose: string;
+  dosesPerDay: number;
+  durationDays: number;
+  route: RouteHint;
+  raw: string;
+  /** True if PRN/SOS (as needed) — frequency is a maximum, not a schedule */
+  isPrn: boolean;
+  /** Human-readable interpretation, e.g. "2x/day for 5 days" or "as needed, max 3x/day" */
+  interpretation: string;
+};
+
+const FREQ_MAP: Record<string, number> = {
+  od: 1, qd: 1, daily: 1, once: 1,
+  bd: 2, bid: 2, bi: 2, twice: 2,
+  tds: 3, tid: 3, three: 3,
+  qid: 4, qds: 4, four: 4,
+  q4h: 6, '4hly': 6,
+  q6h: 4, '6hly': 4,
+  q8h: 3, '8hly': 3,
+  q12h: 2, '12hly': 2,
+  hs: 1, nocte: 1, bedtime: 1,
+  stat: 1, now: 1,
+  // PRN/SOS are NOT frequencies — handled separately as modifiers
+};
+
+const PRN_TOKENS = ['prn', 'sos', 'asneeded'];
+
+const ROUTE_MAP: Record<string, RouteHint> = {
+  iv: 'intravenous',
+  im: 'intramuscular',
+  sc: 'subcutaneous',
+  sl: 'sublingual',
+  topical: 'topical',
+  local: 'topical',
+  eye: 'ophthalmic',
+  ear: 'otic',
+  nasal: 'nasal',
+  inh: 'inhalation',
+  inhale: 'inhalation',
+  rectal: 'rectal',
+};
+
+/** Parse slash-style durations: 5/7 (days), 3/52 (weeks), 6/12 (months) → total days */
+const parseSlashDuration = (s: string): number | null => {
+  const m = s.match(/^(\d{1,3})\s*\/\s*\/?\s*(\d{1,3})$/);
+  if (!m) return null;
+  const num = Number(m[1]);
+  const denom = Number(m[2]);
+  if (denom === 7) return num;            // 3/7 = 3 days
+  if (denom === 52) return num * 7;       // 3/52 = 3 weeks = 21 days
+  if (denom === 12) return num * 30;      // 6/12 = 6 months = 180 days
+  return num;                              // fallback: numerator as days
+};
+
+/** Parse a single shorthand string into structured regimen */
+export const parseShorthand = (input: string): ShorthandParseResult | null => {
+  const raw = input.trim();
+  if (!raw) return null;
+
+  let lower = raw.toLowerCase().replace(/[;,]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  let dosesPerDay = 2;
+  let durationDays = 7;
+  let strengthPerDose = '';
+  let route: RouteHint = 'oral';
+  let isPrn = false;
+
+  // 1. Extract PRN/SOS modifier (before frequency, so "TDS PRN" works)
+  for (const token of PRN_TOKENS) {
+    const re = new RegExp(`\\b${token}\\b`, 'i');
+    if (re.test(lower)) {
+      isPrn = true;
+      lower = lower.replace(re, ' ').trim();
+      break;
+    }
+  }
+
+  // 2. Extract route from end or middle
+  for (const [token, r] of Object.entries(ROUTE_MAP)) {
+    const re = new RegExp(`\\b${token}\\b`, 'i');
+    if (re.test(lower)) {
+      route = r;
+      lower = lower.replace(re, ' ').trim();
+      break;
+    }
+  }
+
+  // 3. Extract duration: "5/7", "5//7", "7d", "14days", "2w", "1m"
+  const slashMatch = lower.match(/(\d{1,3}\s*\/\s*\/?\s*\d{1,3})/);
+  if (slashMatch) {
+    const d = parseSlashDuration(slashMatch[1]);
+    if (d && d > 0) {
+      durationDays = d;
+      lower = lower.replace(slashMatch[1], ' ').trim();
+    }
+  }
+  if (durationDays === 7) {
+    const unitMatch = lower.match(/\b(\d{1,3})\s*(days?|d|weeks?|w|months?|m)\b/);
+    if (unitMatch) {
+      const n = Number(unitMatch[1]);
+      const unit = unitMatch[2][0];
+      if (unit === 'd') durationDays = n;
+      else if (unit === 'w') durationDays = n * 7;
+      else if (unit === 'm') durationDays = n * 30;
+      lower = lower.replace(unitMatch[0], ' ').trim();
+    }
+  }
+
+  // 4. Extract frequency
+  const freqTokens = Object.keys(FREQ_MAP).sort((a, b) => b.length - a.length);
+  for (const token of freqTokens) {
+    const re = new RegExp(`\\b${token}\\b`, 'i');
+    if (re.test(lower)) {
+      dosesPerDay = FREQ_MAP[token];
+      lower = lower.replace(re, ' ').trim();
+      break;
+    }
+  }
+
+  // 5. What remains should be the strength/dose, e.g. "500mg", "1 tab", "2 caps", "5ml"
+  const remainder = lower.replace(/\s+/g, ' ').trim();
+  if (remainder) {
+    strengthPerDose = remainder;
+  }
+
+  // If no explicit strength was given, use sensible defaults
+  if (!strengthPerDose) {
+    strengthPerDose = '1 dose';
+  }
+
+  // PRN defaults: if no frequency specified alongside PRN, use 1 dose/day
+  // (the "1" is just for quantity computation — the actual max is flexible)
+  if (isPrn && dosesPerDay === 2) {
+    // No explicit frequency given with PRN — default to "as needed, no fixed schedule"
+    dosesPerDay = 1;
+  }
+
+  // Build interpretation
+  let interpretation: string;
+  if (isPrn) {
+    if (dosesPerDay > 1) {
+      interpretation = `${strengthPerDose} — as needed, max ${frequencyText(dosesPerDay)} for ${durationDays} day${durationDays === 1 ? '' : 's'}`;
+    } else {
+      interpretation = `${strengthPerDose} — as needed for ${durationDays} day${durationDays === 1 ? '' : 's'}`;
+    }
+  } else {
+    interpretation = `${strengthPerDose} — ${frequencyText(dosesPerDay)} for ${durationDays} day${durationDays === 1 ? '' : 's'}`;
+  }
+
+  return {
+    strengthPerDose,
+    dosesPerDay,
+    durationDays,
+    route,
+    raw,
+    isPrn,
+    interpretation,
+  };
+};
+
+/** Apply a shorthand parse result to a prescription item */
+export const applyShorthand = (
+  item: Record<string, any>,
+  parsed: ShorthandParseResult,
+): Record<string, any> => {
+  const updated = { ...item };
+  updated.strengthPerDose = parsed.strengthPerDose;
+  updated.dosesPerDay = parsed.dosesPerDay;
+  updated.durationDays = parsed.durationDays;
+  updated.route = parsed.route;
+  updated.isPrn = parsed.isPrn;
+
+  const nextComputedQuantity = computeMedicationQuantity(updated, { baseUnit: updated.baseUnit });
+  updated.computedQuantity = nextComputedQuantity;
+  if (!updated.quantityTouched) {
+    updated.quantity = nextComputedQuantity;
+  }
+
+  // Build PRN-aware instructions
+  let nextInstruction: string;
+  if (parsed.isPrn) {
+    const dose = parsed.strengthPerDose?.trim() || '1 dose';
+    const routeText = parsed.route || 'oral';
+    const prefix =
+      routeText === 'oral'
+        ? `Take ${dose} by mouth as needed`
+        : routeText === 'intravenous'
+          ? `Administer ${dose} intravenously as needed`
+          : routeText === 'intramuscular'
+            ? `Administer ${dose} intramuscularly as needed`
+            : routeText === 'topical'
+              ? `Apply ${dose} topically as needed`
+              : `Use ${dose} as needed`;
+    if (parsed.dosesPerDay > 1) {
+      nextInstruction = `${prefix}, up to ${frequencyText(parsed.dosesPerDay)}, for ${parsed.durationDays} ${parsed.durationDays === 1 ? 'day' : 'days'}.`;
+    } else {
+      nextInstruction = `${prefix} for ${parsed.durationDays} ${parsed.durationDays === 1 ? 'day' : 'days'}.`;
+    }
+  } else {
+    nextInstruction = buildSmartInstruction({
+      strengthPerDose: updated.strengthPerDose,
+      dosesPerDay: updated.dosesPerDay,
+      durationDays: updated.durationDays,
+      route: updated.route,
+    });
+  }
+
+  if (!updated.instructions || updated.instructions === updated.smartInstruction) {
+    updated.instructions = nextInstruction;
+  }
+  updated.smartInstruction = nextInstruction;
+
+  return updated;
+};

@@ -16,31 +16,26 @@ import { getPatientFullName } from '@/utils/orderHelpers';
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  UserPlus,
   Users,
   CreditCard,
   TrendingUp,
   DollarSign,
   ArrowRight,
   Loader2,
-  Search,
   Stethoscope,
   Wallet,
   TrendingDown,
   PiggyBank,
   Phone,
-  Scissors,
-  UserCog,
   AlertTriangle,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { prescriptionService } from '@/services/prescriptionService';
-import { visitsAPI, ordersAPI } from '@/services/api';
+import { ordersAPI } from '@/services/api';
 import { useDoctorQueue, useVisitStats } from '@/hooks/useVisits';
 import { useExpenditureSummary } from '@/hooks/useExpenditures';
-import { cn } from '@/lib/utils';
-import { Pill } from 'lucide-react';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 const formatLocalDate = (date: Date) => {
   const year = date.getFullYear();
@@ -112,48 +107,6 @@ export default function ReceptionDashboard() {
     staleTime: 15 * 1000,
   });
 
-  const { data: readyToDispense = [] } = useQuery({
-    queryKey: ['prescriptions', 'dispensing-queue'],
-    queryFn: () => prescriptionService.findAll(),
-    refetchInterval: 15000,
-    staleTime: 10000,
-  });
-
-  const dispensingQueue = useMemo(() => {
-    return (Array.isArray(readyToDispense) ? readyToDispense : [])
-      .filter((rx: any) => rx.isPaid && rx.status !== 'dispensed')
-      .slice(0, 5);
-  }, [readyToDispense]);
-
-  const { data: allVisits = [] } = useQuery({
-    queryKey: ['visits', 'reception-today'],
-    queryFn: () => visitsAPI.getAll({}),
-    staleTime: 15 * 1000,
-  });
-
-  const todayVisits = useMemo(() => {
-    if (!Array.isArray(allVisits)) return [];
-    return allVisits.filter((v: any) => {
-      const created = v.createdAt || v.checkedInAt;
-      return created && formatLocalDate(new Date(created)) === todayStr;
-    });
-  }, [allVisits, todayStr]);
-
-  const serviceTypeCounts = useMemo(() => {
-    const c: Record<string, number> = {
-      normal_consultation: 0,
-      specialist_consultation: 0,
-      observation_4h: 0,
-      procedure: 0,
-      unspecified: 0,
-    };
-    for (const v of todayVisits) {
-      const k = v.serviceType || 'unspecified';
-      if (c[k] != null) c[k] += 1;
-      else c.unspecified += 1;
-    }
-    return c;
-  }, [todayVisits]);
   const todayRevenue = paymentStats?.paidRevenue ?? 0;
   const pendingLabPayments = paymentStats?.pendingOrders ?? 0;
   const pendingPrescriptionPayments = Array.isArray(pendingPrescriptions) ? pendingPrescriptions : [];
@@ -183,9 +136,6 @@ export default function ReceptionDashboard() {
   const totalExpenditures = expenditureSummary?.totalExpenditures || 0;
   const netCashPosition = (paymentStats?.paidRevenue ?? 0) - totalExpenditures;
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const { data: searchResults = [] } = useSearchPatients(searchTerm);
-
   return (
     <RoleLayout
       title="Reception Dashboard"
@@ -193,39 +143,6 @@ export default function ReceptionDashboard() {
       role="receptionist"
       userName={profile?.fullName}
     >
-      {/* Patient Search */}
-      <div className="mb-6">
-        <div className="relative max-w-md">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search patients by name, ID, or phone..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-8"
-          />
-        </div>
-        {searchTerm.length > 0 && searchResults.length > 0 && (
-          <div className="mt-2 border rounded-lg max-h-48 overflow-y-auto">
-            {searchResults.slice(0, 5).map((p: any) => (
-              <div
-                key={p._id}
-                className="p-3 hover:bg-gray-100 cursor-pointer border-b flex justify-between items-center"
-                onClick={() => {
-                  navigate(`/patient/${p._id}`);
-                  setSearchTerm('');
-                }}
-              >
-                <div>
-                  <p className="font-semibold">{p.firstName} {p.lastName}</p>
-                  <p className="text-sm text-gray-500">{p.patientId}</p>
-                </div>
-                <Badge variant="outline">View</Badge>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
       {/* Quick Actions */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <button
@@ -272,7 +189,6 @@ export default function ReceptionDashboard() {
           title="Patients Today"
           value={visitStats?.totalVisits || todayPatients}
           icon={Users}
-          trend={{ value: 12, isPositive: true }}
         />
         <MetricCard
           title="Awaiting Vitals"
@@ -284,7 +200,6 @@ export default function ReceptionDashboard() {
           title="Revenue Today"
           value={`Le ${todayRevenue.toLocaleString()}`}
           icon={TrendingUp}
-          trend={{ value: 8, isPositive: true }}
         />
         <MetricCard
           title="Pending Payments"
@@ -383,76 +298,6 @@ export default function ReceptionDashboard() {
         <PendingOrders />
       </div>
 
-      {/* Dispensing Queue - Ready to Dispense */}
-      {dispensingQueue.length > 0 && (
-        <div className="mb-6 bg-card border rounded-xl shadow-sm">
-          <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <Pill className="w-4 h-4 text-purple-500" />
-              Ready to Dispense
-              <Badge variant="secondary" className="ml-1 text-xs">{dispensingQueue.length}</Badge>
-            </h3>
-            <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reception/dispensing')}>
-              View All <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-          <div className="divide-y">
-            {dispensingQueue.map((rx: any) => {
-              const pName = rx.patientId?.firstName
-                ? `${rx.patientId.firstName} ${rx.patientId.lastName || ''}`.trim()
-                : 'Unknown';
-              const itemCount = (rx.items || []).length;
-              const total = rx.actualTotalAmount || rx.totalAmount || 0;
-              return (
-                <div key={rx._id} className="px-5 py-3 hover:bg-muted/30 transition-colors cursor-pointer"
-                  onClick={() => navigate(`/reception/dispense/${rx._id}`)}>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="p-1.5 bg-purple-100 rounded-lg shrink-0">
-                        <Pill className="w-3.5 h-3.5 text-purple-600" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm truncate">{pName}</span>
-                          <Badge variant="outline" className="text-[10px] shrink-0">{rx.prescriptionNumber}</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {itemCount} item{itemCount !== 1 ? 's' : ''} · Le {total.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                    <Button size="sm" variant="default" className="shrink-0 gap-1 text-xs"
-                      onClick={(e) => { e.stopPropagation(); navigate(`/reception/dispense/${rx._id}`); }}>
-                      Dispense <ArrowRight className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Today's visits by service type */}
-      <div className="mb-6 bg-card border rounded-xl shadow-sm">
-        <div className="px-5 py-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold text-sm flex items-center gap-2">
-            <Stethoscope className="w-4 h-4 text-primary" />
-            Today's Visits by Service Type
-          </h3>
-          <span className="text-xs text-muted-foreground">{todayVisits.length} total</span>
-        </div>
-        <div className="p-5">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-            <ServiceTypeTile icon={Stethoscope} label="Consultations" value={serviceTypeCounts.normal_consultation} color="blue" />
-            <ServiceTypeTile icon={UserCog} label="Specialist" value={serviceTypeCounts.specialist_consultation} color="violet" />
-            <ServiceTypeTile icon={Stethoscope} label="Observation" value={serviceTypeCounts.observation_4h} color="cyan" />
-            <ServiceTypeTile icon={Scissors} label="Procedures" value={serviceTypeCounts.procedure} color="rose" />
-          </div>
-        </div>
-      </div>
-
-
       {/* Recent Activity */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Patients */}
@@ -539,27 +384,6 @@ export default function ReceptionDashboard() {
         </div>
       </div>
     </RoleLayout>
-  );
-}
-
-const SERVICE_TILE_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  blue:   { bg: 'bg-blue-50 dark:bg-blue-950/30',   text: 'text-blue-700 dark:text-blue-300',     border: 'border-blue-200' },
-  violet: { bg: 'bg-violet-50 dark:bg-violet-950/30', text: 'text-violet-700 dark:text-violet-300', border: 'border-violet-200' },
-  cyan:   { bg: 'bg-cyan-50 dark:bg-cyan-950/30',   text: 'text-cyan-700 dark:text-cyan-300',     border: 'border-cyan-200' },
-  rose:   { bg: 'bg-rose-50 dark:bg-rose-950/30',   text: 'text-rose-700 dark:text-rose-300',     border: 'border-rose-200' },
-  amber:  { bg: 'bg-amber-50 dark:bg-amber-950/30', text: 'text-amber-800 dark:text-amber-300',   border: 'border-amber-200' },
-};
-
-function ServiceTypeTile({ icon: Icon, label, value, color }: { icon: any; label: string; value: number; color: keyof typeof SERVICE_TILE_COLORS }) {
-  const c = SERVICE_TILE_COLORS[color];
-  return (
-    <div className={cn('rounded-lg border p-3', c.bg, c.border)}>
-      <div className="flex items-center gap-2 mb-1">
-        <Icon className={cn('w-3.5 h-3.5', c.text)} />
-        <p className={cn('text-xs font-medium', c.text)}>{label}</p>
-      </div>
-      <p className={cn('text-lg font-bold', c.text)}>{value}</p>
-    </div>
   );
 }
 

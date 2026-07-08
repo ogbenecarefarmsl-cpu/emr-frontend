@@ -140,11 +140,6 @@ export default function VisitRegistration() {
       return;
     }
 
-    if (!consultationFee || parseFloat(consultationFee) <= 0) {
-      toast.error('Please enter a valid consultation fee');
-      return;
-    }
-
     try {
       if (selectedService.flag === 'specialist' && !specialistId) {
         toast.error('Please select a specialist for this consultation');
@@ -162,7 +157,7 @@ export default function VisitRegistration() {
       const visit = await createVisit.mutateAsync({
         patientId: selectedPatient._id || selectedPatient.id,
         visitType: visitType as any,
-        consultationFee: parseFloat(consultationFee),
+        consultationFee: parseFloat(consultationFee) || 0,
         chiefComplaint,
         notes: [
           `Service: ${selectedService.label}`,
@@ -177,8 +172,12 @@ export default function VisitRegistration() {
         rapidTestsRequested: rapidTestsRequested.length > 0 ? rapidTestsRequested : undefined,
       });
 
-      await markConsultationPaid.mutateAsync({ visitId: visit._id || visit.id, paymentMethod });
-      toast.success('Consultation payment confirmed. Patient sent to nurse vitals.');
+      if ((visit as any).consultationFeeWaived) {
+        toast.success('Consultation fee waived — patient had a paid visit within 30 days. Sent to nurse vitals.');
+      } else {
+        await markConsultationPaid.mutateAsync({ visitId: visit._id || visit.id, paymentMethod });
+        toast.success('Consultation payment confirmed. Patient sent to nurse vitals.');
+      }
       navigate(`/reception/visit-receipt?visitId=${visit._id || visit.id}`);
     } catch (error: any) {
       toast.error(error.message || 'Failed to create visit');
@@ -440,6 +439,9 @@ export default function VisitRegistration() {
                     placeholder="Configured service fee"
                     min="0"
                   />
+                  <p className="text-[11px] text-muted-foreground">
+                    Fee is auto-waived if the patient had a paid visit within the last 30 days.
+                  </p>
                 </div>
 
                 <div className="space-y-2">

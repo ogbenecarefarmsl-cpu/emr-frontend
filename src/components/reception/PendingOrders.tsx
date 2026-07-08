@@ -1,17 +1,27 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { usePendingClinicalOrders, useMarkOrderPaid } from '@/hooks/useVisits';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle } from 'lucide-react';
+import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle, ArrowRight, User } from 'lucide-react';
 import { prescriptionService } from '@/services/prescriptionService';
+
+type PatientGroup = {
+  patientId: string;
+  patient: any;
+  prescriptions: any[];
+  totalAmount: number;
+  drugNames: string[];
+};
 
 export function PendingOrders() {
   const [activeTab, setActiveTab] = useState('all');
   const [selectedMethods, setSelectedMethods] = useState<Record<string, string>>({});
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: allOrders = [], isLoading, refetch } = usePendingClinicalOrders();
   const { data: labOrders = [] } = usePendingClinicalOrders('lab');
@@ -22,25 +32,31 @@ export function PendingOrders() {
     staleTime: 15 * 1000,
   });
   const markPaid = useMarkOrderPaid();
-  const markPrescriptionPaid = useMutation({
-    mutationFn: ({ prescriptionId, paymentMethod }: { prescriptionId: string; paymentMethod: string }) =>
-      prescriptionService.markAsPaid(prescriptionId, paymentMethod),
-    onSuccess: () => {
-      toast.success('Prescription payment confirmed');
-      queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
-      queryClient.invalidateQueries({ queryKey: ['payments'] });
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['visits'] });
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to confirm prescription payment');
-    },
-  });
 
-  const allPaymentItems = [
-    ...allOrders.map((order: any) => ({ ...order, _paymentKind: 'order' })),
-    ...pendingPrescriptions.map((rx: any) => ({ ...rx, _paymentKind: 'prescription' })),
-  ];
+  const patientGroups = useMemo(() => {
+    const groups: Record<string, PatientGroup> = {};
+    for (const rx of pendingPrescriptions) {
+      const patient = (rx as any).patientId;
+      const pid = patient?._id || patient?.patientId || (rx as any).patientId?.toString() || 'unknown';
+      if (!groups[pid]) {
+        groups[pid] = {
+          patientId: pid,
+          patient,
+          prescriptions: [],
+          totalAmount: 0,
+          drugNames: [],
+        };
+      }
+      groups[pid].prescriptions.push(rx);
+      groups[pid].totalAmount += Number((rx as any).totalAmount || 0);
+      for (const item of ((rx as any).items || [])) {
+        if (item.medicationName && !groups[pid].drugNames.includes(item.medicationName)) {
+          groups[pid].drugNames.push(item.medicationName);
+        }
+      }
+    }
+    return Object.values(groups).sort((a, b) => b.prescriptions.length - a.prescriptions.length);
+  }, [pendingPrescriptions]);
 
   const handleMarkPaid = async (orderId: string, paymentMethod: string = 'cash') => {
     try {
@@ -52,8 +68,10 @@ export function PendingOrders() {
     }
   };
 
-  const handleMarkPrescriptionPaid = async (prescriptionId: string, paymentMethod: string = 'cash') => {
-    await markPrescriptionPaid.mutateAsync({ prescriptionId, paymentMethod });
+  const navigateToDispense = (group: PatientGroup) => {
+    const primaryRx = group.prescriptions[0];
+    const rxIds = group.prescriptions.map((rx: any) => rx._id).join(',');
+    navigate(`/reception/dispense/${primaryRx._id}?rxIds=${encodeURIComponent(rxIds)}`);
   };
 
   const getOrderTypeBadge = (orderType: string) => {
@@ -77,12 +95,84 @@ export function PendingOrders() {
     }
   };
 
-  const renderPrescriptionBadge = () => (
-    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
-      <Pill className="h-3 w-3 mr-1" />
-      Prescription
-    </Badge>
-  );
+  const renderPatientGroups = (groups: PatientGroup[]) => {
+    if (groups.length === 0) {
+      return (
+        <div className="text-center py-8 text-muted-foreground">
+          <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+          <p>No pending prescriptions</p>
+          <p className="text-sm">Doctor-prescribed medications will appear here</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-3">
+        {groups.map((group) => (
+          <div
+            key={group.patientId}
+            className="border rounded-lg p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+            onClick={() => navigateToDispense(group)}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                  <User className="h-5 w-5 text-primary" />
+                </div>
+                <div className="min-w-0">
+                  <div className="font-medium truncate">
+                    {group.patient?.firstName} {group.patient?.lastName}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {group.patient?.patientId || group.patientId}
+                    {group.patient?.phone && <span className="ml-2">{group.patient.phone}</span>}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 text-[10px]">
+                      <Pill className="h-3 w-3 mr-1" />
+                      {group.prescriptions.length} Rx
+                    </Badge>
+                    {group.prescriptions.map((rx: any) => (
+                      <Badge key={rx._id} variant="secondary" className="text-[10px]">
+                        {rx.prescriptionNumber}
+                      </Badge>
+                    ))}
+                  </div>
+                  <div className="text-xs text-muted-foreground mt-1.5">
+                    <span className="font-medium text-foreground">Drugs:</span>{' '}
+                    {group.drugNames.slice(0, 4).join(', ')}
+                    {group.drugNames.length > 4 && <span className="text-muted-foreground"> +{group.drugNames.length - 4} more</span>}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground mt-1">
+                    Ordered by: {[...new Set(group.prescriptions.map((rx: any) => rx.prescribedBy?.fullName || rx.doctorId?.fullName || 'Unknown'))].join(', ')}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="text-right">
+                  <div className="font-semibold text-lg text-primary">
+                    {group.totalAmount > 0 ? `Le ${group.totalAmount.toLocaleString()}` : 'Price at dispense'}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">grouped bill</div>
+                </div>
+                <Button
+                  size="sm"
+                  className="bg-green-600 hover:bg-green-700"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigateToDispense(group);
+                  }}
+                >
+                  View & Dispense
+                  <ArrowRight className="h-4 w-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   const renderOrderList = (items: any[]) => {
     if (items.length === 0) {
@@ -90,20 +180,19 @@ export function PendingOrders() {
         <div className="text-center py-8 text-muted-foreground">
           <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p>No pending clinical payments</p>
-          <p className="text-sm">Doctor-created lab orders and prescriptions will appear here</p>
+          <p className="text-sm">Lab and pharmacy orders will appear here</p>
         </div>
       );
     }
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-3">
         {items.map((item: any) => {
-          const isPrescription = item._paymentKind === 'prescription';
           const patient = item.patientId;
           const patientName = patient
             ? `${patient.firstName} ${patient.lastName}`
             : 'Unknown Patient';
-          const total = Number(isPrescription ? item.totalAmount : item.total || 0);
+          const total = Number(item.total || 0);
 
           return (
             <div
@@ -112,35 +201,21 @@ export function PendingOrders() {
             >
               <div className="flex items-center gap-4 min-w-0">
                 <div className="flex flex-col items-center">
-                  {isPrescription ? renderPrescriptionBadge() : getOrderTypeBadge(item.orderType)}
+                  {getOrderTypeBadge(item.orderType)}
                 </div>
                 <div className="min-w-0">
                   <div className="font-medium truncate">{patientName}</div>
                   <div className="text-sm text-muted-foreground">
-                    {patient?.patientId} - {isPrescription ? 'Prescription' : 'Order'}: {isPrescription ? item.prescriptionNumber : item.orderNumber}
-                    {!item.visitId && (
-                      <Badge variant="outline" className="ml-2 text-[10px] h-4 px-1 bg-amber-50 text-amber-700 border-amber-200">No visit</Badge>
-                    )}
+                    {patient?.patientId} - Order: {item.orderNumber}
                   </div>
                   <div className="text-sm text-muted-foreground">
-                    Ordered by: {item.orderedBy?.fullName || item.prescribedBy?.fullName || item.doctorId?.fullName || 'Unknown'}
+                    Ordered by: {item.orderedBy?.fullName || 'Unknown'}
                   </div>
-                  {isPrescription && item.items?.length > 0 && (
-                    <div className="text-sm text-muted-foreground mt-1">
-                      Drugs:{' '}
-                      <span className="font-medium text-foreground">
-                        {item.items.map((rxItem: any) => rxItem.medicationName).join(', ')}
-                      </span>
-                    </div>
-                  )}
-                  {!isPrescription && item.order_tests && item.order_tests.length > 0 && (
+                  {item.order_tests && item.order_tests.length > 0 && (
                     <div className="text-sm text-muted-foreground mt-1">
                       Tests:{' '}
                       <span className="font-medium text-foreground">
-                        {item.order_tests.map((test: any) => test.testCode).join(', ')}
-                      </span>
-                      <span className="ml-1 text-xs">
-                        ({item.order_tests.map((test: any) => test.testName).join(', ')})
+                        {item.order_tests.map((test: any) => test.testName).join(', ')}
                       </span>
                     </div>
                   )}
@@ -160,24 +235,21 @@ export function PendingOrders() {
                 </div>
                 <div className="flex items-center gap-2">
                   <select
-                    value={selectedMethods[`${isPrescription ? 'rx' : 'order'}-${item._id || item.id}`] || 'cash'}
-                    onChange={(e) => setSelectedMethods(prev => ({ ...prev, [`${isPrescription ? 'rx' : 'order'}-${item._id || item.id}`]: e.target.value }))}
+                    value={selectedMethods[item._id || item.id] || 'cash'}
+                    onChange={(e) => setSelectedMethods((prev) => ({ ...prev, [item._id || item.id]: e.target.value }))}
                     className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                   >
                     <option value="cash">Cash</option>
                     <option value="orange_money">Orange Money</option>
                     <option value="afrimoney">Afrimoney</option>
-                    {!isPrescription && <option value="wallet">Wallet</option>}
+                    <option value="wallet">Wallet</option>
                   </select>
                   <Button
-                    onClick={() => {
-                      const method = selectedMethods[`${isPrescription ? 'rx' : 'order'}-${item._id || item.id}`] || 'cash';
-                      isPrescription ? handleMarkPrescriptionPaid(item._id || item.id, method) : handleMarkPaid(item._id || item.id, method);
-                    }}
-                    disabled={markPaid.isPending || markPrescriptionPaid.isPending}
+                    onClick={() => handleMarkPaid(item._id || item.id, selectedMethods[item._id || item.id] || 'cash')}
+                    disabled={markPaid.isPending}
                     className="bg-green-600 hover:bg-green-700"
                   >
-                    {(markPaid.isPending || markPrescriptionPaid.isPending) ? (
+                    {markPaid.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <>
@@ -210,7 +282,7 @@ export function PendingOrders() {
           <CreditCard className="h-5 w-5" />
           Pending Clinical Payments
           <Badge variant="secondary" className="ml-auto">
-            {allPaymentItems.length} items
+            {patientGroups.length} patient{patientGroups.length !== 1 ? 's' : ''}, {pendingPrescriptions.length + allOrders.length} items
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -218,7 +290,7 @@ export function PendingOrders() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="all">
-              All ({allPaymentItems.length})
+              All ({pendingPrescriptions.length + allOrders.length})
             </TabsTrigger>
             <TabsTrigger value="lab">
               Lab ({labOrders.length})
@@ -231,16 +303,33 @@ export function PendingOrders() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="all" className="mt-4">
-            {renderOrderList(allPaymentItems)}
+            {patientGroups.length > 0 && (
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Prescriptions (grouped by patient)</p>
+                {renderPatientGroups(patientGroups)}
+              </div>
+            )}
+            {allOrders.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Clinical Orders</p>
+                {renderOrderList(allOrders)}
+              </div>
+            )}
+            {patientGroups.length === 0 && allOrders.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No pending clinical payments</p>
+              </div>
+            )}
           </TabsContent>
           <TabsContent value="lab" className="mt-4">
-            {renderOrderList(labOrders.map((order: any) => ({ ...order, _paymentKind: 'order' })))}
+            {renderOrderList(labOrders)}
           </TabsContent>
           <TabsContent value="prescription" className="mt-4">
-            {renderOrderList(pendingPrescriptions.map((rx: any) => ({ ...rx, _paymentKind: 'prescription' })))}
+            {renderPatientGroups(patientGroups)}
           </TabsContent>
           <TabsContent value="pharmacy" className="mt-4">
-            {renderOrderList(pharmacyOrders.map((order: any) => ({ ...order, _paymentKind: 'order' })))}
+            {renderOrderList(pharmacyOrders)}
           </TabsContent>
         </Tabs>
       </CardContent>

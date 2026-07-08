@@ -36,6 +36,12 @@ interface DispenseLine {
   /** Price snapshot at this moment */
   pricePerSellUnit: number;
   lineTotal: number;
+  /** Manual charge fields for catalogs that do not yet have clean base units */
+  manualSellUnitLabel: string;
+  manualPricePerSellUnit: number;
+  manualBaseUnitsPerSellUnit: number;
+  doctorInstruction?: string;
+  pharmacistNote?: string;
   /** Substitute tracking */
   isSubstitute: boolean;
   /** Live medication object (for showing stock/packs) */
@@ -50,6 +56,16 @@ const getUnitsPerPack = (pack: Medication['packSizes'][number]) =>
 const isSingleUseMedication = (med?: Medication) => {
   const text = `${med?.name || ''} ${med?.dosageForm || ''} ${med?.baseUnit || ''}`.toLowerCase();
   return /\b(vial|ampoule|ampule|infusion|bag)\b/.test(text);
+};
+
+const suggestManualUnit = (name = '') => {
+  const text = name.toLowerCase();
+  if (/\b(cream|ointment|gel|lotion)\b/.test(text)) return 'tube';
+  if (/\b(syrup|suspension|solution|drops?)\b/.test(text)) return 'bottle';
+  if (/\b(vial|ampoule|ampule)\b/.test(text)) return 'ampule';
+  if (/\b(capsule|caps)\b/.test(text)) return 'card';
+  if (/\b(tablet|tab)\b/.test(text)) return 'card';
+  return 'unit';
 };
 
 export default function ReceptionDispensePage() {
@@ -111,6 +127,11 @@ export default function ReceptionDispensePage() {
           dispenseMode: 'individual',
           pricePerSellUnit: 0,
           lineTotal: 0,
+          manualSellUnitLabel: suggestManualUnit(item.medicationName),
+          manualPricePerSellUnit: 0,
+          manualBaseUnitsPerSellUnit: 1,
+          doctorInstruction: item.instructions || item.dosage || '',
+          pharmacistNote: item.pharmacistNote || '',
           isSubstitute: false,
         };
       }),
@@ -154,11 +175,13 @@ export default function ReceptionDispensePage() {
   const computeLineTotals = (line: DispenseLine): DispenseLine => {
     const med = line.medication;
     let baseUnits = line.sellUnits;
-    let pricePerSellUnit = med?.unitPrice || 0;
+    let pricePerSellUnit = line.manualPricePerSellUnit || med?.unitPrice || 0;
     if (line.dispenseMode === 'pack' && line.packSizeIndex != null && med?.packSizes?.[line.packSizeIndex]) {
       const pack = med.packSizes[line.packSizeIndex];
       baseUnits = line.sellUnits * getUnitsPerPack(pack);
       pricePerSellUnit = pack.sellingPrice;
+    } else {
+      baseUnits = line.sellUnits * Math.max(1, Number(line.manualBaseUnitsPerSellUnit || 1));
     }
     const stock = Number(med?.stockQuantity ?? 0);
     const error = med && baseUnits > stock
@@ -254,6 +277,19 @@ export default function ReceptionDispensePage() {
     );
   };
 
+  const setManualField = (lineId: string, field: 'manualSellUnitLabel' | 'manualPricePerSellUnit' | 'manualBaseUnitsPerSellUnit', value: string | number) => {
+    setLines((current) =>
+      current.map((l) => {
+        if (l.lineId !== lineId) return l;
+        const next = {
+          ...l,
+          [field]: field === 'manualSellUnitLabel' ? String(value) : Number(value),
+        };
+        return computeLineTotals(next);
+      }),
+    );
+  };
+
   const removeLine = (lineId: string) => {
     setLines((current) => current.filter((l) => l.lineId !== lineId));
   };
@@ -326,6 +362,9 @@ export default function ReceptionDispensePage() {
             dispenseMode: l.dispenseMode,
             packSizeIndex: l.packSizeIndex,
             sellUnits: l.sellUnits,
+            manualSellUnitLabel: l.dispenseMode === 'individual' ? l.manualSellUnitLabel : undefined,
+            manualPricePerSellUnit: l.dispenseMode === 'individual' ? l.manualPricePerSellUnit : undefined,
+            manualBaseUnitsPerSellUnit: l.dispenseMode === 'individual' ? l.manualBaseUnitsPerSellUnit : undefined,
             ...(l.medicationId !== l.originalMedicationId ? { substituteMedicationId: l.medicationId } : {}),
           }));
         await prescriptionService.dispense(prescription._id, {
@@ -446,6 +485,14 @@ export default function ReceptionDispensePage() {
                           Stock: <strong>{med.stockQuantity}</strong> {med.baseUnit || 'units'} · Base unit price: Le {med.unitPrice?.toLocaleString() || 0}
                         </p>
                       )}
+                      {line.doctorInstruction && (
+                        <p className="mt-2 rounded-md bg-blue-50 px-2 py-1 text-xs text-blue-900">
+                          Doctor instruction: <strong>{line.doctorInstruction}</strong>
+                        </p>
+                      )}
+                      {line.pharmacistNote && (
+                        <p className="mt-1 text-xs text-amber-700">Pharmacist note: {line.pharmacistNote}</p>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button size="sm" variant="outline" onClick={() => startSubstitute(line.lineId)}>
@@ -461,7 +508,7 @@ export default function ReceptionDispensePage() {
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                     {/* Mode toggle */}
                     <div className="space-y-1">
-                      <Label className="text-xs">Sell mode</Label>
+                      <Label className="text-xs">Charge mode</Label>
                       <Select
                         value={line.dispenseMode}
                         onValueChange={(v: 'individual' | 'pack') => setDispenseMode(line.lineId, v)}
@@ -470,7 +517,7 @@ export default function ReceptionDispensePage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="individual">Individual {med?.baseUnit || 'units'}</SelectItem>
+                          <SelectItem value="individual">Manual unit</SelectItem>
                           <SelectItem value="pack" disabled={packSizes.length === 0}>
                             Pack{packSizes.length > 0 ? ` (${packSizes.length} options)` : ' (no packs)'}
                           </SelectItem>
@@ -500,12 +547,36 @@ export default function ReceptionDispensePage() {
                       </div>
                     )}
 
+                    {line.dispenseMode === 'individual' && (
+                      <>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Charge as</Label>
+                          <Input
+                            value={line.manualSellUnitLabel}
+                            onChange={(e) => setManualField(line.lineId, 'manualSellUnitLabel', e.target.value)}
+                            placeholder="card, tube, bottle"
+                            className="h-9"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Unit price</Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={line.manualPricePerSellUnit}
+                            onChange={(e) => setManualField(line.lineId, 'manualPricePerSellUnit', Number(e.target.value))}
+                            className="h-9"
+                          />
+                        </div>
+                      </>
+                    )}
+
                     {/* Sell units */}
                     <div className="space-y-1">
                       <Label className="text-xs">
                         {line.dispenseMode === 'pack'
                           ? `How many ${packSizes[line.packSizeIndex ?? 0]?.unit || 'packs'} to dispense`
-                          : `How many ${med?.baseUnit || 'units'} to dispense`}
+                          : `How many ${line.manualSellUnitLabel || 'units'} to charge`}
                       </Label>
                       <Input
                         type="number"
@@ -515,6 +586,18 @@ export default function ReceptionDispensePage() {
                         className="h-9"
                       />
                     </div>
+                    {line.dispenseMode === 'individual' && (
+                      <div className="space-y-1">
+                        <Label className="text-xs">Stock units per charge unit</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={line.manualBaseUnitsPerSellUnit}
+                          onChange={(e) => setManualField(line.lineId, 'manualBaseUnitsPerSellUnit', Number(e.target.value))}
+                          className="h-9"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Stock check warning */}
@@ -535,9 +618,12 @@ export default function ReceptionDispensePage() {
                         {line.dispenseMode === 'pack' && packSizes[line.packSizeIndex ?? 0] && (
                           <> ({line.sellUnits} × {getUnitsPerPack(packSizes[line.packSizeIndex ?? 0])})</>
                         )}
+                        {line.dispenseMode === 'individual' && (
+                          <> ({line.sellUnits} x {line.manualSellUnitLabel || 'unit'})</>
+                        )}
                       </p>
                       <p className="mt-0.5">
-                        @ Le {line.pricePerSellUnit.toLocaleString()} per {line.dispenseMode === 'pack' ? (packSizes[line.packSizeIndex ?? 0]?.name || 'pack') : (med?.baseUnit || 'unit')}
+                        @ Le {line.pricePerSellUnit.toLocaleString()} per {line.dispenseMode === 'pack' ? (packSizes[line.packSizeIndex ?? 0]?.name || 'pack') : (line.manualSellUnitLabel || 'unit')}
                       </p>
                     </div>
                     <p className="font-semibold">Le {line.lineTotal.toLocaleString()}</p>

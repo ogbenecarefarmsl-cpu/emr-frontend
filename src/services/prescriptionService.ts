@@ -37,6 +37,9 @@ export interface DispenseItemInput {
   dispenseMode: 'individual' | 'pack';
   packSizeIndex?: number;
   sellUnits: number;
+  manualSellUnitLabel?: string;
+  manualPricePerSellUnit?: number;
+  manualBaseUnitsPerSellUnit?: number;
   substituteMedicationId?: string;
   substituteNote?: string;
 }
