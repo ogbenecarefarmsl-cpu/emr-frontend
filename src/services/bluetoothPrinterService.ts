@@ -87,6 +87,7 @@ class BluetoothPrinterService {
     if (!this.isSupported) return false;
     const saved = this.getSavedDevice();
     if (!saved) return false;
+    if (typeof navigator.bluetooth.getDevices !== 'function') return false;
 
     try {
       const devices = await navigator.bluetooth.getDevices();

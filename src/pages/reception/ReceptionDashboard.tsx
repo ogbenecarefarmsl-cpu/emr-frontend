@@ -21,6 +21,7 @@ import {
   TrendingUp,
   DollarSign,
   ArrowRight,
+  UserPlus,
   Loader2,
   Stethoscope,
   Wallet,
