@@ -41,6 +41,7 @@ import {
   validateMedicationRegimen,
   parseShorthand,
   applyShorthand,
+  frequencyText,
   type MedicationLike,
 } from '@/lib/medicationIntelligence';
 

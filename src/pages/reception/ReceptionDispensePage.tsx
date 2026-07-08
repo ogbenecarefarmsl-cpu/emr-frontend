@@ -121,15 +121,18 @@ export default function ReceptionDispensePage() {
     setPrescriptions(rxBundle);
     const initialLines: DispenseLine[] = rxBundle.flatMap((prescription) =>
       (prescription.items || []).map((item: any, idx: number) => {
-        const medId = typeof item.medicationId === 'object' ? item.medicationId._id : item.medicationId;
+        const medId = typeof item.medicationId === 'object'
+          ? (item.medicationId?._id || item.medicationId?.id)
+          : item.medicationId;
+        const lineMedicationId = medId || item.medicationName || `${prescription._id}-${idx}`;
         const instruction = item.instructions || item.dosage || '';
         const fallbackUnitPrice = getManualUnitPriceFallback(prescription, item);
         return {
-          lineId: `${prescription._id}-${medId}-${idx}`,
+          lineId: `${prescription._id}-${lineMedicationId}-${idx}`,
           prescriptionId: prescription._id,
           prescriptionNumber: prescription.prescriptionNumber,
-          medicationId: medId,
-          originalMedicationId: medId,
+          medicationId: lineMedicationId,
+          originalMedicationId: lineMedicationId,
           medicationName: item.medicationName,
           prescribedBaseUnits: item.quantity,
           sellUnits: item.quantity,
@@ -153,6 +156,7 @@ export default function ReceptionDispensePage() {
 
   // Hydrate a single line with medication details (stock, packs, price)
   const hydrateLine = async (line: DispenseLine) => {
+    if (!line.medicationId || line.medicationId === 'undefined') return;
     try {
       const med = await medicationService.findById(line.medicationId);
       updateLineInState(recommendDispenseLine({ ...line, medication: med }));
