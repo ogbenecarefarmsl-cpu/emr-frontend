@@ -212,6 +212,46 @@ const getResultRiskTone = (flag?: string) => {
   return 'border-emerald-200 bg-emerald-50 text-emerald-700';
 };
 
+const chartOrderResults = (chart: any): LabResult[] => {
+  const orders = Array.isArray(chart?.orders) ? chart.orders : [];
+
+  return orders.flatMap((order: any) => {
+    const orderId = order._id || order.id || order.orderNumber || 'order';
+    const fromPanels = Object.entries(order.panels || {}).flatMap(([panelCode, panel]: [string, any]) =>
+      (panel?.tests || []).filter((test: any) => test?.result).map((test: any, index: number) => ({
+        _id: test.result._id || `${orderId}-${test.testCode || panelCode}-${index}`,
+        testCode: test.testCode || panelCode || '',
+        testName: test.testName || panel?.name || test.testCode || 'Lab result',
+        value: String(test.result.value ?? ''),
+        unit: test.result.unit,
+        referenceRange: test.result.referenceRange || test.result.reference_range,
+        reference_range: test.result.reference_range || test.result.referenceRange,
+        flag: test.result.flag,
+        status: test.result.status || order.status || 'completed',
+        resulted_at: test.result.resultedAt || test.result.resulted_at || test.result.createdAt || order.updatedAt || order.createdAt,
+        createdAt: test.result.createdAt || order.createdAt || new Date().toISOString(),
+      } as LabResult))
+    );
+
+    const orderTests = order.orderTests || order.order_tests || order.tests || [];
+    const fromTests = orderTests.filter((test: any) => test?.result).map((test: any, index: number) => ({
+      _id: test.result._id || `${orderId}-${test.testCode || test.code || index}`,
+      testCode: test.testCode || test.code || '',
+      testName: test.testName || test.name || test.testCode || 'Lab result',
+      value: String(test.result.value ?? ''),
+      unit: test.result.unit,
+      referenceRange: test.result.referenceRange || test.result.reference_range,
+      reference_range: test.result.reference_range || test.result.referenceRange,
+      flag: test.result.flag,
+      status: test.result.status || order.status || 'completed',
+      resulted_at: test.result.resultedAt || test.result.resulted_at || test.result.createdAt || order.updatedAt || order.createdAt,
+      createdAt: test.result.createdAt || order.createdAt || new Date().toISOString(),
+    } as LabResult));
+
+    return [...fromPanels, ...fromTests];
+  });
+};
+
 export default function DoctorDashboard() {
   const { profile, signOut } = useAuth();
   const navigate = useNavigate();
@@ -418,9 +458,11 @@ export default function DoctorDashboard() {
     currentVisitLabOrder?.id ||
     selectedVisit?.consultationOrderId;
   const { data: labResults = [] } = useResults(labOrderId);
-  const abnormalLabResults = labResults.filter((result: LabResult) => result.flag && result.flag !== 'normal');
-  const criticalLabResults = labResults.filter((result: LabResult) => result.flag === 'critical_high' || result.flag === 'critical_low');
-  const latestResultAt = labResults.reduce<string | undefined>((latest, result: LabResult) => {
+  const chartReviewLabResults = useMemo(() => chartOrderResults(patientChart), [patientChart]);
+  const displayedLabResults = selectedVisit ? labResults : chartReviewLabResults;
+  const abnormalLabResults = displayedLabResults.filter((result: LabResult) => result.flag && result.flag !== 'normal');
+  const criticalLabResults = displayedLabResults.filter((result: LabResult) => result.flag === 'critical_high' || result.flag === 'critical_low');
+  const latestResultAt = displayedLabResults.reduce<string | undefined>((latest, result: LabResult) => {
     const candidate = result.resulted_at || result.createdAt;
     if (!candidate) return latest;
     if (!latest) return candidate;
@@ -430,7 +472,7 @@ export default function DoctorDashboard() {
   // m8: Sorted lab results
   const sortedLabResults = useMemo(() => {
     const flagOrder = { critical_high: 0, critical_low: 1, high: 2, low: 3, normal: 4 };
-    const sorted = [...labResults];
+    const sorted = [...displayedLabResults];
     if (!labSortField) {
       // Default: flagged first, then by test name
       sorted.sort((a, b) => {
@@ -453,7 +495,7 @@ export default function DoctorDashboard() {
       });
     }
     return sorted;
-  }, [labResults, labSortField, labSortDir]);
+  }, [displayedLabResults, labSortField, labSortDir]);
 
   const toggleLabSort = (field: 'testName' | 'value' | 'flag') => {
     if (labSortField === field) {
@@ -990,6 +1032,7 @@ export default function DoctorDashboard() {
   const isReadOnly = !canContinueClinicalWork;
   const canWriteConsultation = canContinueClinicalWork && selectedVisit?.consultationPaid === true;
   const consultationPaymentBlocksWriting = canContinueClinicalWork && selectedVisit?.consultationPaid === false;
+  const isChartReviewMode = !selectedVisit && !!searchedPatient;
   const canCloseEncounter = !!selectedVisit && !['awaiting_lab', 'awaiting_results', 'awaiting_pharmacy', 'awaiting_dispensing'].includes(selectedVisit.status);
   const closureBlockers = useMemo(() => {
     if (!selectedVisit) return [];
@@ -1184,12 +1227,12 @@ export default function DoctorDashboard() {
         acceptPending={acceptPatient.isPending}
       />
 
-      <div className="flex flex-1 pt-14 h-full">
+      <div className="flex flex-1 min-h-0 pt-14 h-full">
         {/* Main Workspace */}
-        <main className="flex-1 h-[calc(100vh-56px)] flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto flex flex-col lg:flex-row gap-4 bg-slate-100/80 p-3 md:p-4">
+        <main className="flex-1 h-[calc(100vh-56px)] min-h-0 flex flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col lg:flex-row gap-4 bg-slate-100/80 p-3 md:p-4">
             {/* Left Editor Area */}
-            <div className="flex-1 flex flex-col gap-4 min-w-0">
+            <div className="flex-1 flex flex-col gap-4 min-w-0 min-h-0">
               {selectedVisit || searchedPatient ? (
                 <>
                   {/* Calm Patient Header */}
@@ -1218,7 +1261,7 @@ export default function DoctorDashboard() {
                             ) : (
                               <span className="text-[10px] text-muted-foreground">NKDA</span>
                             )}
-                            {isReadOnly && <Badge className="h-5 bg-amber-500 text-[10px] text-white hover:bg-amber-500">View-only</Badge>}
+                            {selectedVisit && isReadOnly && <Badge className="h-5 bg-amber-500 text-[10px] text-white hover:bg-amber-500">View-only</Badge>}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                             <span className="font-mono">{contextPatient?.patientId || 'PID N/A'}</span>
@@ -1275,19 +1318,48 @@ export default function DoctorDashboard() {
 
                   <div className="grid overflow-visible rounded-xl border border-border bg-white shadow-sm xl:grid-cols-[minmax(0,1fr)_320px]">
                     <section className="min-w-0 border-r border-border/80">
-                      <Tabs value={activeTab} onValueChange={(val) => guardNavigation(() => setActiveTab(val), 'tab', val)} className="flex flex-col">
+                      <Tabs value={activeTab} onValueChange={(val) => guardNavigation(() => setActiveTab(val), 'tab', val)} className="flex min-h-0 flex-col">
                         <div className="border-b border-border px-4 md:px-5">
                           <TabsList className="h-11 bg-transparent p-0">
                             <TabsTrigger value="soap" className="rounded-none border-b-2 border-transparent px-0 mr-6 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Consult</TabsTrigger>
                             <TabsTrigger value="lab-results" className="rounded-none border-b-2 border-transparent px-0 mr-6 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">
                               Results
-                              {labResults.length > 0 && <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{labResults.length}</span>}
+                              {displayedLabResults.length > 0 && <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-[10px]">{displayedLabResults.length}</span>}
                             </TabsTrigger>
                             <TabsTrigger value="timeline" className="rounded-none border-b-2 border-transparent px-0 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">Timeline</TabsTrigger>
                           </TabsList>
                         </div>
 
                         <TabsContent value="soap" className="m-0 flex-1 overflow-y-auto p-4 md:p-5">
+                          {isChartReviewMode ? (
+                            <div className="mx-auto max-w-3xl space-y-4 rounded-xl border border-amber-200 bg-amber-50/50 p-5 text-sm text-amber-900">
+                              <div className="flex items-start gap-3">
+                                <div className="mt-0.5 rounded-full bg-amber-100 p-2 text-amber-700">
+                                  <FileText className="h-5 w-5" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="text-base font-semibold text-amber-950">Chart review mode</h3>
+                                  <p className="mt-1 text-sm">
+                                    SOAP notes require an active visit. You can still review this patient's timeline, review lab history, order labs, or prescribe from this chart.
+                                  </p>
+                                  <div className="mt-4 flex flex-wrap gap-2">
+                                    <Button type="button" size="sm" variant="outline" className="bg-white" onClick={() => setActiveTab('timeline')}>
+                                      <Clock className="mr-1.5 h-3.5 w-3.5" /> Timeline
+                                    </Button>
+                                    <Button type="button" size="sm" variant="outline" className="bg-white" onClick={() => setActiveTab('lab-results')}>
+                                      <FlaskConical className="mr-1.5 h-3.5 w-3.5" /> Results
+                                    </Button>
+                                    <Button type="button" size="sm" className="bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}>
+                                      <Plus className="mr-1.5 h-3.5 w-3.5" /> Order Lab
+                                    </Button>
+                                    <Button type="button" size="sm" className="bg-slate-900 text-white hover:bg-slate-800" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setShorthandInputs({}); setShorthandErrors({}); setPrescriptionModalOpen(true); }}>
+                                      <Pill className="mr-1.5 h-3.5 w-3.5" /> Prescribe
+                                    </Button>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
                           <div className="mx-auto max-w-5xl space-y-5">
                             <div className="grid gap-2 rounded-lg border border-border bg-white p-3 sm:grid-cols-3 lg:grid-cols-6">
                               {[
@@ -1387,10 +1459,11 @@ export default function DoctorDashboard() {
                               </div>
                             </div>
                           </div>
+                          )}
                         </TabsContent>
 
                         <TabsContent value="lab-results" className="m-0 flex-1 overflow-y-auto bg-slate-50/60 p-3 md:p-5">
-                          {selectedVisit ? (
+                          {patientId ? (
                             <div className="mx-auto max-w-6xl space-y-4">
                               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -1405,11 +1478,23 @@ export default function DoctorDashboard() {
                                       )}
                                     </div>
                                     <p className="mt-1 text-xs text-muted-foreground">
-                                      Current visit LIS results for {patientDisplayName(selectedVisit)}. Last result: {formatClinicalDateTime(latestResultAt)}.
+                                      {selectedVisit
+                                        ? `Current visit LIS results for ${patientDisplayName(selectedVisit)}.`
+                                        : `Patient lab history for ${[contextPatient?.firstName, contextPatient?.lastName].filter(Boolean).join(' ').trim() || 'this patient'}.`}
+                                      {' '}Last result: {formatClinicalDateTime(latestResultAt)}.
                                     </p>
                                   </div>
                                   <div className="flex flex-wrap items-center gap-2">
-                                    <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={() => queryClient.invalidateQueries({ queryKey: ['results', labOrderId] })}>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 text-xs"
+                                      onClick={() => {
+                                        if (selectedVisit) queryClient.invalidateQueries({ queryKey: ['results', labOrderId] });
+                                        else queryClient.invalidateQueries({ queryKey: ['patient-chart', patientId] });
+                                      }}
+                                    >
                                       <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
                                     </Button>
                                     <Button type="button" size="sm" variant="outline" className="h-8 text-xs" disabled={sortedLabResults.length === 0}>
@@ -1467,7 +1552,7 @@ export default function DoctorDashboard() {
 
                               {sortedLabResults.length === 0 ? (
                                 <div className="rounded-xl border border-dashed border-slate-300 bg-white py-14 text-center text-sm text-muted-foreground">
-                                  No released lab results yet for this visit.
+                                  {selectedVisit ? 'No released lab results yet for this visit.' : 'No released lab results found in this patient chart.'}
                                 </div>
                               ) : (
                                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -1548,18 +1633,22 @@ export default function DoctorDashboard() {
                       <div className="space-y-5">
                         <div className="rounded-lg border border-teal-100 bg-white p-3 shadow-sm">
                           <div className="mb-2 flex items-center justify-between">
-                            <h3 className="text-sm font-semibold">Encounter</h3>
+                            <h3 className="text-sm font-semibold">{selectedVisit ? 'Encounter' : 'Chart Review'}</h3>
                             {selectedVisit && <span className="text-[10px] capitalize text-muted-foreground">{statusLabel(selectedVisit.status)}</span>}
                           </div>
                           <div className="mb-3 text-xs text-muted-foreground">
-                            <p className="font-medium text-foreground">Next step</p>
-                            <p>Finalize this encounter and move to the next patient.</p>
+                            <p className="font-medium text-foreground">{selectedVisit ? 'Next step' : 'Patient-only actions'}</p>
+                            <p>{selectedVisit ? 'Finalize this encounter and move to the next patient.' : 'Review history, order labs, or prescribe. Select an active visit to write SOAP notes.'}</p>
                           </div>
-                          <Button className="w-full justify-center bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
-                            {completeVisit.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-                            Complete & Next
-                          </Button>
-                          {closureBlockers.length > 0 && <p className="mt-2 text-xs text-amber-700">{closureBlockers[0]}</p>}
+                          {selectedVisit && (
+                            <>
+                              <Button className="w-full justify-center bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
+                                {completeVisit.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                                Complete & Next
+                              </Button>
+                              {closureBlockers.length > 0 && <p className="mt-2 text-xs text-amber-700">{closureBlockers[0]}</p>}
+                            </>
+                          )}
                         </div>
 
                         <div className="grid grid-cols-4 gap-2 border-t border-border pt-4">
@@ -1637,6 +1726,7 @@ export default function DoctorDashboard() {
                           </div>
                         </div>
 
+                        {selectedVisit && (
                         <div className="border-t border-border pt-4">
                           <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Closure checklist</h4>
                           <div className="space-y-1.5 text-xs">
@@ -1653,10 +1743,12 @@ export default function DoctorDashboard() {
                             ))}
                           </div>
                         </div>
+                        )}
                       </div>
                     </aside>
                   </div>
 
+                  {selectedVisit && (
                   <div className="sticky bottom-0 z-10 border-t bg-white/95 px-4 md:px-5 py-3 backdrop-blur supports-[backdrop-filter]:bg-white/85">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div className="text-xs text-muted-foreground">
@@ -1675,6 +1767,7 @@ export default function DoctorDashboard() {
                       </div>
                     </div>
                   </div>
+                  )}
                 </>
               ) : (
                 <div className="flex-1 flex flex-col gap-6">
