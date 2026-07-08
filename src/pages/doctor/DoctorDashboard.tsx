@@ -793,7 +793,7 @@ export default function DoctorDashboard() {
 
   const buildPrescriptionItem = (med: MedicationLike, pharmacistNote = '') => {
     const regimen = buildSmartRegimen(med);
-    const instructions = buildSmartInstruction(regimen);
+    const instructions = '';
     const computedQuantity = computeMedicationQuantity(regimen, med);
     return {
       medicationId: med._id,
@@ -883,6 +883,9 @@ export default function DoctorDashboard() {
     }
     setPrescriptionItems(updated);
   };
+
+  const hasPrescriptionInstruction = (item: any) =>
+    typeof item.instructions === 'string' && item.instructions.trim().length > 0;
 
   const removePrescriptionItem = (index: number) => {
     setPrescriptionItems(prescriptionItems.filter((_, i) => i !== index));
@@ -2054,10 +2057,10 @@ export default function DoctorDashboard() {
               <div className="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
                 <div className="flex items-center justify-between border-b px-4 py-3">
                   <div>
-                    <Label className="text-sm font-semibold text-slate-950">Regimen</Label>
-                    <p className="text-[11px] text-muted-foreground">Type shorthand like <span className="font-mono font-medium text-slate-700">BD 5/7</span>, <span className="font-mono font-medium text-slate-700">TDS 3/52</span>, or <span className="font-mono font-medium text-slate-700">500mg OD 6/12</span></p>
+                    <Label className="text-sm font-semibold text-slate-950">Prescription instructions</Label>
+                    <p className="text-[11px] text-muted-foreground">Select a drug, then write exactly how the patient should take it.</p>
                   </div>
-                  <Badge variant="outline" className="bg-slate-50 text-[10px]">Est. pricing</Badge>
+                  <Badge variant="outline" className="bg-slate-50 text-[10px]">Reception prices</Badge>
                 </div>
                 <ScrollArea className="min-h-0 flex-1">
                   {prescriptionItems.length === 0 ? (
@@ -2067,16 +2070,8 @@ export default function DoctorDashboard() {
                   ) : (
                     <div className="space-y-2 p-3">
                       {prescriptionItems.map((item, index) => {
-                        const computedQty = computeMedicationQuantity(item, { baseUnit: item.baseUnit });
-                        const dispenseQty = Number(item.quantity || computedQty || 1);
-                        const estimate = getPrescriptionEstimate({ ...item, quantity: dispenseQty });
-                        const unitLabel = item.baseUnit || 'unit';
                         const duplicateCount = prescriptionItems.filter((c) => c.medicationId === item.medicationId).length;
                         const isDuplicate = duplicateCount > 1;
-                        const quantityDiffers = dispenseQty !== computedQty;
-                        const validationErrors = validateMedicationRegimen({ ...item, quantity: dispenseQty });
-                        const shorthandVal = shorthandInputs[index] ?? '';
-                        const shorthandErr = shorthandErrors[index];
                         return (
                           <div key={index} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                             {/* Header: drug name + badges + remove */}
@@ -2096,47 +2091,9 @@ export default function DoctorDashboard() {
                               </Button>
                             </div>
 
-                            {/* Shorthand input */}
-                            <div className="mt-2">
-                              <div className="relative">
-                                <Input
-                                  placeholder="e.g. BD 5/7, TDS 14d, 500mg OD 3/52, 2tabs QID 5/7 IV"
-                                  value={shorthandVal}
-                                  onChange={(e) => handleShorthandChange(index, e.target.value)}
-                                  className={cn('h-9 pr-16 text-sm font-mono', shorthandErr && 'border-red-300 bg-red-50')}
-                                />
-                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground pointer-events-none font-sans">shorthand</span>
-                              </div>
-                              {shorthandErr && (
-                                <p className="mt-1 text-[10px] text-red-600">{shorthandErr}</p>
-                              )}
-                            </div>
-
-                            {/* Parsed interpretation line */}
-                            {!shorthandErr && shorthandVal.trim() && (
-                              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                                <span className="font-medium text-slate-700">{frequencyText(item.dosesPerDay || 1)}</span>
-                                <span className="text-slate-300">|</span>
-                                <span>{item.strengthPerDose}</span>
-                                <span className="text-slate-300">|</span>
-                                <span>{item.durationDays}d</span>
-                                <span className="text-slate-300">|</span>
-                                <span>{statusLabel(item.route)}</span>
-                                <span className="text-slate-300">|</span>
-                                <span className="font-medium text-slate-800">{dispenseQty} {unitLabel}</span>
-                                {estimate.lineTotal > 0 && (
-                                  <>
-                                    <span className="text-slate-300">|</span>
-                                    <span className="font-semibold text-teal-700">Le {estimate.lineTotal.toLocaleString()}</span>
-                                  </>
-                                )}
-                              </div>
-                            )}
-
-                            {/* Compact edit row: route + qty */}
-                            <div className="mt-2 grid grid-cols-[auto_100px_100px_minmax(0,1fr)] gap-2 items-center">
+                            <div className="mt-3 grid gap-2 md:grid-cols-[120px_minmax(0,1fr)]">
                               <Select value={item.route || 'oral'} onValueChange={(v) => updatePrescriptionItem(index, 'route', v)}>
-                                <SelectTrigger className="h-7 w-[90px] text-[10px]"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="oral">Oral</SelectItem>
                                   <SelectItem value="intravenous">IV</SelectItem>
@@ -2149,26 +2106,12 @@ export default function DoctorDashboard() {
                                   <SelectItem value="inhalation">Inhale</SelectItem>
                                 </SelectContent>
                               </Select>
-                              <div>
-                                <Label className="text-[9px] uppercase text-muted-foreground">Qty</Label>
-                                <Input type="number" min={1} value={dispenseQty} onChange={(e) => updatePrescriptionItem(index, 'quantity', Number(e.target.value) || 0)} className={cn('h-7 text-[11px] font-semibold', quantityDiffers && 'border-amber-300 bg-amber-50')} />
-                              </div>
-                              <div>
-                                <Label className="text-[9px] uppercase text-muted-foreground">Doses/day</Label>
-                                <Input type="number" min={1} max={24} value={item.dosesPerDay} onChange={(e) => updatePrescriptionItem(index, 'dosesPerDay', parseInt(e.target.value) || 1)} className="h-7 text-[11px]" />
-                              </div>
-                              <div>
-                                <Label className="text-[9px] uppercase text-muted-foreground">Days</Label>
-                                <Input type="number" min={1} max={365} value={item.durationDays} onChange={(e) => updatePrescriptionItem(index, 'durationDays', parseInt(e.target.value) || 1)} className="h-7 text-[11px]" />
-                              </div>
-                            </div>
-
-                            {/* Instructions */}
-                            <div className="mt-2 grid gap-1.5 lg:grid-cols-[minmax(0,1fr)_auto]">
-                              <Input placeholder="Patient instructions (auto-generated)" value={item.instructions} onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)} className="h-7 text-[11px]" />
-                              <Button type="button" variant="ghost" size="sm" className="h-7 text-[10px] text-muted-foreground" onClick={() => updatePrescriptionItem(index, 'instructions', item.smartInstruction || buildSmartInstruction(item))}>
-                                Regenerate
-                              </Button>
+                              <Textarea
+                                placeholder="Write instruction, including strength if needed. Example: 500mg BD for 5 days after food"
+                                value={item.instructions || ''}
+                                onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)}
+                                className="min-h-[72px] resize-none text-sm"
+                              />
                             </div>
 
                             {/* Pharmacist note (collapsible) */}
@@ -2177,10 +2120,9 @@ export default function DoctorDashboard() {
                               <Input placeholder="Internal note for pharmacist" value={item.pharmacistNote || ''} onChange={(e) => updatePrescriptionItem(index, 'pharmacistNote', e.target.value)} className="mt-1 h-7 text-[11px]" />
                             </details>
 
-                            {/* Validation errors */}
-                            {validationErrors.length > 0 && (
+                            {!hasPrescriptionInstruction(item) && (
                               <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] text-red-700">
-                                {validationErrors.join(' ')}
+                                Instruction is required before sending to reception.
                               </div>
                             )}
                           </div>
@@ -2209,7 +2151,7 @@ export default function DoctorDashboard() {
           </div>
           <DialogFooter className="border-t bg-white px-4 py-3 sm:px-5">
             <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
-            <Button className="bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()} disabled={(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) || prescriptionItems.length === 0 || prescriptionItems.some(i => validateMedicationRegimen(i).length > 0)}>
+            <Button className="bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()} disabled={(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) || prescriptionItems.length === 0 || prescriptionItems.some(i => !hasPrescriptionInstruction(i))}>
               {(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
               {editingPrescription ? 'Update Prescription' : 'Create Prescription'}
             </Button>
