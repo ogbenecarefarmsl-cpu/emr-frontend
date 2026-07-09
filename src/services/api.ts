@@ -1455,4 +1455,51 @@ export const roomsAPI = {
   },
 };
 
+export const insuranceAPI = {
+  // Programs
+  getPrograms: async () => {
+    const response = await api.get('/insurance/programs');
+    return response.data;
+  },
+  getLookup: async () => {
+    const response = await api.get('/insurance/programs/lookup');
+    return response.data;
+  },
+  getProgram: async (id: string) => {
+    const response = await api.get(`/insurance/programs/${id}`);
+    return response.data;
+  },
+  createProgram: async (data: any) => {
+    const response = await api.post('/insurance/programs', data);
+    return response.data;
+  },
+  updateProgram: async (id: string, data: any) => {
+    const response = await api.patch(`/insurance/programs/${id}`, data);
+    return response.data;
+  },
+  deleteProgram: async (id: string) => {
+    await api.delete(`/insurance/programs/${id}`);
+  },
+  // Sub-entities
+  getSubEntities: async (programId: string) => {
+    const response = await api.get(`/insurance/programs/${programId}/subs`);
+    return response.data;
+  },
+  getSubEntity: async (id: string) => {
+    const response = await api.get(`/insurance/subs/${id}`);
+    return response.data;
+  },
+  createSubEntity: async (programId: string, data: any) => {
+    const response = await api.post(`/insurance/programs/${programId}/subs`, data);
+    return response.data;
+  },
+  updateSubEntity: async (id: string, data: any) => {
+    const response = await api.patch(`/insurance/subs/${id}`, data);
+    return response.data;
+  },
+  deleteSubEntity: async (id: string) => {
+    await api.delete(`/insurance/subs/${id}`);
+  },
+};
+
 export default api;

@@ -288,6 +288,14 @@ export default function VisitRegistration() {
                       {selectedPatient.phone && (
                         <p className="text-sm text-green-600">{selectedPatient.phone}</p>
                       )}
+                      {selectedPatient.insurance?.programCode && (
+                        <p className="text-sm text-blue-700 mt-1">
+                          Insurance: {selectedPatient.insurance.programCode}
+                          {selectedPatient.insurance.subEntityCode && ` / ${selectedPatient.insurance.subEntityCode}`}
+                          {selectedPatient.insurance.memberNumber && ` • #${selectedPatient.insurance.memberNumber}`}
+                          {selectedPatient.insurance.responsiblePerson && ` • Resp: ${selectedPatient.insurance.responsiblePerson}`}
+                        </p>
+                      )}
                     </div>
                     <Button
                       variant="ghost"

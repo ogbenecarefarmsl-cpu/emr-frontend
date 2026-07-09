@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { useCreatePatient } from '@/hooks/usePatients';
+import { useInsuranceLookup } from '@/hooks/useInsurance';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { UserPlus, ArrowRight, Loader2 } from 'lucide-react';
+import { UserPlus, ArrowRight, Loader2, Shield, ChevronDown, ChevronUp } from 'lucide-react';
 
 type AgeUnit = 'years' | 'months' | 'weeks' | 'days';
 
@@ -46,6 +47,7 @@ export default function RegisterPatient() {
   const { profile } = useAuth();
   const createPatient = useCreatePatient();
   const navigate = useNavigate();
+  const { data: insuranceLookup = [] } = useInsuranceLookup();
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -60,6 +62,17 @@ export default function RegisterPatient() {
     bloodType: '' as string,
     allergies: '',
   });
+
+  const [insuranceForm, setInsuranceForm] = useState({
+    programCode: '',
+    subEntityCode: '',
+    memberNumber: '',
+    memberName: '',
+    responsiblePerson: '',
+    responsiblePhone: '',
+    responsibleAddress: '',
+  });
+  const [showInsurance, setShowInsurance] = useState(false);
 
   const [createdPatient, setCreatedPatient] = useState<{ id?: string; _id?: string; patientId: string } | null>(null);
 
@@ -99,6 +112,15 @@ export default function RegisterPatient() {
         address: formData.address.trim() || undefined,
         bloodType: formData.bloodType || undefined,
         allergies: formData.allergies ? formData.allergies.split(',').map(a => a.trim()).filter(Boolean) : undefined,
+        insurance: insuranceForm.programCode ? {
+          programCode: insuranceForm.programCode || undefined,
+          subEntityCode: insuranceForm.subEntityCode || undefined,
+          memberNumber: insuranceForm.memberNumber || undefined,
+          memberName: insuranceForm.memberName || undefined,
+          responsiblePerson: insuranceForm.responsiblePerson || undefined,
+          responsiblePhone: insuranceForm.responsiblePhone || undefined,
+          responsibleAddress: insuranceForm.responsibleAddress || undefined,
+        } : undefined,
       });
 
       setCreatedPatient(newPatient);
@@ -123,6 +145,16 @@ export default function RegisterPatient() {
       bloodType: '',
       allergies: '',
     });
+    setInsuranceForm({
+      programCode: '',
+      subEntityCode: '',
+      memberNumber: '',
+      memberName: '',
+      responsiblePerson: '',
+      responsiblePhone: '',
+      responsibleAddress: '',
+    });
+    setShowInsurance(false);
     setCreatedPatient(null);
   };
 
@@ -347,6 +379,105 @@ export default function RegisterPatient() {
                 placeholder="e.g. Penicillin, Sulfa drugs, Latex (comma-separated)"
               />
               <p className="text-xs text-muted-foreground">Separate multiple allergies with commas.</p>
+            </div>
+
+            {/* Insurance Section */}
+            <div className="md:col-span-2 space-y-2">
+              <button
+                type="button"
+                onClick={() => setShowInsurance(!showInsurance)}
+                className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+              >
+                <Shield className="w-4 h-4" />
+                Insurance Information (Optional)
+                {showInsurance ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+
+              {showInsurance && (
+                <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Insurance Program</Label>
+                      <Select
+                        value={insuranceForm.programCode}
+                        onValueChange={(val) => setInsuranceForm(prev => ({ ...prev, programCode: val, subEntityCode: '' }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select program" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {insuranceLookup.map((prog) => (
+                            <SelectItem key={prog._id} value={prog.code}>{prog.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Sub-Entity / Employer</Label>
+                      <Select
+                        value={insuranceForm.subEntityCode}
+                        onValueChange={(val) => setInsuranceForm(prev => ({ ...prev, subEntityCode: val }))}
+                        disabled={!insuranceForm.programCode}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={insuranceForm.programCode ? "Select sub-entity" : "Select program first"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {insuranceLookup
+                            .find(p => p.code === insuranceForm.programCode)
+                            ?.subEntities?.map((sub) => (
+                              <SelectItem key={sub._id} value={sub.code}>{sub.name}</SelectItem>
+                            )) || []}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Member Number</Label>
+                      <Input
+                        value={insuranceForm.memberNumber}
+                        onChange={(e) => setInsuranceForm(prev => ({ ...prev, memberNumber: e.target.value }))}
+                        placeholder="Policy/member ID"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Member Name</Label>
+                      <Input
+                        value={insuranceForm.memberName}
+                        onChange={(e) => setInsuranceForm(prev => ({ ...prev, memberName: e.target.value }))}
+                        placeholder="Name on insurance card"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Person Responsible</Label>
+                      <Input
+                        value={insuranceForm.responsiblePerson}
+                        onChange={(e) => setInsuranceForm(prev => ({ ...prev, responsiblePerson: e.target.value }))}
+                        placeholder="Employee / primary insured"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Responsible Phone</Label>
+                      <Input
+                        value={insuranceForm.responsiblePhone}
+                        onChange={(e) => setInsuranceForm(prev => ({ ...prev, responsiblePhone: e.target.value }))}
+                        placeholder="Contact number"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Responsible Address</Label>
+                    <Input
+                      value={insuranceForm.responsibleAddress}
+                      onChange={(e) => setInsuranceForm(prev => ({ ...prev, responsibleAddress: e.target.value }))}
+                      placeholder="Address of responsible person"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

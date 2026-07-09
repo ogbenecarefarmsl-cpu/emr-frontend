@@ -18,7 +18,7 @@ import {
   FlaskConical, BedDouble, TrendingUp, Package, Shield, BarChart3,
   Printer, Settings, ArrowRight, Loader2, Activity, UserCog,
   Calendar, FileText, FileSearch, Clock, Skull, Database, Trash2,
-  HardDriveDownload, Download, Play, RefreshCw, Building2, Tags,
+  HardDriveDownload, Download, Play, RefreshCw, Building2, Tags, FileCheck,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -411,6 +411,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <AdminTool icon={Shield} label="Staff & Roles" to="/admin/users" navigate={navigate} highlight />
           <AdminTool icon={Building2} label="Branches & APIs" to="/admin/branches" navigate={navigate} highlight />
+          <AdminTool icon={FileCheck} label="Insurance" to="/admin/insurance" navigate={navigate} highlight />
           <AdminTool icon={Tags} label="Service Pricing" to="/admin/service-pricing" navigate={navigate} highlight />
           <AdminTool icon={UserCog} label="Doctors" to="/admin/doctors" navigate={navigate} />
           <AdminTool icon={BedDouble} label="Rooms & Beds" to="/admin/rooms" navigate={navigate} />
