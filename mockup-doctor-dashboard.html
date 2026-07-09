@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doctor Dashboard — Post-UX-Correction Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: #f8fafc; color: #1e293b; font-size: 14px; }
+
+  /* ── Layout ── */
+  .shell { display: flex; height: 100vh; }
+  .sidebar { width: 260px; background: #0f172a; color: #e2e8f0; display: flex; flex-direction: column; flex-shrink: 0; }
+  .sidebar-header { padding: 16px 20px; border-bottom: 1px solid #1e293b; }
+  .sidebar-header h2 { font-size: 15px; font-weight: 700; color: #fff; }
+  .sidebar-header p { font-size: 11px; color: #94a3b8; margin-top: 2px; }
+  .sidebar-section { padding: 12px 16px; }
+  .sidebar-section-title { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin-bottom: 8px; }
+  .queue-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+  .queue-item:hover { background: #1e293b; }
+  .queue-item.active { background: #1e40af; }
+  .queue-item .avatar { width: 32px; height: 32px; border-radius: 50%; background: #334155; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: #94a3b8; flex-shrink: 0; }
+  .queue-item.active .avatar { background: #2563eb; color: #fff; }
+  .queue-item .info { flex: 1; min-width: 0; }
+  .queue-item .name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .queue-item .meta { font-size: 11px; color: #94a3b8; }
+  .queue-item .badge { font-size: 10px; padding: 2px 6px; border-radius: 10px; font-weight: 600; flex-shrink: 0; }
+  .badge-red { background: #dc2626; color: #fff; }
+  .badge-amber { background: #d97706; color: #fff; }
+  .badge-blue { background: #2563eb; color: #fff; }
+  .badge-green { background: #16a34a; color: #fff; }
+  .badge-gray { background: #475569; color: #e2e8f0; }
+
+  .sidebar-stats { margin-top: auto; padding: 12px 16px; border-top: 1px solid #1e293b; }
+  .stat-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 12px; }
+  .stat-row .label { color: #94a3b8; }
+  .stat-row .value { font-weight: 600; }
+  .stat-row .value.warn { color: #f59e0b; }
+  .stat-row .value.good { color: #22c55e; }
+
+  .sidebar-shortcuts { padding: 12px 16px; border-top: 1px solid #1e293b; }
+  .shortcut { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #64748b; padding: 3px 0; }
+  .shortcut kbd { background: #1e293b; border: 1px solid #334155; border-radius: 4px; padding: 1px 5px; font-family: inherit; font-size: 10px; color: #94a3b8; }
+
+  /* ── Main Area ── */
+  .main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Patient Context Strip — CLEANED UP */
+  .patient-strip { display: flex; align-items: center; gap: 12px; padding: 12px 24px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+  .patient-strip .avatar-lg { width: 40px; height: 40px; border-radius: 50%; background: #dbeafe; color: #1d4ed8; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 16px; flex-shrink: 0; }
+  .patient-strip .primary-info { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .patient-strip .patient-name { font-size: 16px; font-weight: 700; }
+  .patient-strip .patient-id { font-size: 12px; color: #64748b; }
+  .patient-strip .separator { color: #cbd5e1; }
+  .patient-strip .triage-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .triage-urgent { background: #dc2626; }
+  .triage-normal { background: #22c55e; }
+  .triage-low { background: #94a3b8; }
+  .patient-strip .complaint { font-size: 13px; color: #475569; max-width: 300px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .patient-strip .allergy-badge { display: inline-flex; align-items: center; gap: 4px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 6px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
+
+  /* Secondary info — pushed to right */
+  .patient-strip .secondary-info { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-shrink: 0; }
+  .patient-strip .secondary-item { font-size: 11px; color: #64748b; text-align: right; }
+  .patient-strip .secondary-item .value { font-weight: 600; color: #334155; font-size: 13px; }
+
+  /* ── Tab Bar — FIXED LABELS ── */
+  .tab-bar { display: flex; gap: 0; padding: 0 24px; background: #fff; border-bottom: 1px solid #e2e8f0; }
+  .tab { padding: 12px 20px; font-size: 13px; font-weight: 500; color: #64748b; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; display: flex; align-items: center; gap: 6px; }
+  .tab:hover { color: #334155; }
+  .tab.active { color: #2563eb; border-bottom-color: #2563eb; font-weight: 600; }
+  .tab .count { background: #e2e8f0; color: #475569; font-size: 10px; padding: 1px 6px; border-radius: 10px; font-weight: 600; }
+  .tab.active .count { background: #dbeafe; color: #2563eb; }
+
+  .content { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  /* ── Cards ── */
+  .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .card-title { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .card-title .icon { width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+
+  /* ── SOAP Form ── */
+  .soap-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .soap-field { display: flex; flex-direction: column; gap: 6px; }
+  .soap-label { font-size: 12px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+  .soap-label .letter { width: 20px; height: 20px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; }
+  .letter-s { background: #2563eb; }
+  .letter-o { background: #16a34a; }
+  .letter-a { background: #9333ea; }
+  .letter-p { background: #ea580c; }
+  .soap-textarea { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; font-size: 13px; resize: vertical; min-height: 80px; font-family: inherit; transition: border-color 0.15s; }
+  .soap-textarea:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+
+  /* ── Vitals Grid — WITH VALIDATION ── */
+  .vitals-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .vital-input { display: flex; flex-direction: column; gap: 4px; }
+  .vital-label { font-size: 11px; color: #64748b; font-weight: 500; }
+  .vital-field { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; font-size: 14px; font-weight: 500; width: 100%; transition: border-color 0.15s; }
+  .vital-field:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .vital-field.invalid { border-color: #dc2626; background: #fef2f2; }
+  .vital-hint { font-size: 10px; color: #94a3b8; }
+  .vital-hint.error { color: #dc2626; font-weight: 500; }
+
+  /* ── Lab Results Sortable Table ── */
+  .results-table { width: 100%; border-collapse: collapse; }
+  .results-table th { text-align: left; padding: 8px 12px; font-size: 11px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; border-bottom: 2px solid #e2e8f0; cursor: pointer; user-select: none; }
+  .results-table th:hover { color: #334155; }
+  .results-table th .sort-arrow { margin-left: 4px; opacity: 0.3; }
+  .results-table th.sorted .sort-arrow { opacity: 1; color: #2563eb; }
+  .results-table td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; font-size: 13px; }
+  .results-table tr:hover { background: #f8fafc; }
+  .flag-badge { padding: 2px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; }
+  .flag-normal { background: #f0fdf4; color: #16a34a; }
+  .flag-low { background: #fffbeb; color: #d97706; }
+  .flag-high { background: #fff7ed; color: #ea580c; }
+  .flag-critical { background: #fef2f2; color: #dc2626; }
+
+  /* ── Allergy Override Modal (replaces window.confirm) ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; }
+  .modal { background: #fff; border-radius: 16px; width: 440px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); overflow: hidden; }
+  .modal-header { padding: 20px 24px 16px; display: flex; align-items: flex-start; gap: 12px; }
+  .modal-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+  .modal-icon.warning { background: #fef2f2; color: #dc2626; }
+  .modal-icon.discard { background: #fffbeb; color: #d97706; }
+  .modal-title { font-size: 16px; font-weight: 700; }
+  .modal-desc { font-size: 13px; color: #64748b; margin-top: 4px; line-height: 1.5; }
+  .modal-body { padding: 0 24px 20px; }
+  .allergy-match { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: 12px; margin-top: 12px; }
+  .allergy-match .drug-name { font-weight: 600; color: #991b1b; }
+  .allergy-match .match-reason { font-size: 12px; color: #b91c1c; margin-top: 4px; }
+  .modal-input { width: 100%; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; font-size: 13px; margin-top: 12px; }
+  .modal-input:focus { outline: none; border-color: #2563eb; }
+  .modal-actions { padding: 16px 24px; display: flex; justify-content: flex-end; gap: 8px; background: #f8fafc; border-top: 1px solid #e2e8f0; }
+  .btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid transparent; transition: all 0.15s; }
+  .btn-ghost { background: transparent; color: #64748b; border-color: #e2e8f0; }
+  .btn-ghost:hover { background: #f1f5f9; }
+  .btn-danger { background: #dc2626; color: #fff; }
+  .btn-danger:hover { background: #b91c1c; }
+  .btn-danger:disabled { background: #fecaca; color: #991b1b; cursor: not-allowed; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+
+  /* ── Sticky Action Bar ── */
+  .sticky-bar { display: flex; align-items: center; gap: 8px; padding: 10px 24px; background: #fff; border-top: 1px solid #e2e8f0; }
+  .sticky-bar .spacer { flex: 1; }
+  .sticky-bar .shortcut-hint { font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 4px; }
+  .sticky-bar kbd { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 4px; padding: 1px 5px; font-size: 10px; }
+
+  /* ── Unsaved Changes Banner ── */
+  .unsaved-banner { display: flex; align-items: center; gap: 10px; padding: 8px 24px; background: #fffbeb; border-bottom: 1px solid #fde68a; font-size: 13px; }
+  .unsaved-banner .dot { width: 8px; height: 8px; border-radius: 50%; background: #f59e0b; flex-shrink: 0; }
+  .unsaved-banner .text { color: #92400e; flex: 1; }
+  .unsaved-banner .save-btn { font-size: 12px; font-weight: 600; color: #2563eb; cursor: pointer; background: none; border: none; }
+  .unsaved-banner .discard-btn { font-size: 12px; color: #94a3b8; cursor: pointer; background: none; border: none; text-decoration: underline; }
+
+  .section-title { font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.03em; margin-bottom: 12px; }
+
+  /* ── Annotations ── */
+  .annotation { position: relative; }
+  .annotation::after { content: attr(data-note); position: absolute; top: -8px; right: -8px; background: #2563eb; color: #fff; font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; pointer-events: none; z-index: 10; }
+</style>
+</head>
+<body>
+
+<div class="shell">
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <h2>Dr. Paul Carefam</h2>
+      <p>Harbour Medical - Allen Town</p>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Waiting (2)</div>
+      <div class="queue-item">
+        <div class="avatar">JS</div>
+        <div class="info">
+          <div class="name">Jecinta Chukwuma</div>
+          <div class="meta">38/F - Procedure</div>
+        </div>
+        <span class="badge badge-amber">Normal</span>
+      </div>
+      <div class="queue-item">
+        <div class="avatar">FS</div>
+        <div class="info">
+          <div class="name">Fanta Sheku</div>
+          <div class="meta">24/F - Procedure</div>
+        </div>
+        <span class="badge badge-gray">New</span>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Seeing Now (1)</div>
+      <div class="queue-item active">
+        <div class="avatar">MK</div>
+        <div class="info">
+          <div class="name">Medinatu Kanu</div>
+          <div class="meta">22/F - In Consultation</div>
+        </div>
+        <span class="badge badge-red">Urgent</span>
+      </div>
+    </div>
+
+    <!-- ALL queue categories now visible -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">Pipeline Overview</div>
+      <div class="stat-row"><span class="label">Awaiting Lab Payment</span><span class="value warn">1</span></div>
+      <div class="stat-row"><span class="label">Awaiting Results</span><span class="value warn">3</span></div>
+      <div class="stat-row"><span class="label">Pharmacy Workflow</span><span class="value warn">2</span></div>
+      <div class="stat-row"><span class="label">Results Ready</span><span class="value good">1</span></div>
+    </div>
+
+    <div class="sidebar-stats">
+      <div class="stat-row"><span class="label">Today's Patients</span><span class="value">8</span></div>
+      <div class="stat-row"><span class="label">Completed</span><span class="value good">5</span></div>
+      <div class="stat-row"><span class="label">Wallet Balance</span><span class="value">Le 15,000</span></div>
+    </div>
+
+    <div class="sidebar-shortcuts">
+      <div class="shortcut"><kbd>Ctrl+S</kbd> Save notes</div>
+      <div class="shortcut"><kbd>Ctrl+Enter</kbd> Complete visit</div>
+      <div class="shortcut"><kbd>1-5</kbd> Switch tabs</div>
+    </div>
+  </div>
+
+  <!-- ── Main Content ── -->
+  <div class="main">
+
+    <!-- Patient Context Strip — CLEANED: critical info left, admin info right -->
+    <div class="patient-strip">
+      <div class="avatar-lg">MK</div>
+      <div class="primary-info">
+        <span class="patient-name">Medinatu Kanu</span>
+        <span class="patient-id">PAT-20260606-0004</span>
+        <span class="separator">|</span>
+        <span class="triage-dot triage-urgent" title="Urgent triage priority"></span>
+        <span class="complaint">FBC, ESR, MP, Urinalysis - follow up malaria treatment</span>
+        <span class="allergy-badge">&#9888; Penicillin</span>
+      </div>
+      <div class="secondary-info">
+        <div class="secondary-item"><div class="value">Le 25,000</div>wallet</div>
+        <div class="secondary-item"><div class="value">VIS-20260606-0004</div>visit</div>
+      </div>
+    </div>
+
+    <!-- Unsaved Changes Banner -->
+    <div class="unsaved-banner annotation" data-note="C1 FIX">
+      <span class="dot"></span>
+      <span class="text">You have unsaved SOAP notes</span>
+      <button class="save-btn">Save Draft</button>
+      <button class="discard-btn">Discard</button>
+    </div>
+
+    <!-- Tab Bar — FIXED: matching labels -->
+    <div class="tab-bar annotation" data-note="M2 FIX: labels match now">
+      <div class="tab">Consult</div>
+      <div class="tab active">Orders <span class="count">4</span></div>
+      <div class="tab">Results <span class="count">3</span></div>
+      <div class="tab">Summary</div>
+      <div class="tab">History</div>
+    </div>
+
+    <!-- Content: Lab Results Tab -->
+    <div class="content">
+      <div class="card annotation" data-note="M4 FIX: vitals validation">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="icon" style="background:#dbeafe;color:#2563eb;">+</span>
+            Vitals Entry
+          </div>
+        </div>
+        <div class="vitals-grid">
+          <div class="vital-input">
+            <span class="vital-label">Temperature (C)</span>
+            <input class="vital-field" value="37.2" min="30" max="42" step="0.1">
+            <span class="vital-hint">30-42 C</span>
+          </div>
+          <div class="vital-input">
+            <span class="vital-label">Blood Pressure</span>
+            <input class="vital-field" value="120/80" placeholder="120/80">
+            <span class="vital-hint">systolic/diastolic</span>
+          </div>
+          <div class="vital-input">
+            <span class="vital-label">Heart Rate (bpm)</span>
+            <input class="vital-field invalid" value="999" min="20" max="300">
+            <span class="vital-hint error">Must be 20-300 bpm</span>
+          </div>
+          <div class="vital-input">
+            <span class="vital-label">SpO2 (%)</span>
+            <input class="vital-field" value="98" min="0" max="100">
+            <span class="vital-hint">0-100%</span>
+          </div>
+          <div class="vital-input">
+            <span class="vital-label">Resp Rate (/min)</span>
+            <input class="vital-field" value="18" min="4" max="60">
+            <span class="vital-hint">4-60</span>
+          </div>
+          <div class="vital-input">
+            <span class="vital-label">Weight (kg)</span>
+            <input class="vital-field" value="62" min="0.1" max="500" step="0.1">
+            <span class="vital-hint">0.1-500 kg</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lab Results — SORTABLE -->
+      <div class="card annotation" data-note="m8 FIX: sortable columns">
+        <div class="card-header">
+          <div class="card-title">
+            <span class="icon" style="background:#fef3c7;color:#d97706;">!</span>
+            Lab Results - ORD-20260611-0001
+          </div>
+          <span style="font-size:12px;color:#64748b;">Click column headers to sort</span>
+        </div>
+        <table class="results-table">
+          <thead>
+            <tr>
+              <th class="sorted">Test <span class="sort-arrow">&#9650;</span></th>
+              <th>Code</th>
+              <th>Value</th>
+              <th>Flag <span class="sort-arrow">&#9660;</span></th>
+              <th>Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Monocytes #</strong></td>
+              <td style="color:#64748b;">MONO</td>
+              <td><strong>1.85</strong> <span style="color:#64748b;">x10^3/uL</span></td>
+              <td><span class="flag-badge flag-critical">CRITICAL HIGH</span></td>
+              <td style="color:#64748b;">0.2-1.0</td>
+            </tr>
+            <tr>
+              <td><strong>Lymphocytes #</strong></td>
+              <td style="color:#64748b;">LYMP</td>
+              <td><strong>9.63</strong> <span style="color:#64748b;">x10^3/uL</span></td>
+              <td><span class="flag-badge flag-high">HIGH</span></td>
+              <td style="color:#64748b;">1.0-4.8</td>
+            </tr>
+            <tr>
+              <td><strong>Hemoglobin</strong></td>
+              <td style="color:#64748b;">HGB</td>
+              <td><strong>9.8</strong> <span style="color:#64748b;">g/dL</span></td>
+              <td><span class="flag-badge flag-low">LOW</span></td>
+              <td style="color:#64748b;">12.0-16.0</td>
+            </tr>
+            <tr>
+              <td><strong>Hematocrit</strong></td>
+              <td style="color:#64748b;">HCT</td>
+              <td><strong>31.2</strong> <span style="color:#64748b;">%</span></td>
+              <td><span class="flag-badge flag-low">LOW</span></td>
+              <td style="color:#64748b;">36.0-46.0</td>
+            </tr>
+            <tr>
+              <td><strong>MCV</strong></td>
+              <td style="color:#64748b;">MCV</td>
+              <td><strong>78.2</strong> <span style="color:#64748b;">fL</span></td>
+              <td><span class="flag-badge flag-low">LOW</span></td>
+              <td style="color:#64748b;">80.0-100.0</td>
+            </tr>
+            <tr>
+              <td>Basophils #</td>
+              <td style="color:#64748b;">BASO</td>
+              <td>0.13 <span style="color:#64748b;">x10^3/uL</span></td>
+              <td><span class="flag-badge flag-high">HIGH</span></td>
+              <td style="color:#64748b;">0.0-0.1</td>
+            </tr>
+            <tr>
+              <td>White Blood Cells</td>
+              <td style="color:#64748b;">WBC</td>
+              <td>7.2 <span style="color:#64748b;">x10^3/uL</span></td>
+              <td><span class="flag-badge flag-normal">NORMAL</span></td>
+              <td style="color:#64748b;">4.5-11.0</td>
+            </tr>
+            <tr>
+              <td>Platelets</td>
+              <td style="color:#64748b;">PLT</td>
+              <td>245 <span style="color:#64748b;">x10^3/uL</span></td>
+              <td><span class="flag-badge flag-normal">NORMAL</span></td>
+              <td style="color:#64748b;">150-400</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Clinical Actions</div>
+        </div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;">
+          <button class="btn btn-ghost" style="display:flex;align-items:center;gap:6px;padding:12px 20px;">
+            <span style="color:#2563eb;">&#9878;</span> Order Lab Tests
+          </button>
+          <button class="btn btn-ghost" style="display:flex;align-items:center;gap:6px;padding:12px 20px;">
+            <span style="color:#9333ea;">&#9883;</span> Prescribe Medication
+          </button>
+          <button class="btn btn-ghost" style="display:flex;align-items:center;gap:6px;padding:12px 20px;">
+            <span style="color:#0891b2;">&#8644;</span> Refer Patient
+          </button>
+          <button class="btn btn-ghost" style="display:flex;align-items:center;gap:6px;padding:12px 20px;">
+            <span style="color:#16a34a;">&#9877;</span> Treatment Plan
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sticky Bottom Bar -->
+    <div class="sticky-bar">
+      <span style="font-size:12px;color:#64748b;">Medinatu Kanu - <strong>In Consultation</strong></span>
+      <span class="spacer"></span>
+      <span class="shortcut-hint"><kbd>Ctrl+S</kbd> Save</span>
+      <span class="shortcut-hint"><kbd>Ctrl+Enter</kbd> Close</span>
+      <button class="btn btn-primary" style="margin-left:8px;">Complete Visit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Allergy Override Modal (C2 FIX) ── -->
+<div class="modal-overlay annotation" data-note="C2 FIX: replaces window.confirm" id="allergyModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-icon warning">&#9888;</div>
+      <div>
+        <div class="modal-title">Drug-Allergy Conflict</div>
+        <div class="modal-desc">
+          This medication may cause an adverse reaction in this patient.
+          Review the match below and confirm to proceed.
+        </div>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div class="allergy-match">
+        <div class="drug-name">Amoxicillin 500mg</div>
+        <div class="match-reason">Matches known allergy: <strong>Penicillin</strong> (cross-reactivity with penicillin-class antibiotics)</div>
+      </div>
+      <div style="margin-top:12px;">
+        <label style="font-size:12px;font-weight:600;color:#64748b;">Type PROCEED to override (logged for audit)</label>
+        <input class="modal-input" placeholder="Type PROCEED to confirm">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="document.getElementById('allergyModal').style.display='none'">Cancel</button>
+      <button class="btn btn-danger" disabled>Prescribe Anyway</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Discard Changes Modal (C1 FIX) ── -->
+<div class="modal-overlay annotation" data-note="C1 FIX: unsaved changes guard" id="discardModal" style="display:none;">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-icon discard">&#9888;</div>
+      <div>
+        <div class="modal-title">Unsaved Changes</div>
+        <div class="modal-desc">
+          You have unsaved SOAP notes for <strong>Medinatu Kanu</strong>.
+          Switching patients will discard your current work.
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="document.getElementById('discardModal').style.display='none'">Stay on Patient</button>
+      <button class="btn btn-primary">Save Draft & Switch</button>
+      <button class="btn btn-danger">Discard & Switch</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

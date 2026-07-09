@@ -1262,6 +1262,12 @@ export default function DoctorDashboard() {
                               <span className="text-[10px] text-muted-foreground">NKDA</span>
                             )}
                             {selectedVisit && isReadOnly && <Badge className="h-5 bg-amber-500 text-[10px] text-white hover:bg-amber-500">View-only</Badge>}
+                            {contextPatient?.insurance?.programCode && (
+                              <Badge variant="outline" className="h-5 border-blue-200 bg-blue-50 text-[10px] text-blue-700">
+                                {contextPatient.insurance.programCode}{contextPatient.insurance.subEntityCode ? ` / ${contextPatient.insurance.subEntityCode}` : ''}
+                                {contextPatient.insurance.memberNumber ? ` #${contextPatient.insurance.memberNumber}` : ''}
+                              </Badge>
+                            )}
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                             <span className="font-mono">{contextPatient?.patientId || 'PID N/A'}</span>
@@ -2458,6 +2464,11 @@ export default function DoctorDashboard() {
                             {p.chronicConditions?.length > 0 && (
                               <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-amber-50 text-amber-700 border-amber-200">
                                 {p.chronicConditions.length} chronic
+                              </Badge>
+                            )}
+                            {p.insurance?.programCode && (
+                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-blue-50 text-blue-700 border-blue-200">
+                                {p.insurance.programCode}
                               </Badge>
                             )}
                           </div>

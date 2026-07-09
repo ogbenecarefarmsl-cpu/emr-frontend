@@ -469,6 +469,9 @@ export function DoctorTopBar({
                         >
                           <p className="text-xs font-medium">{name}</p>
                           <p className="text-[10px] text-muted-foreground">{p.patientId || p._id} · {p.age ? `${p.age}y` : ''} {p.gender || ''}</p>
+                          {p.insurance?.programCode && (
+                            <p className="text-[10px] text-blue-600 font-medium">{p.insurance.programCode}{p.insurance.subEntityCode ? ` / ${p.insurance.subEntityCode}` : ''}</p>
+                          )}
                         </button>
                       );
                     })}

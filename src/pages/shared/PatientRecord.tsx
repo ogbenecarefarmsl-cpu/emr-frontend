@@ -13,7 +13,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import {
   Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical,
   Clock, AlertTriangle, ChevronDown, Calendar, Droplets, ExternalLink, RefreshCw,
-  Phone, Hash, TrendingUp, ClipboardList
+  Phone, Hash, TrendingUp, ClipboardList, Shield
 } from 'lucide-react';
 import { PatientTreatmentPlans } from './PatientTreatmentPlans';
 import { toast } from 'sonner';
@@ -225,8 +225,12 @@ const PatientRecord = () => {
                   {patient.chronicConditions?.length > 0 && (
                     <Badge variant="secondary" className="text-[10px]">{patient.chronicConditions.join(', ')}</Badge>
                   )}
-                  {patient.insuranceProvider && (
-                    <Badge variant="outline" className="text-[10px]">{patient.insuranceProvider}</Badge>
+                  {patient.insurance?.programCode && (
+                    <Badge variant="outline" className="text-[10px] gap-1">
+                      <Shield className="w-3 h-3" />
+                      {patient.insurance.programCode}
+                      {patient.insurance.subEntityCode && ` / ${patient.insurance.subEntityCode}`}
+                    </Badge>
                   )}
                 </div>
               </div>
