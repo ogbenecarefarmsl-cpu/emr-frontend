@@ -29,6 +29,7 @@ import {
   PiggyBank,
   Phone,
   AlertTriangle,
+  Shield,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { prescriptionService } from '@/services/prescriptionService';
@@ -145,7 +146,7 @@ export default function ReceptionDashboard() {
       userName={profile?.fullName}
     >
       {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <button
           onClick={() => navigate('/reception/register')}
           className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary hover:border-primary transition-all duration-200"
@@ -181,6 +182,15 @@ export default function ReceptionDashboard() {
             <Users className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
           </div>
           <span className="text-sm font-semibold text-foreground">Search Patients</span>
+        </button>
+        <button
+          onClick={() => navigate('/admin/insurance')}
+          className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border bg-card hover:bg-secondary hover:shadow-md transition-all duration-200"
+        >
+          <div className="w-12 h-12 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+            <Shield className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+          </div>
+          <span className="text-sm font-semibold text-foreground">Insurance</span>
         </button>
       </div>
 
