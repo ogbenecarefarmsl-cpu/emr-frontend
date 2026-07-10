@@ -37,6 +37,8 @@ export function PendingOrders() {
     mutationFn: (orderId: string) => insuranceClaimsAPI.markOrderInsurance(orderId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pendingClinicalOrders'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-income'] });
     },
   });
 

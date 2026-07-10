@@ -346,6 +346,9 @@ export function useMarkOrderPaid() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['visits'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-income'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-history'] });
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to mark order paid');
