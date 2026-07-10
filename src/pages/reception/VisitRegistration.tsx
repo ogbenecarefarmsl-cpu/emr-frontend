@@ -16,7 +16,8 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-import { Loader2, Search, UserPlus, Stethoscope, ArrowLeft, Thermometer, Scissors, UserCog } from 'lucide-react';
+import { Loader2, Search, UserPlus, Stethoscope, ArrowLeft, Thermometer, Scissors, UserCog, ShieldOff, AlertTriangle } from 'lucide-react';
+import { insuranceBlocksAPI } from '@/services/api';
 
 type ServiceId = 'normal_consultation' | 'specialist_consultation' | 'observation_4h' | 'procedure';
 
@@ -97,6 +98,44 @@ export default function VisitRegistration() {
     [servicePriceMap],
   );
   const selectedService = pricedServices.find((service) => service.id === selectedServiceId) || pricedServices[0];
+  const hasInsurance = !!selectedPatient?.insurance?.programCode;
+  const [insuranceBlock, setInsuranceBlock] = useState<any>(null);
+  const [checkingBlock, setCheckingBlock] = useState(false);
+  const [acknowledgedBlock, setAcknowledgedBlock] = useState(false);
+  const isBlocked = !!insuranceBlock;
+
+  // Check for insurance block when patient is selected
+  useEffect(() => {
+    if (!selectedPatient) {
+      setInsuranceBlock(null);
+      setAcknowledgedBlock(false);
+      return;
+    }
+
+    const checkBlock = async () => {
+      setCheckingBlock(true);
+      try {
+        const result = await insuranceBlocksAPI.check({
+          patientId: selectedPatient._id || selectedPatient.id,
+          memberNumber: selectedPatient.insurance?.memberNumber,
+          programCode: selectedPatient.insurance?.programCode,
+        });
+        if (result.blocked) {
+          setInsuranceBlock(result);
+          setAcknowledgedBlock(false);
+        } else {
+          setInsuranceBlock(null);
+          setAcknowledgedBlock(false);
+        }
+      } catch {
+        setInsuranceBlock(null);
+      } finally {
+        setCheckingBlock(false);
+      }
+    };
+
+    checkBlock();
+  }, [selectedPatient]);
 
   const recentPatients = useMemo(() => {
     if (!Array.isArray(allPatients)) return [];
@@ -140,6 +179,12 @@ export default function VisitRegistration() {
       return;
     }
 
+    // Block check: require acknowledgment
+    if (isBlocked && !acknowledgedBlock) {
+      toast.error('Please acknowledge the insurance block before proceeding');
+      return;
+    }
+
     try {
       if (selectedService.flag === 'specialist' && !specialistId) {
         toast.error('Please select a specialist for this consultation');
@@ -154,11 +199,15 @@ export default function VisitRegistration() {
       if (wantsMalariaTest) rapidTestsRequested.push('malaria');
       if (wantsTyphoidTest) rapidTestsRequested.push('typhoid');
 
+      // When blocked, force self-pay (send consultation fee as normal, no insurance)
+      const effectiveFee = isBlocked ? parseFloat(consultationFee) || 0 : parseFloat(consultationFee) || 0;
+
       const visit = await createVisit.mutateAsync({
         patientId: selectedPatient._id || selectedPatient.id,
         visitType: visitType as any,
         consultationFee: parseFloat(consultationFee) || 0,
         chiefComplaint,
+        selfPayOverride: isBlocked || undefined,
         notes: [
           `Service: ${selectedService.label}`,
           procedureType ? `Procedure: ${procedureType}` : undefined,
@@ -174,6 +223,8 @@ export default function VisitRegistration() {
 
       if ((visit as any).consultationFeeWaived) {
         toast.success('Consultation fee waived — patient had a paid visit within 30 days. Sent to nurse vitals.');
+      } else if ((visit as any).consultationCoveredByInsurance) {
+        toast.success('Consultation covered by insurance. Patient sent to nurse vitals.');
       } else {
         await markConsultationPaid.mutateAsync({ visitId: visit._id || visit.id, paymentMethod });
         toast.success('Consultation payment confirmed. Patient sent to nurse vitals.');
@@ -279,9 +330,16 @@ export default function VisitRegistration() {
                 <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-green-800">
-                        {selectedPatient.firstName} {selectedPatient.lastName}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-green-800">
+                          {selectedPatient.firstName} {selectedPatient.lastName}
+                        </p>
+                        {hasInsurance && (
+                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
+                            {selectedPatient.insurance.programCode}
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-sm text-green-600">
                         {selectedPatient.patientId} • {selectedPatient.age}y • {selectedPatient.gender === 'M' ? 'Male' : 'Female'}
                       </p>
@@ -310,6 +368,41 @@ export default function VisitRegistration() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Insurance Block Warning */}
+        {isBlocked && (
+          <Card className="border-red-300 bg-red-50">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <ShieldOff className="h-6 w-6 text-red-600 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-red-800 flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4" />
+                    Insurance Coverage Blocked
+                  </h3>
+                  <p className="text-sm text-red-700 mt-1">
+                    <strong>{insuranceBlock.reasonLabel}</strong>
+                    {insuranceBlock.block?.programCode && ` — ${insuranceBlock.block.programCode}`}
+                    {insuranceBlock.block?.effectiveDate && ` (effective ${new Date(insuranceBlock.block.effectiveDate).toLocaleDateString()})`}
+                  </p>
+                  {insuranceBlock.block?.reasonDetail && (
+                    <p className="text-xs text-red-600 mt-1">{insuranceBlock.block.reasonDetail}</p>
+                  )}
+                  <div className="mt-3 flex items-center gap-2">
+                    <Checkbox
+                      id="ackBlock"
+                      checked={acknowledgedBlock}
+                      onCheckedChange={(c) => setAcknowledgedBlock(!!c)}
+                    />
+                    <label htmlFor="ackBlock" className="text-sm font-medium text-red-800">
+                      I understand — register this patient as <strong>self-pay</strong> (patient pays out of pocket)
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Visit Details */}
         <Card>
@@ -438,34 +531,50 @@ export default function VisitRegistration() {
 
                 <div className="space-y-2">
                   <Label htmlFor="consultationFee">Service Fee (Le)</Label>
-                  <Input
-                    id="consultationFee"
-                    type="number"
-                    value={consultationFee}
-                    readOnly
-                    className="bg-muted"
-                    placeholder="Configured service fee"
-                    min="0"
-                  />
-                  <p className="text-[11px] text-muted-foreground">
-                    Fee is auto-waived if the patient had a paid visit within the last 30 days.
-                  </p>
+                  {hasInsurance && !isBlocked ? (
+                    <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">Insurance</Badge>
+                      <span className="text-sm text-blue-700">Consultation covered — no payment required</span>
+                    </div>
+                  ) : isBlocked ? (
+                    <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
+                      <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">Self-Pay</Badge>
+                      <span className="text-sm text-amber-700">Insurance blocked — patient pays out of pocket</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Input
+                        id="consultationFee"
+                        type="number"
+                        value={consultationFee}
+                        readOnly
+                        className="bg-muted"
+                        placeholder="Configured service fee"
+                        min="0"
+                      />
+                      <p className="text-[11px] text-muted-foreground">
+                        Fee is auto-waived if the patient had a paid visit within the last 30 days.
+                      </p>
+                    </>
+                  )}
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="paymentMethod">Payment Method</Label>
-                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select payment method" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">Cash</SelectItem>
-                      <SelectItem value="orange_money">Orange Money</SelectItem>
-                      <SelectItem value="afrimoney">Afrimoney</SelectItem>
-                      <SelectItem value="wallet">Wallet</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {(!hasInsurance || isBlocked) && (
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentMethod">Payment Method</Label>
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select payment method" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="cash">Cash</SelectItem>
+                        <SelectItem value="orange_money">Orange Money</SelectItem>
+                        <SelectItem value="afrimoney">Afrimoney</SelectItem>
+                        <SelectItem value="wallet">Wallet</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -525,12 +634,22 @@ export default function VisitRegistration() {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!selectedPatient || createVisit.isPending || markConsultationPaid.isPending}
+            disabled={!selectedPatient || createVisit.isPending || markConsultationPaid.isPending || (isBlocked && !acknowledgedBlock)}
           >
             {createVisit.isPending || markConsultationPaid.isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
                 Processing...
+              </>
+            ) : isBlocked ? (
+              <>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Create Visit (Self-Pay Override)
+              </>
+            ) : hasInsurance ? (
+              <>
+                <UserPlus className="h-4 w-4 mr-2" />
+                Create Visit (Insurance)
               </>
             ) : (
               <>

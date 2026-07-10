@@ -60,7 +60,7 @@ export function LabResultReport({ orderId, onPrintComplete }: LabResultReportPro
 
   // Use admin-configured paper size and orientation
   const pageSize = `${printerSettings.a4.paperSize} ${printerSettings.a4.orientation}`;
-  const reportWatermarkSrc = import.meta.env.VITE_REPORT_HEADER_LOGO || '/harbour-emr-logo.svg';
+  const reportWatermarkSrc = reportData?.laboratoryInfo.logo || import.meta.env.VITE_REPORT_HEADER_LOGO || '/harbour-emr-logo.svg';
 
   // Use smart pagination to split results across pages intelligently
   // Heights calibrated to print layout (mm) - COMPACT VERSION

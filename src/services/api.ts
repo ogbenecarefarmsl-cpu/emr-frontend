@@ -1502,4 +1502,84 @@ export const insuranceAPI = {
   },
 };
 
+export const insuranceClaimsAPI = {
+  list: async (params?: { status?: string; programCode?: string; branchId?: string; patientId?: string }) => {
+    const response = await api.get('/insurance-claims', { params });
+    return response.data;
+  },
+  getById: async (id: string) => {
+    const response = await api.get(`/insurance-claims/${id}`);
+    return response.data;
+  },
+  getByVisit: async (visitId: string) => {
+    const response = await api.get(`/insurance-claims/visit/${visitId}`);
+    return response.data;
+  },
+  getByPatient: async (patientId: string) => {
+    const response = await api.get(`/insurance-claims/patient/${patientId}`);
+    return response.data;
+  },
+  getStats: async (branchId?: string) => {
+    const response = await api.get('/insurance-claims/stats', { params: { branchId } });
+    return response.data;
+  },
+  create: async (data: any) => {
+    const response = await api.post('/insurance-claims', data);
+    return response.data;
+  },
+  addItem: async (claimId: string, item: any) => {
+    const response = await api.post(`/insurance-claims/${claimId}/items`, item);
+    return response.data;
+  },
+  removeItem: async (claimId: string, itemIndex: number) => {
+    await api.delete(`/insurance-claims/${claimId}/items/${itemIndex}`);
+  },
+  updateItemCoverage: async (claimId: string, itemIndex: number, coveredByInsurance: boolean) => {
+    const response = await api.patch(`/insurance-claims/${claimId}/items/${itemIndex}/coverage`, { coveredByInsurance });
+    return response.data;
+  },
+  updateStatus: async (claimId: string, data: { status: string; approvedAmount?: number; paidAmount?: number; rejectionReason?: string; notes?: string }) => {
+    const response = await api.patch(`/insurance-claims/${claimId}/status`, data);
+    return response.data;
+  },
+  markOrderInsurance: async (orderId: string) => {
+    const response = await api.post('/insurance-claims/mark-order-insurance', { orderId });
+    return response.data;
+  },
+};
+
+export const insuranceBlocksAPI = {
+  list: async (params?: { programCode?: string; isActive?: string; search?: string }) => {
+    const response = await api.get('/insurance-blocks', { params });
+    return response.data;
+  },
+  getById: async (id: string) => {
+    const response = await api.get(`/insurance-blocks/${id}`);
+    return response.data;
+  },
+  check: async (params: { patientId?: string; memberNumber?: string; programCode?: string }) => {
+    const response = await api.get('/insurance-blocks/check', { params });
+    return response.data;
+  },
+  create: async (data: any) => {
+    const response = await api.post('/insurance-blocks', data);
+    return response.data;
+  },
+  deactivate: async (id: string) => {
+    const response = await api.patch(`/insurance-blocks/${id}/deactivate`);
+    return response.data;
+  },
+  reactivate: async (id: string) => {
+    const response = await api.patch(`/insurance-blocks/${id}/reactivate`);
+    return response.data;
+  },
+  remove: async (id: string) => {
+    await api.delete(`/insurance-blocks/${id}`);
+  },
+  getStats: async () => {
+    const response = await api.get('/insurance-blocks/stats');
+    return response.data;
+  },
+};
+
 export default api;

@@ -30,6 +30,7 @@ import {
   Phone,
   AlertTriangle,
   Shield,
+  ShieldOff,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { prescriptionService } from '@/services/prescriptionService';
@@ -191,6 +192,15 @@ export default function ReceptionDashboard() {
             <Shield className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
           </div>
           <span className="text-sm font-semibold text-foreground">Insurance</span>
+        </button>
+        <button
+          onClick={() => navigate('/admin/insurance-blocks')}
+          className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border bg-card hover:bg-secondary hover:shadow-md transition-all duration-200"
+        >
+          <div className="w-12 h-12 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
+            <ShieldOff className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+          </div>
+          <span className="text-sm font-semibold text-foreground">Block List</span>
         </button>
       </div>
 

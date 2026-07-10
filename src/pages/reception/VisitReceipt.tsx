@@ -249,7 +249,7 @@ export default function VisitReceipt() {
             <>
               {/* Header (branch letterhead) */}
               <div className="header">
-                <BranchLetterhead compact />
+                <BranchLetterhead compact branch={receiptData.branch} />
               </div>
 
               {/* Title */}
@@ -319,7 +319,7 @@ export default function VisitReceipt() {
 
               {/* Footer */}
               <div className="footer">
-                <BranchFooterText />
+                <BranchFooterText branch={receiptData.branch} />
                 <div style={{ marginTop: '10px', fontSize: '9px' }}>
                   Computer-generated receipt
                 </div>

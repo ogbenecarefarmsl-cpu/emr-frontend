@@ -285,7 +285,7 @@ export default function InsuranceManagementPage() {
                   <Input
                     value={programForm.code}
                     onChange={(e) => setProgramForm({ ...programForm, code: e.target.value.toUpperCase() })}
-                    placeholder="e.g. AIC"
+                    placeholder="e.g. AIC, RHIP, ACTIVA"
                     disabled={!!editingProgram}
                   />
                 </div>

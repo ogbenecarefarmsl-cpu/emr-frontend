@@ -29,9 +29,11 @@ import {
   Info,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useMyBranch } from '@/hooks/useBranch';
 
 export default function PrinterSetup() {
   const { profile } = useAuth();
+  const { data: branch } = useMyBranch();
   const {
     settings,
     updateThermalSettings,
@@ -149,7 +151,7 @@ export default function PrinterSetup() {
         const ok = await usbPrinterService.autoConnect();
         if (!ok) throw new Error('Printer not connected. Please connect first.');
       }
-      const bytes = buildTestReceiptESCPOS();
+      const bytes = buildTestReceiptESCPOS(branch);
       await usbPrinterService.print(bytes);
       toast.success('Test receipt sent to USB printer');
     } catch (err: unknown) {
@@ -167,7 +169,7 @@ export default function PrinterSetup() {
         const ok = await btPrinterService.autoConnect();
         if (!ok) throw new Error('Bluetooth printer not connected. Please connect first.');
       }
-      const bytes = buildTestReceiptESCPOS();
+      const bytes = buildTestReceiptESCPOS(branch);
       await btPrinterService.print(bytes);
       toast.success('Test receipt sent to Bluetooth printer');
     } catch (err: unknown) {

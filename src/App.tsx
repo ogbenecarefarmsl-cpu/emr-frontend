@@ -58,6 +58,8 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import UserManagementPage from "./pages/admin/UserManagementPage";
 import BranchManagementPage from "./pages/admin/BranchManagementPage";
 import InsuranceManagementPage from "./pages/admin/InsuranceManagementPage";
+import AdminInsuranceClaimsPage from "./pages/admin/AdminInsuranceClaimsPage";
+import InsuranceBlockListPage from "./pages/admin/InsuranceBlockListPage";
 import Reports from "./pages/admin/Reports";
 import TestCatalogManagement from "./pages/admin/TestCatalogManagement";
 import ReconciliationReview from "./pages/admin/ReconciliationReview";
@@ -375,6 +377,12 @@ function AppRoutes() {
       } />
       <Route path="/admin/insurance" element={
         <RoleGuard allowedRoles={['admin', 'receptionist']}><InsuranceManagementPage /></RoleGuard>
+      } />
+      <Route path="/admin/insurance-claims" element={
+        <RoleGuard allowedRoles={['admin', 'receptionist']}><AdminInsuranceClaimsPage /></RoleGuard>
+      } />
+      <Route path="/admin/insurance-blocks" element={
+        <RoleGuard allowedRoles={['admin', 'receptionist']}><InsuranceBlockListPage /></RoleGuard>
       } />
       <Route path="/admin/service-pricing" element={
         <RoleGuard allowedRoles={['admin']}><ServicePricingPage /></RoleGuard>

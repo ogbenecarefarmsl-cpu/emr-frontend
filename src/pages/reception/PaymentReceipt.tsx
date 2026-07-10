@@ -165,7 +165,7 @@ export default function PaymentReceipt() {
     <div className="receipt">
       {/* Header (branch letterhead from DB) */}
       <div className="header">
-        <BranchLetterhead />
+        <BranchLetterhead branch={receiptData.branch} />
       </div>
 
       {/* Copy Type Badge */}
@@ -315,7 +315,7 @@ export default function PaymentReceipt() {
         <>
           <div className="thank-you">THANK YOU!</div>
           <div className="footer">
-            <BranchFooterText />
+            <BranchFooterText branch={receiptData.branch} />
             <div style={{ marginTop: '10px', fontSize: '9px' }}>
               This is a computer-generated receipt
             </div>

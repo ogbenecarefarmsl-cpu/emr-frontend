@@ -1,4 +1,4 @@
-import { useMyBranch } from '@/hooks/useBranch';
+import { useMyBranch, type Branch } from '@/hooks/useBranch';
 
 /**
  * BranchLetterhead
@@ -12,8 +12,15 @@ import { useMyBranch } from '@/hooks/useBranch';
  * If the user has no branch assigned, falls back to a generic placeholder
  * so the receipt still prints.
  */
-export function BranchLetterhead({ compact = false }: { compact?: boolean }) {
-  const { data: branch, isLoading } = useMyBranch();
+export function BranchLetterhead({
+  compact = false,
+  branch: suppliedBranch,
+}: {
+  compact?: boolean;
+  branch?: Partial<Branch> | null;
+}) {
+  const { data: currentBranch, isLoading } = useMyBranch(!suppliedBranch);
+  const branch = suppliedBranch || currentBranch;
 
   if (isLoading) {
     return (
@@ -66,8 +73,9 @@ export function BranchLetterhead({ compact = false }: { compact?: boolean }) {
  * Renders the receipt footer (thank-you message, hours, etc.) from
  * the current branch's settings. Falls back to a generic message.
  */
-export function BranchFooterText() {
-  const { data: branch } = useMyBranch();
+export function BranchFooterText({ branch: suppliedBranch }: { branch?: Partial<Branch> | null } = {}) {
+  const { data: currentBranch } = useMyBranch(!suppliedBranch);
+  const branch = suppliedBranch || currentBranch;
   const text =
     branch?.footerText?.trim() ||
     'Thank you for choosing us! | Please keep this receipt for your records.';

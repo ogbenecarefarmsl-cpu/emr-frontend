@@ -25,7 +25,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
       <div ref={ref} className="receipt">
         {/* Header (branch letterhead from DB) */}
         <div className="header">
-          <BranchLetterhead />
+          <BranchLetterhead branch={data.branch} />
         </div>
 
         {/* Copy Type Badge */}
@@ -190,7 +190,7 @@ export const ThermalReceipt = forwardRef<HTMLDivElement, ThermalReceiptProps>(
           <>
             <div className="thank-you">THANK YOU!</div>
             <div className="footer">
-              <BranchFooterText />
+              <BranchFooterText branch={data.branch} />
               <div style={{ marginTop: '10px', fontSize: '9px' }}>
                 This is a computer-generated receipt
               </div>

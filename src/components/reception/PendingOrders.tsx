@@ -7,8 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle, ArrowRight, User } from 'lucide-react';
+import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle, ArrowRight, User, Shield, ShieldOff } from 'lucide-react';
 import { prescriptionService } from '@/services/prescriptionService';
+import { insuranceClaimsAPI, insuranceBlocksAPI } from '@/services/api';
 
 type PatientGroup = {
   patientId: string;
@@ -32,6 +33,38 @@ export function PendingOrders() {
     staleTime: 15 * 1000,
   });
   const markPaid = useMarkOrderPaid();
+  const markOrderInsuranceMutation = useMutation({
+    mutationFn: (orderId: string) => insuranceClaimsAPI.markOrderInsurance(orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['pendingClinicalOrders'] });
+    },
+  });
+
+  // Fetch active blocks to check if patients are blocked from insurance
+  const { data: activeBlocks = [] } = useQuery({
+    queryKey: ['insurance-blocks-active'],
+    queryFn: () => insuranceBlocksAPI.list({ isActive: 'true' }),
+    staleTime: 30000,
+  });
+
+  // Create a lookup set of blocked patient IDs
+  const blockedPatientIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const block of activeBlocks) {
+      if (block.patientId?._id) ids.add(block.patientId._id);
+    }
+    return ids;
+  }, [activeBlocks]);
+
+  const blockedInsuranceKeys = useMemo(() => {
+    const keys = new Set<string>();
+    for (const block of activeBlocks) {
+      if (block.memberNumber && block.programCode) {
+        keys.add(`${String(block.programCode).toUpperCase()}::${block.memberNumber}`);
+      }
+    }
+    return keys;
+  }, [activeBlocks]);
 
   const patientGroups = useMemo(() => {
     const groups: Record<string, PatientGroup> = {};
@@ -65,6 +98,16 @@ export function PendingOrders() {
       refetch();
     } catch (error: any) {
       toast.error(error.message || 'Failed to confirm payment');
+    }
+  };
+
+  const handleMarkInsurance = async (orderId: string) => {
+    try {
+      await markOrderInsuranceMutation.mutateAsync(orderId);
+      toast.success('Insurance coverage recorded for this order');
+      refetch();
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to record insurance coverage');
     }
   };
 
@@ -193,6 +236,11 @@ export function PendingOrders() {
             ? `${patient.firstName} ${patient.lastName}`
             : 'Unknown Patient';
           const total = Number(item.total || 0);
+          const isInsurancePatient = !!item.visitId?.insurance?.programCode;
+          const insuranceKey = item.visitId?.insurance?.memberNumber && item.visitId?.insurance?.programCode
+            ? `${String(item.visitId.insurance.programCode).toUpperCase()}::${item.visitId.insurance.memberNumber}`
+            : '';
+          const isBlocked = blockedPatientIds.has(item.patientId?._id) || (insuranceKey ? blockedInsuranceKeys.has(insuranceKey) : false);
 
           return (
             <div
@@ -204,7 +252,21 @@ export function PendingOrders() {
                   {getOrderTypeBadge(item.orderType)}
                 </div>
                 <div className="min-w-0">
-                  <div className="font-medium truncate">{patientName}</div>
+                  <div className="font-medium truncate flex items-center gap-2">
+                    {patientName}
+                    {isInsurancePatient && !isBlocked && (
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
+                        <Shield className="h-3 w-3 mr-0.5" />
+                        {item.visitId.insurance.programCode}
+                      </Badge>
+                    )}
+                    {isBlocked && (
+                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px]">
+                        <ShieldOff className="h-3 w-3 mr-0.5" />
+                        Blocked
+                      </Badge>
+                    )}
+                  </div>
                   <div className="text-sm text-muted-foreground">
                     {patient?.patientId} - Order: {item.orderNumber}
                   </div>
@@ -234,30 +296,75 @@ export function PendingOrders() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <select
-                    value={selectedMethods[item._id || item.id] || 'cash'}
-                    onChange={(e) => setSelectedMethods((prev) => ({ ...prev, [item._id || item.id]: e.target.value }))}
-                    className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                  >
-                    <option value="cash">Cash</option>
-                    <option value="orange_money">Orange Money</option>
-                    <option value="afrimoney">Afrimoney</option>
-                    <option value="wallet">Wallet</option>
-                  </select>
-                  <Button
-                    onClick={() => handleMarkPaid(item._id || item.id, selectedMethods[item._id || item.id] || 'cash')}
-                    disabled={markPaid.isPending}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {markPaid.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <>
-                        <CreditCard className="h-4 w-4 mr-1" />
-                        Pay
-                      </>
-                    )}
-                  </Button>
+                  {isInsurancePatient && !isBlocked ? (
+                    <>
+                      <Button
+                        onClick={() => handleMarkInsurance(item._id || item.id)}
+                        disabled={markOrderInsuranceMutation.isPending}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {markOrderInsuranceMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Shield className="h-4 w-4 mr-1" />
+                            Insurance
+                          </>
+                        )}
+                      </Button>
+                      <select
+                        value={selectedMethods[item._id || item.id] || 'cash'}
+                        onChange={(e) => setSelectedMethods((prev) => ({ ...prev, [item._id || item.id]: e.target.value }))}
+                        className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="orange_money">Orange Money</option>
+                        <option value="afrimoney">Afrimoney</option>
+                        <option value="wallet">Wallet</option>
+                      </select>
+                      <Button
+                        onClick={() => handleMarkPaid(item._id || item.id, selectedMethods[item._id || item.id] || 'cash')}
+                        disabled={markPaid.isPending}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {markPaid.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            Pay
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <select
+                        value={selectedMethods[item._id || item.id] || 'cash'}
+                        onChange={(e) => setSelectedMethods((prev) => ({ ...prev, [item._id || item.id]: e.target.value }))}
+                        className="flex h-9 rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                      >
+                        <option value="cash">Cash</option>
+                        <option value="orange_money">Orange Money</option>
+                        <option value="afrimoney">Afrimoney</option>
+                        <option value="wallet">Wallet</option>
+                      </select>
+                      <Button
+                        onClick={() => handleMarkPaid(item._id || item.id, selectedMethods[item._id || item.id] || 'cash')}
+                        disabled={markPaid.isPending}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {markPaid.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            Pay
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

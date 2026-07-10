@@ -192,7 +192,7 @@ export default function PrescriptionReceipt() {
             <>
               {/* Header (branch letterhead) */}
               <div className="header">
-                <BranchLetterhead compact />
+                <BranchLetterhead compact branch={branch} />
               </div>
 
               {/* Doc title */}
@@ -291,7 +291,7 @@ export default function PrescriptionReceipt() {
 
               {/* Footer */}
               <div className="footer">
-                <BranchFooterText />
+                <BranchFooterText branch={branch} />
                 <div style={{ marginTop: '10px', fontSize: '9px' }}>
                   Computer-generated receipt
                 </div>

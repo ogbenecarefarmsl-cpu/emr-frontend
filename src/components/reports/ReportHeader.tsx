@@ -9,22 +9,12 @@ export function ReportHeader({ laboratoryInfo }: ReportHeaderProps) {
   const secondaryColor = '#16a34a';
   const showLogo = true;
 
-  // Keep logo code-driven with an optional env override and no template/database dependency.
-  // Use the resized logo from public folder
-  const hardcodedLogoUrl = import.meta.env.VITE_REPORT_HEADER_LOGO || '/harbour-emr-logo.svg';
-  const logoSrc = hardcodedLogoUrl;
-
-  const defaultLabName = 'HARBOUR Medical Diagnostic';
-  const defaultMotto = 'Automated Precision...';
-  const defaultAddress = '114, Fourah Bay Road, Freetown, Sierra leone';
-  const defaultPhone = '+23274414434';
-  const defaultEmail = 'harbourmedicaldiagnostics@gmail.com';
-
-  const labName = defaultLabName;
-  const motto = defaultMotto;
-  const address = defaultAddress;
-  const phone = defaultPhone;
-  const email = defaultEmail;
+  const logoSrc = laboratoryInfo.logo || import.meta.env.VITE_REPORT_HEADER_LOGO || '/harbour-emr-logo.svg';
+  const labName = laboratoryInfo.name;
+  const motto = 'Automated Precision...';
+  const address = laboratoryInfo.address;
+  const phone = laboratoryInfo.phone;
+  const email = laboratoryInfo.email;
 
   // Attempt to split the first word from the rest for dynamic styling
   const labNameTrimmed = labName.trim();
@@ -49,7 +39,7 @@ export function ReportHeader({ laboratoryInfo }: ReportHeaderProps) {
             </div>
           )}
 
-          {!showLogo && showLabName && (
+          {showLabName && (
             <div className="flex flex-col justify-center leading-tight">
               <span
                 className="font-bold tracking-wide uppercase"
@@ -77,6 +67,7 @@ export function ReportHeader({ laboratoryInfo }: ReportHeaderProps) {
           {phone && <span className="font-semibold tracking-[0.1px]">{phone}</span>}
           {email && <span className="font-medium">{email}</span>}
           {showAddress && address && <span className="font-medium">{address}</span>}
+          {laboratoryInfo.website && <span className="font-medium">{laboratoryInfo.website}</span>}
         </div>
       </div>
 

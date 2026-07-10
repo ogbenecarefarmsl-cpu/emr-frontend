@@ -28,6 +28,7 @@ import { CreditCard, Banknote, Smartphone, Printer, Check, Wallet } from 'lucide
 import { format } from 'date-fns';
 import { useAddPayment } from '@/hooks/useOrders';
 import { usePatientWallet } from '@/hooks/usePatients';
+import { useMyBranch } from '@/hooks/useBranch';
 
 interface PaymentDialogProps {
   open: boolean;
@@ -63,6 +64,7 @@ export function PaymentDialog({
   const { settings, thermalConnected } = usePrinterContext();
   const addPayment = useAddPayment();
   const { data: wallet } = usePatientWallet(order.patientObjectId || '');
+  const { data: branch } = useMyBranch();
   const patientReceiptRef = useRef<HTMLDivElement>(null);
   const labReceiptRef = useRef<HTMLDivElement>(null);
 
@@ -99,6 +101,18 @@ export function PaymentDialog({
     paymentDate: new Date().toISOString(),
     cashier: cashierName,
     collectionDate: format(new Date(), 'yyyy-MM-dd HH:mm'),
+    branch: branch
+      ? {
+          name: branch.name,
+          address: branch.address,
+          phone: branch.phone,
+          email: branch.email,
+          tagline: branch.tagline,
+          website: branch.website,
+          operatingHours: branch.operatingHours,
+          footerText: branch.footerText,
+        }
+      : undefined,
   };
 
   const change = receiptData.amountPaid - order.total;

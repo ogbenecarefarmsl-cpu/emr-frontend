@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { useMyBranch } from '@/hooks/useBranch';
 
 // ── Demo receipt data used for test prints ─────────────────────────────────
 
@@ -62,6 +63,7 @@ const TEST_RECEIPT_DATA = {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function PrinterSettings() {
+  const { data: branch } = useMyBranch();
   const { profile } = useAuth();
   const {
     settings,
@@ -123,7 +125,7 @@ export default function PrinterSettings() {
         const ok = await usbPrinterService.autoConnect();
         if (!ok) throw new Error('Printer not connected. Please connect first.');
       }
-      const bytes = buildReceiptESCPOS(TEST_RECEIPT_DATA, 'patient');
+      const bytes = buildReceiptESCPOS(TEST_RECEIPT_DATA, 'patient', branch);
       await usbPrinterService.print(bytes);
       toast.success('Test receipt sent to printer');
     } catch (err: unknown) {

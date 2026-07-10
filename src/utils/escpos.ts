@@ -54,10 +54,7 @@ export interface BranchHeaderData {
 
 export const FALLBACK_BRANCH: BranchHeaderData = {
   name: 'Harbour Medical Diagnostic',
-  address: '555, Bai Bureh Road, Allen Town',
-  phone: '+23275405804',
-  email: 'harbourmedicaldiagnostics@gmail.com',
-  footerText: 'Thank you for choosing us! | Open 6 days/week | Lab & Pharmacy under one roof',
+  footerText: 'Branch not assigned - contact an administrator',
 };
 
 /**
@@ -72,9 +69,20 @@ export function buildBranchHeaderESCPOS(b: EscPosBuilder, branch: BranchHeaderDa
   b.bold(true);
   b.line(data.name.toUpperCase());
   b.bold(false);
-  if (data.address) b.line(data.address);
+  if (data.tagline) wrapText(data.tagline, LINE_WIDTH).forEach(line => b.line(line));
+  if (data.address) wrapText(data.address, LINE_WIDTH).forEach(line => b.line(line));
   if (data.phone) b.line(`Tel: ${data.phone}`);
+  if (data.email) wrapText(data.email, LINE_WIDTH).forEach(line => b.line(line));
+  if (data.website) wrapText(data.website, LINE_WIDTH).forEach(line => b.line(line));
+  if (data.operatingHours) wrapText(data.operatingHours, LINE_WIDTH).forEach(line => b.line(line));
   b.separator('=');
+}
+
+function buildBranchFooterESCPOS(b: EscPosBuilder, branch: BranchHeaderData | null | undefined) {
+  const text = (branch || FALLBACK_BRANCH).footerText;
+  if (!text) return;
+  b.align('center');
+  wrapText(text, LINE_WIDTH).forEach(line => b.line(line));
 }
 
 /** Right-aligns `value` and left-aligns `label`, filling with spaces. */
@@ -204,12 +212,11 @@ export class EscPosBuilder {
  * Pass `branch` to print the user's assigned branch letterhead; if
  * omitted, falls back to a generic placeholder.
  */
-export function buildTestReceiptESCPOS(): Uint8Array {
+export function buildTestReceiptESCPOS(branch?: BranchHeaderData | null): Uint8Array {
   const b = new EscPosBuilder();
   const now = new Date();
 
-  b.init();
-  b.align('center');
+  buildBranchHeaderESCPOS(b, branch);
   b.bold(true);
   b.fontSize(1);
   b.line('PRINTER TEST');
@@ -251,9 +258,10 @@ export function buildReceiptESCPOS(
       : data.discount;
 
   const b = new EscPosBuilder();
+  const selectedBranch = branch || data.branch;
 
   // ── Header (branch letterhead from DB) ──────────────────────────────────
-  buildBranchHeaderESCPOS(b, branch);
+  buildBranchHeaderESCPOS(b, selectedBranch);
 
   // ── Copy type ────────────────────────────────────────────────────────────
   b.bold(true);
@@ -295,6 +303,7 @@ export function buildReceiptESCPOS(
   b.align('center');
   b.line(`*** ${data.orderNumber} ***`);
   b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
+  buildBranchFooterESCPOS(b, selectedBranch);
 
   b.feed(2);
   b.cut();
@@ -402,6 +411,8 @@ export function buildTreatmentPlanESCPOS(
   }
   b.separator('-');
 
+  buildBranchFooterESCPOS(b, branch);
+
   b.feed(2);
   b.cut();
 
@@ -458,6 +469,7 @@ export function buildVisitReceiptESCPOS(
 
   b.align('center');
   b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
+  buildBranchFooterESCPOS(b, branch);
 
   b.feed(2);
   b.cut();
@@ -526,6 +538,7 @@ export function buildPrescriptionReceiptESCPOS(
   b.bold(false);
   b.line(padLine('Payment:', data.isPaid ? 'PAID' : 'UNPAID'));
   b.separator('=');
+  buildBranchFooterESCPOS(b, branch);
 
   b.feed(2);
   b.cut();
@@ -579,6 +592,7 @@ export function buildWalkInReceiptESCPOS(
   b.line(padLine58('Method:', data.paymentMethod.toUpperCase()));
   b.line(padLine58('Cashier:', data.cashier));
   b.separator('-');
+  buildBranchFooterESCPOS(b, branch);
 
   b.feed(2);
   b.cut();

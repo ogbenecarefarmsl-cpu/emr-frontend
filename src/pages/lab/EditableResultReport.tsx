@@ -6,6 +6,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Printer, Save, Edit2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useMyBranch } from '@/hooks/useBranch';
 
 interface TestResult {
   id: string;
@@ -35,6 +36,7 @@ interface PatientInfo {
 
 export default function EditableResultReport() {
   const printRef = useRef<HTMLDivElement>(null);
+  const { data: branch } = useMyBranch();
   const [isEditing, setIsEditing] = useState(false);
   
   const [patientInfo, setPatientInfo] = useState<PatientInfo>({
@@ -159,22 +161,27 @@ export default function EditableResultReport() {
           <div className="flex items-start justify-between">
             {/* Logo and Company Name */}
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
-                <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
+              {branch?.logoUrl ? (
+                <img src={branch.logoUrl} alt={`${branch.name} logo`} className="w-16 h-16 object-contain" />
+              ) : (
+                <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-green-500 rounded-lg flex items-center justify-center">
+                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+              )}
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">HARBOUR EMR</h1>
-                <p className="text-xs text-gray-500 italic">Clinical Laboratory Services</p>
+                <h1 className="text-2xl font-bold text-gray-900">{branch?.name || 'Clinical Laboratory'}</h1>
+                <p className="text-xs text-gray-500 italic">{branch?.tagline || 'Clinical Laboratory Services'}</p>
               </div>
             </div>
             
             {/* Contact Info */}
             <div className="text-right text-sm text-gray-600">
-              <p className="font-semibold">075 766461, 031-551811</p>
-              <p>Harbour Clinicals</p>
-              <p>114 Fourah Bay Road, Freetown, Sierra Leone</p>
+              {branch?.phone && <p className="font-semibold">{branch.phone}</p>}
+              {branch?.email && <p>{branch.email}</p>}
+              {branch?.address && <p>{branch.address}</p>}
+              {branch?.website && <p>{branch.website}</p>}
             </div>
           </div>
         </div>
