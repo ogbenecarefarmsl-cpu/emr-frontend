@@ -737,7 +737,7 @@ export default function DoctorDashboard() {
         patientId,
         items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, computedQuantity, quantityTouched, isControlled, requiresPrescription, ...item }) => ({
           ...item,
-          quantity: Number(item.quantity || computedQuantity || computeMedicationQuantity(item, { baseUnit }) || 1),
+          quantity: Math.max(1, Number(item.quantity || computedQuantity || computeMedicationQuantity(item, { baseUnit }) || 1)),
           // The frontend no longer sends dosage/frequency/duration (legacy) — backend
           // auto-generates them from strengthPerDose / dosesPerDay / durationDays
           instructions: item.instructions?.trim() || undefined,

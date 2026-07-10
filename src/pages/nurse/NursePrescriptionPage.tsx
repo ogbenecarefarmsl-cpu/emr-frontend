@@ -15,6 +15,7 @@ import { prescriptionService, CreatePrescriptionItemInput } from '@/services/pre
 import { visitsAPI } from '@/services/api';
 import { RouteOfAdministrationEnum } from '@/types/prescription';
 import { Loader2, Pill, Plus, Search, Send, Trash2 } from 'lucide-react';
+import { computeMedicationQuantity } from '@/lib/medicationIntelligence';
 
 const CLOSED_VISIT_STATUSES = new Set(['completed', 'cancelled']);
 
@@ -156,6 +157,7 @@ export default function NursePrescriptionPage() {
         visitId,
         items: selectedMeds.map(({ unitPrice, stockQuantity, sellMode, packSizes, baseUnit, ...item }) => ({
           ...item,
+          quantity: Math.max(1, Number(item.quantity || computeMedicationQuantity(item, { baseUnit }) || 1)),
           instructions: item.instructions?.trim() || undefined,
           pharmacistNote: item.pharmacistNote?.trim() || undefined,
         })),
