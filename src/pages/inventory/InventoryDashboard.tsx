@@ -130,7 +130,7 @@ export default function InventoryDashboard() {
     mutationFn: () =>
       inventoryAPI.receiveStock({
         medicationId: receiveForm.medicationId,
-        quantity: parseInt(receiveForm.quantity),
+        quantity: Math.max(1, parseInt(receiveForm.quantity) || 1),
         batchNumber: receiveForm.batchNumber || undefined,
         expiryDate: receiveForm.expiryDate || undefined,
         unitCost: receiveForm.unitCost ? parseFloat(receiveForm.unitCost) : undefined,
@@ -600,6 +600,7 @@ export default function InventoryDashboard() {
                 <Label>Quantity</Label>
                 <Input
                   type="number"
+                  min={1}
                   value={receiveForm.quantity}
                   onChange={(e) => setReceiveForm({ ...receiveForm, quantity: e.target.value })}
                 />

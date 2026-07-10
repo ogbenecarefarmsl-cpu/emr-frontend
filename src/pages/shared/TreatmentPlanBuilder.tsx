@@ -779,7 +779,7 @@ function DrugIvForm({
             type="number"
             className="mt-1"
             value={dosesPerDay}
-            onChange={(e) => setDosesPerDay(Number(e.target.value))}
+            onChange={(e) => setDosesPerDay(Math.max(1, Number(e.target.value)))}
             min={1}
           />
         </div>
@@ -789,7 +789,7 @@ function DrugIvForm({
             type="number"
             className="mt-1"
             value={durationDays}
-            onChange={(e) => setDurationDays(Number(e.target.value))}
+            onChange={(e) => setDurationDays(Math.max(1, Number(e.target.value)))}
             min={1}
           />
         </div>
@@ -894,7 +894,7 @@ function SmartDrugIvForm({
             type="number"
             className="mt-1"
             value={dosesPerDay}
-            onChange={(e) => setDosesPerDay(Number(e.target.value))}
+            onChange={(e) => setDosesPerDay(Math.max(1, Number(e.target.value)))}
             min={1}
           />
         </div>
@@ -904,7 +904,7 @@ function SmartDrugIvForm({
             type="number"
             className="mt-1"
             value={durationDays}
-            onChange={(e) => setDurationDays(Number(e.target.value))}
+            onChange={(e) => setDurationDays(Math.max(1, Number(e.target.value)))}
             min={1}
           />
         </div>

@@ -803,7 +803,7 @@ export default function DoctorDashboard() {
       return await prescriptionService.update(editingPrescription._id, {
         items: prescriptionItems.map(({ unitPrice, sellMode, packSizes, baseUnit, smartInstruction, computedQuantity, quantityTouched, isControlled, requiresPrescription, ...item }) => ({
           ...item,
-          quantity: Number(item.quantity || computedQuantity || computeMedicationQuantity(item, { baseUnit }) || 1),
+          quantity: Math.max(1, Number(item.quantity || computedQuantity || computeMedicationQuantity(item, { baseUnit }) || 1)),
           instructions: item.instructions?.trim() || undefined,
           pharmacistNote: item.pharmacistNote?.trim() || undefined,
         })),
@@ -920,7 +920,7 @@ export default function DoctorDashboard() {
       updated[index].smartInstruction = nextInstruction;
     }
     if (field === 'quantity') {
-      updated[index].quantity = Number(value) || 0;
+      updated[index].quantity = Math.max(0, Number(value) || 0);
       updated[index].quantityTouched = Number(value) !== Number(updated[index].computedQuantity || 0);
     }
     setPrescriptionItems(updated);
