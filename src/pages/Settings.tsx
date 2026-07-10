@@ -44,7 +44,7 @@ export default function Settings() {
     {
       id: 'organization',
       title: 'Organization',
-      description: 'Laboratory name, address, and contact information',
+      description: 'Clinic name, address, and contact information',
       icon: Building2,
     },
     {

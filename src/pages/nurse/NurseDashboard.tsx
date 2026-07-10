@@ -40,7 +40,7 @@ const workspaces = [
     accent: 'text-blue-600 bg-blue-500/10',
   },
   {
-    title: 'Lab Requests',
+    title: 'Test Orders',
     description: 'Order LIS-backed tests and route payment to reception.',
     to: '/nurse/lab-requests',
     icon: FlaskConical,

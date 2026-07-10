@@ -262,8 +262,8 @@ export default function TestCatalogManagement() {
 
   return (
     <RoleLayout 
-      title="Lab Test Pricing" 
-      subtitle="Manage lab tests, prices, reference ranges, and categories"
+      title="Test Pricing" 
+      subtitle="Manage tests, prices, reference ranges, and categories"
       role={primaryRole || 'admin'} 
       userName={profile?.fullName}
     >
@@ -386,13 +386,13 @@ export default function TestCatalogManagement() {
                                 <span className="ml-2 text-xs text-muted-foreground">({test.panelName})</span>
                               )}
                             </td>
-                            <td className="px-5 py-2.5 text-muted-foreground">{test.unit || '—'}</td>
+                            <td className="px-5 py-2.5 text-muted-foreground">{test.unit || 'ï¿½'}</td>
                             <td className="px-5 py-2.5 text-muted-foreground">
                               {test.referenceRanges && test.referenceRanges.length > 0
                                 ? test.referenceRanges.map((r, i) => (
                                     <span key={i} className="block text-xs">{r.range} {r.unit}</span>
                                   ))
-                                : test.referenceRange || '—'
+                                : test.referenceRange || 'ï¿½'
                               }
                             </td>
                             <td className="px-5 py-2.5">Le {test.price?.toLocaleString()}</td>
@@ -777,10 +777,10 @@ export default function TestCatalogManagement() {
                 {/* Tips */}
                 <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs text-blue-800 space-y-1">
                   <p className="font-semibold">Tips:</p>
-                  <p>• Assign a <strong>Panel Code</strong> (Basic Info tab) to group this test under a panel sub-header on the report.</p>
-                  <p>• Tests with no panel code appear as individual rows under the category heading.</p>
-                  <p>• Use the <strong>Panel</strong> tab to create a new orderable panel combining multiple tests.</p>
-                  <p>• Age/gender-specific ranges (Reference Ranges tab) are automatically matched to the patient at report time.</p>
+                  <p>ï¿½ Assign a <strong>Panel Code</strong> (Basic Info tab) to group this test under a panel sub-header on the report.</p>
+                  <p>ï¿½ Tests with no panel code appear as individual rows under the category heading.</p>
+                  <p>ï¿½ Use the <strong>Panel</strong> tab to create a new orderable panel combining multiple tests.</p>
+                  <p>ï¿½ Age/gender-specific ranges (Reference Ranges tab) are automatically matched to the patient at report time.</p>
                 </div>
               </div>
             </TabsContent>

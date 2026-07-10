@@ -219,7 +219,7 @@ export default function AdminDashboard() {
           <PipelineStep label="Awaiting Vitals" value={s?.visitsAwaitingTriage || 0} color="amber" onClick={() => navigate('/nurse')} />
           <PipelineStep label="In Queue" value={s?.visitsInQueue || 0} color="blue" onClick={() => navigate('/admin/patients')} />
           <PipelineStep label="In Consult" value={s?.visitsInConsultation || 0} color="indigo" onClick={() => navigate('/admin/patients')} />
-          <PipelineStep label="Awaiting Lab" value={s?.visitsAwaitingLab || 0} color="amber" onClick={() => navigate('/admin/orders')} />
+          <PipelineStep label="Awaiting Test" value={s?.visitsAwaitingLab || 0} color="amber" onClick={() => navigate('/admin/orders')} />
           <PipelineStep label="Awaiting Result" value={s?.visitsAwaitingResults || 0} color="orange" onClick={() => navigate('/admin/orders')} />
           <PipelineStep label="Result Ready" value={s?.visitsResultsReady || 0} color="emerald" onClick={() => navigate('/admin/results')} />
           <PipelineStep label="Awaiting Pharm" value={s?.visitsAwaitingPharmacy || 0} color="purple" onClick={() => navigate('/admin/orders')} />
@@ -232,7 +232,7 @@ export default function AdminDashboard() {
       {/* ───────── Department activity ───────── */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
         <MetricCard
-          title="Lab Orders"
+          title="Test Orders"
           value={dept?.labOrdersToday || 0}
           icon={FlaskConical}
         />

@@ -100,7 +100,7 @@ export default function NurseLabRequestsPage() {
   const createLabOrder = useMutation({
     mutationFn: async () => {
       if (!selectedVisit || !selectedPatientId) {
-        throw new Error('Select a patient visit before creating the lab request');
+        throw new Error('Select a patient visit before creating the test order');
       }
       if (selectedTests.length === 0) {
         throw new Error('Select at least one LIS test or panel');
@@ -123,7 +123,7 @@ export default function NurseLabRequestsPage() {
       });
     },
     onSuccess: (order: any) => {
-      toast.success(`${order?.orderNumber || 'Lab request'} sent to reception for payment`);
+      toast.success(`${order?.orderNumber || 'Order'} sent to reception for payment`);
       setSelectedTests([]);
       setNotes('');
       setPriority('routine');
@@ -131,7 +131,7 @@ export default function NurseLabRequestsPage() {
       queryClient.invalidateQueries({ queryKey: ['visits'], exact: false });
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || error?.message || 'Failed to create lab request');
+      toast.error(error?.response?.data?.message || error?.message || 'Failed to create test order');
     },
   });
 
@@ -159,8 +159,8 @@ export default function NurseLabRequestsPage() {
 
   return (
     <RoleLayout
-      title="Nurse Lab Requests"
-      subtitle="Create LIS-backed lab requests for active visits; reception completes payment"
+      title="Nurse Test Orders"
+      subtitle="Create LIS-backed test orders for active visits; reception completes payment"
       role="nurse"
       userName={profile?.fullName}
     >
@@ -326,7 +326,7 @@ export default function NurseLabRequestsPage() {
                                 {test.isPanel && <Badge variant="secondary">Panel</Badge>}
                               </div>
                               <p className="mt-1 text-xs text-muted-foreground">
-                                {test.category || 'Lab'}{test.panelComponents?.length ? ` - ${test.panelComponents.length} component tests` : ''}
+                                {test.category || 'Test'}{test.panelComponents?.length ? ` - ${test.panelComponents.length} component tests` : ''}
                               </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-3">

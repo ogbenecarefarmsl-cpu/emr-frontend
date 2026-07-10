@@ -102,7 +102,7 @@ export default function OrdersPage() {
     const type = order.orderType || 'lab';
     const config: Record<string, { label: string; className: string; icon: any }> = {
       consultation: { label: 'Consultation', className: 'bg-cyan-50 text-cyan-700 border-cyan-200', icon: Stethoscope },
-      lab: { label: 'Lab', className: 'bg-blue-50 text-blue-700 border-blue-200', icon: FlaskConical },
+      lab: { label: 'Test', className: 'bg-blue-50 text-blue-700 border-blue-200', icon: FlaskConical },
       pharmacy: { label: 'Pharmacy', className: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: Pill },
       procedure: { label: 'Procedure', className: 'bg-purple-50 text-purple-700 border-purple-200', icon: ClipboardList },
       admission: { label: 'Admission', className: 'bg-rose-50 text-rose-700 border-rose-200', icon: BedDouble },
@@ -160,7 +160,7 @@ export default function OrdersPage() {
   const getDestinationLabel = (order: any) => {
     const type = order.orderType || 'lab';
     if (order.status === 'awaiting_payment') return 'Awaiting reception payment';
-    if (type === 'lab' && order.status === 'pending_collection') return 'Lab queue';
+    if (type === 'lab' && order.status === 'pending_collection') return 'Test queue';
     if (type === 'pharmacy' && order.status === 'paid') return 'Pharmacy queue';
     if (type === 'consultation' && order.status === 'paid') return 'Nurse vitals / doctor flow';
     if (order.status === 'completed') return 'Completed';
@@ -212,7 +212,7 @@ export default function OrdersPage() {
               <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="awaiting_payment">Awaiting Payment</SelectItem>
               <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="pending_collection">Lab Queue</SelectItem>
+              <SelectItem value="pending_collection">Test Queue</SelectItem>
               <SelectItem value="collected">Collected</SelectItem>
               <SelectItem value="processing">Processing</SelectItem>
               <SelectItem value="completed">Completed</SelectItem>
@@ -225,7 +225,7 @@ export default function OrdersPage() {
             <SelectContent>
               <SelectItem value="all">All Types</SelectItem>
               <SelectItem value="consultation">Consultation</SelectItem>
-              <SelectItem value="lab">Lab</SelectItem>
+              <SelectItem value="lab">Test</SelectItem>
               <SelectItem value="pharmacy">Pharmacy</SelectItem>
               <SelectItem value="procedure">Procedure</SelectItem>
               <SelectItem value="admission">Admission</SelectItem>

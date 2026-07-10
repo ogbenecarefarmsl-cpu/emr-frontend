@@ -221,7 +221,7 @@ const chartOrderResults = (chart: any): LabResult[] => {
       (panel?.tests || []).filter((test: any) => test?.result).map((test: any, index: number) => ({
         _id: test.result._id || `${orderId}-${test.testCode || panelCode}-${index}`,
         testCode: test.testCode || panelCode || '',
-        testName: test.testName || panel?.name || test.testCode || 'Lab result',
+        testName: test.testName || panel?.name || test.testCode || 'Test result',
         value: String(test.result.value ?? ''),
         unit: test.result.unit,
         referenceRange: test.result.referenceRange || test.result.reference_range,
@@ -237,7 +237,7 @@ const chartOrderResults = (chart: any): LabResult[] => {
     const fromTests = orderTests.filter((test: any) => test?.result).map((test: any, index: number) => ({
       _id: test.result._id || `${orderId}-${test.testCode || test.code || index}`,
       testCode: test.testCode || test.code || '',
-      testName: test.testName || test.name || test.testCode || 'Lab result',
+      testName: test.testName || test.name || test.testCode || 'Test result',
       value: String(test.result.value ?? ''),
       unit: test.result.unit,
       referenceRange: test.result.referenceRange || test.result.reference_range,
@@ -711,7 +711,7 @@ export default function DoctorDashboard() {
       return await ordersAPI.create(orderData);
     },
     onSuccess: () => {
-      toast.success('Lab order created. Patient should pay at reception.');
+      toast.success('Order created. Patient should pay at reception.');
       setLabOrderModalOpen(false);
       setSelectedTests([]);
       setEditingOrder(null);
@@ -783,7 +783,7 @@ export default function DoctorDashboard() {
       });
     },
     onSuccess: () => {
-      toast.success('Lab order updated');
+      toast.success('Order updated');
       setLabOrderModalOpen(false);
       setSelectedTests([]);
       setEditingOrder(null);
@@ -1038,8 +1038,8 @@ export default function DoctorDashboard() {
     if (!selectedVisit) return [];
     const blockers: string[] = [];
     const status = selectedVisit.status;
-    if (status === 'awaiting_lab') blockers.push('Lab order payment is still pending.');
-    if (status === 'awaiting_results') blockers.push('Lab processing is still in progress.');
+    if (status === 'awaiting_lab') blockers.push('Order payment is still pending.');
+    if (status === 'awaiting_results') blockers.push('Test processing is still in progress.');
     if (status === 'awaiting_pharmacy') blockers.push('Pharmacy order payment is still pending.');
     if (status === 'awaiting_dispensing') blockers.push('Pharmacy dispensing is still pending.');
 
@@ -1659,7 +1659,7 @@ export default function DoctorDashboard() {
 
                         <div className="grid grid-cols-4 gap-2 border-t border-border pt-4">
                           {[
-                            { label: 'Order Lab', icon: FlaskConical, disabled: !contextPatient, onClick: () => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); } },
+                            { label: 'Order Test', icon: FlaskConical, disabled: !contextPatient, onClick: () => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); } },
                             { label: 'Prescribe', icon: Pill, disabled: !contextPatient, onClick: () => { setEditingPrescription(null); setPrescriptionItems([]); setShorthandInputs({}); setShorthandErrors({}); setPrescriptionModalOpen(true); } },
                             { label: 'Plan', icon: ClipboardList, disabled: !contextPatient, onClick: () => setTreatmentPlanOpen(true) },
                             { label: 'Refer', icon: Send, disabled: !selectedVisit, onClick: () => { setReferralOpen(true); setReferralForm({ specialistId: '', reason: '', notes: '' }); } },
@@ -1890,7 +1890,7 @@ export default function DoctorDashboard() {
                               </div>
                               <div className="min-w-0">
                                 <p className="text-sm font-medium truncate">{patientDisplayName(visit)}</p>
-                                <p className="text-xs text-muted-foreground truncate">{visit.chiefComplaint || 'Lab results available'}</p>
+                                <p className="text-xs text-muted-foreground truncate">{visit.chiefComplaint || 'Results available'}</p>
                               </div>
                             </div>
                             <Badge className="bg-green-600 text-white text-[10px] shrink-0">Results Ready</Badge>

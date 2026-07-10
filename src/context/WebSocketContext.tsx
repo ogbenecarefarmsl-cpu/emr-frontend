@@ -319,7 +319,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
 
       if (isPaid && order?.orderType === 'lab' && hasRole('lab_tech', 'admin')) {
         soundService.play('payment-received');
-        toast.success('Paid lab order ready', {
+        toast.success('Paid order ready', {
           description: `${orderNumber} - ${patientName}`,
           duration: 8000,
         });
@@ -398,8 +398,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       invalidateClinicalFlow();
       if (hasRole('receptionist', 'admin')) {
         soundService.play('new-order');
-        toast.success('Lab payment pending', {
-          description: `${getPatientName(visit)} has a doctor lab order awaiting payment`,
+        toast.success('Payment pending', {
+          description: `${getPatientName(visit)} has a doctor test order awaiting payment`,
           duration: 10000,
         });
       }
@@ -421,7 +421,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       invalidateRevenueFlow();
       if (hasRole('lab_tech', 'admin')) {
         soundService.play('payment-received');
-        toast.success('New paid lab order', {
+        toast.success('New paid order', {
           description: `${getPatientName(visit)} is ready for sample collection`,
           duration: 10000,
         });
@@ -446,7 +446,7 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
         soundService.play('results-ready');
         notificationService.notifyResultsReady(getVisitNumber(visit), getPatientName(visit));
         toast.success('New result available', {
-          description: `${getPatientName(visit)} has released lab results`,
+          description: `${getPatientName(visit)} has released test results`,
           duration: 12000,
         });
       }

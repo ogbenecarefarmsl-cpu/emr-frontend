@@ -49,7 +49,7 @@ const ROUTE_OPTIONS = [
 const TYPE_META: Record<string, { label: string; icon: any; color: string }> = {
   drug: { label: 'Drug', icon: Pill, color: 'bg-blue-100 text-blue-700' },
   iv: { label: 'IV', icon: FlaskConical, color: 'bg-purple-100 text-purple-700' },
-  lab: { label: 'Lab Test', icon: Beaker, color: 'bg-green-100 text-green-700' },
+  lab: { label: 'Test', icon: Beaker, color: 'bg-green-100 text-green-700' },
   procedure: { label: 'Procedure', icon: Scissors, color: 'bg-orange-100 text-orange-700' },
   other: { label: 'Other', icon: FileText, color: 'bg-gray-100 text-gray-700' },
 };
@@ -202,7 +202,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
   };
 
   const addLabTest = () => {
-    if (!selectedLab) return toast.error('Select a lab test');
+    if (!selectedLab) return toast.error('Select a test');
     const duplicate = items.some((item) => item.type === 'lab' && (item.testId || item.testCode) === (selectedLab._id || selectedLab.testId || selectedLab.testCode || selectedLab.code));
     const newItem: CreateTreatmentPlanItemInput = {
       type: 'lab',
@@ -214,7 +214,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
     setItems((prev) => [...prev, newItem]);
     setSelectedLab(null);
     setLabSearch('');
-    toast.success(`Added lab test: ${newItem.testName}${duplicate ? ' (duplicate)' : ''}`);
+    toast.success(`Added test: ${newItem.testName}${duplicate ? ' (duplicate)' : ''}`);
   };
 
   const addProcedure = () => {
@@ -330,7 +330,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
             <Pill className="h-3 w-3 mr-1" /> Drug
           </TabsTrigger>
           <TabsTrigger value="lab" className="text-xs">
-            <Beaker className="h-3 w-3 mr-1" /> Lab
+            <Beaker className="h-3 w-3 mr-1" /> Test
           </TabsTrigger>
           <TabsTrigger value="procedure" className="text-xs">
             <Scissors className="h-3 w-3 mr-1" /> Proc
@@ -363,7 +363,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
         {/* Lab tab */}
         <TabsContent value="lab" className="space-y-3">
           <div>
-            <Label className="text-sm">Search Lab Tests</Label>
+            <Label className="text-sm">Search Tests</Label>
             <div className="relative mt-1">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -412,7 +412,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
             </div>
           )}
           <Button onClick={addLabTest} disabled={!selectedLab} size="sm">
-            <Plus className="h-4 w-4 mr-1" /> Add Lab Test
+            <Plus className="h-4 w-4 mr-1" /> Add Test
           </Button>
         </TabsContent>
 

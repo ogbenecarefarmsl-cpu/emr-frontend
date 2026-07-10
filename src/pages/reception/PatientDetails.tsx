@@ -527,7 +527,7 @@ export default function PatientDetails() {
                 <FlaskConical className="w-7 h-7 text-muted-foreground/50" />
               </div>
               <p className="font-medium text-muted-foreground">No results yet</p>
-              <p className="text-sm text-muted-foreground/70 mt-1">Lab results will appear here once available</p>
+              <p className="text-sm text-muted-foreground/70 mt-1">Test results will appear here once available</p>
             </div>
           ) : (
             <Accordion type="multiple" className="space-y-2">

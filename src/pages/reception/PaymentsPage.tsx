@@ -472,7 +472,7 @@ export default function PaymentsPage() {
                           orderType === 'pharmacy' ? 'bg-emerald-500/10 text-emerald-600' :
                           'bg-muted'
                         )}>
-                          {order._isConsultationPayment ? 'Consultation' : order._isPrescriptionPayment ? 'Prescription' : orderType === 'lab' ? 'Lab' : orderType === 'pharmacy' ? 'Pharmacy Order' : orderType || '-'}
+                          {order._isConsultationPayment ? 'Consultation' : order._isPrescriptionPayment ? 'Prescription' : orderType === 'lab' ? 'Test' : orderType === 'pharmacy' ? 'Pharmacy Order' : orderType || '-'}
                         </Badge>
                         {!order.visitId && !order._visitId && (
                           <Badge variant="outline" className="text-[10px] w-fit bg-amber-50 text-amber-700 border-amber-200">No visit</Badge>

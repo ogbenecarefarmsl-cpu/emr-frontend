@@ -125,7 +125,7 @@ export function PendingOrders() {
         return (
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
             <FlaskConical className="h-3 w-3 mr-1" />
-            Lab
+            Test
           </Badge>
         );
       case 'pharmacy':
@@ -225,7 +225,7 @@ export function PendingOrders() {
         <div className="text-center py-8 text-muted-foreground">
           <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
           <p>No pending clinical payments</p>
-          <p className="text-sm">Lab and pharmacy orders will appear here</p>
+          <p className="text-sm">Test and pharmacy orders will appear here</p>
         </div>
       );
     }
@@ -402,7 +402,7 @@ export function PendingOrders() {
               All ({pendingPrescriptions.length + allOrders.length})
             </TabsTrigger>
             <TabsTrigger value="lab">
-              Lab ({labOrders.length})
+              Tests ({labOrders.length})
             </TabsTrigger>
             <TabsTrigger value="prescription">
               Prescriptions ({pendingPrescriptions.length})

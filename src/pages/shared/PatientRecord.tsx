@@ -242,7 +242,7 @@ const PatientRecord = () => {
             {[
               { label: 'Consultations', value: summary.totalConsultations || 0, icon: Stethoscope, color: 'text-blue-600' },
               { label: 'Prescriptions', value: summary.totalPrescriptions || 0, icon: Pill, color: 'text-emerald-600' },
-              { label: 'Lab Orders', value: summary.totalLabOrders || 0, icon: FlaskConical, color: 'text-purple-600' },
+              { label: 'Test Orders', value: summary.totalLabOrders || 0, icon: FlaskConical, color: 'text-purple-600' },
               { label: 'Last Visit', value: summary.lastVisit ? formatDate(summary.lastVisit) : 'N/A', icon: Calendar, color: 'text-amber-600' },
             ].map((stat, i) => (
               <div key={stat.label} className={`px-5 py-4 ${i < 3 ? 'border-r' : ''}`}>
@@ -265,7 +265,7 @@ const PatientRecord = () => {
               Timeline
             </TabsTrigger>
             <TabsTrigger value="lab-results" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
-              Lab Results <Badge variant="secondary" className="ml-1.5 h-5 text-[10px]">{orders.length}</Badge>
+              Test Results <Badge variant="secondary" className="ml-1.5 h-5 text-[10px]">{orders.length}</Badge>
             </TabsTrigger>
             <TabsTrigger value="prescriptions" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-2.5">
               Prescriptions <Badge variant="secondary" className="ml-1.5 h-5 text-[10px]">{prescriptions.length}</Badge>
@@ -377,8 +377,8 @@ const PatientRecord = () => {
                 <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center mb-4">
                   <FlaskConical className="w-7 h-7 text-muted-foreground/50" />
                 </div>
-                <p className="font-medium text-muted-foreground">No lab orders yet</p>
-                <p className="text-sm text-muted-foreground/70 mt-1">Lab results will appear here once ordered</p>
+                <p className="font-medium text-muted-foreground">No test orders yet</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">Test results will appear here once ordered</p>
               </div>
             ) : (() => {
               const flaggedResults = getAllFlaggedResults();
