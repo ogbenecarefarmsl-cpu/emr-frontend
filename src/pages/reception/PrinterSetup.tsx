@@ -445,7 +445,7 @@ export default function PrinterSetup() {
                   Number of Copies
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  1 = Patient copy only, 2 = Patient + Lab copy
+                  1 = Patient copy only, 2 = Patient + Clinic copy
                 </p>
               </div>
               <div className="flex gap-2">

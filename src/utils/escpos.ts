@@ -1,15 +1,14 @@
 /**
- * ESC/POS command builder for 80mm thermal receipt printers (e.g. Xprinter XT-80P).
+ * ESC/POS command builder for 58mm thermal receipt printers.
  *
- * Line width at normal font on 80mm paper is approximately 42 characters.
+ * Line width at normal font on 58mm paper is approximately 32 characters.
  * ESC/POS reference: https://reference.epson-biz.com/modules/ref_escpos/index.php
  */
 
 const ESC = 0x1b;
 const GS  = 0x1d;
 
-export const LINE_WIDTH = 42;
-export const LINE_WIDTH_58 = 32;
+export const LINE_WIDTH = 32;
 
 // Re-exported so callers can share the type without importing ThermalReceipt
 export interface ReceiptData {
@@ -69,12 +68,8 @@ export function buildBranchHeaderESCPOS(b: EscPosBuilder, branch: BranchHeaderDa
   b.bold(true);
   b.line(data.name.toUpperCase());
   b.bold(false);
-  if (data.tagline) wrapText(data.tagline, LINE_WIDTH).forEach(line => b.line(line));
-  if (data.address) wrapText(data.address, LINE_WIDTH).forEach(line => b.line(line));
   if (data.phone) b.line(`Tel: ${data.phone}`);
-  if (data.email) wrapText(data.email, LINE_WIDTH).forEach(line => b.line(line));
-  if (data.website) wrapText(data.website, LINE_WIDTH).forEach(line => b.line(line));
-  if (data.operatingHours) wrapText(data.operatingHours, LINE_WIDTH).forEach(line => b.line(line));
+  if (data.address) wrapText(data.address, LINE_WIDTH).forEach(line => b.line(line));
   b.separator('=');
 }
 
@@ -259,50 +254,51 @@ export function buildReceiptESCPOS(
 
   const b = new EscPosBuilder();
   const selectedBranch = branch || data.branch;
+  const w = LINE_WIDTH;
 
-  // ── Header (branch letterhead from DB) ──────────────────────────────────
+  // ── Header ────────────────────────────────────────────────────────────
   buildBranchHeaderESCPOS(b, selectedBranch);
 
-  // ── Copy type ────────────────────────────────────────────────────────────
+  // ── Copy type ─────────────────────────────────────────────────────────
   b.bold(true);
-  b.line(center(copyType === 'patient' ? '*** PATIENT COPY ***' : '*** LAB COPY ***'));
+  b.line(center(copyType === 'patient' ? '*** PATIENT COPY ***' : '*** CLINIC COPY ***'));
   b.bold(false);
 
-  // ── Receipt info ─────────────────────────────────────────────────────────
+  // ── Receipt info ──────────────────────────────────────────────────────
   b.align('left');
-  b.line(padLine('Receipt:', data.receiptNumber));
   b.line(padLine('Order:', data.orderNumber));
   b.line(padLine('Date:', dateStr));
 
-  // ── Patient info ─────────────────────────────────────────────────────────
+  // ── Patient info ──────────────────────────────────────────────────────
   b.line(padLine('Patient:', data.patientName));
-  b.line(padLine('ID:', data.patientId));
-  if (data.patientAge) b.line(padLine('Age:', data.patientAge));
-  if (data.patientGender) b.line(padLine('Sex:', data.patientGender));
+  if (data.patientAge || data.patientGender) {
+    const ageSex = [data.patientAge, data.patientGender].filter(Boolean).join('/');
+    b.line(padLine('Age/Sex:', ageSex));
+  }
 
-  // ── Tests ────────────────────────────────────────────────────────────────
+  // ── Tests ─────────────────────────────────────────────────────────────
+  b.separator('-');
   for (const test of data.tests) {
-    const nameTrunc =
-      test.name.length > LINE_WIDTH - test.code.length - 3
-        ? test.name.slice(0, LINE_WIDTH - test.code.length - 3 - 2) + '..'
-        : test.name;
-    b.line(`${test.code}  ${nameTrunc}`);
-    b.line(padLine('', formatCurrency(test.price)));
+    const maxName = w - 2;
+    const nameTrunc = test.name.length > maxName
+      ? test.name.slice(0, maxName - 2) + '..'
+      : test.name;
+    b.line(nameTrunc);
+    b.line(padLine('  ', formatCurrency(test.price)));
   }
   b.separator('=');
 
-  // ── Totals ───────────────────────────────────────────────────────────────
+  // ── Totals ────────────────────────────────────────────────────────────
   b.bold(true);
   b.line(padLine('TOTAL:', formatCurrency(data.total)));
   b.bold(false);
   b.line(padLine('Paid:', formatCurrency(data.amountPaid)));
-  b.line(padLine('Method:', data.paymentMethod.replace('-', ' ').toUpperCase()));
+  b.line(padLine('Method:', data.paymentMethod.replace(/_/g, ' ').toUpperCase()));
   b.separator('=');
 
-  // ── Footer ───────────────────────────────────────────────────────────────
+  // ── Footer ────────────────────────────────────────────────────────────
   b.align('center');
   b.line(`*** ${data.orderNumber} ***`);
-  b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
   buildBranchFooterESCPOS(b, selectedBranch);
 
   b.feed(2);
@@ -334,7 +330,7 @@ export interface TreatmentPlanEscPosData {
   printedAt?: string;
 }
 
-function padLine58(label: string, value: string, width = LINE_WIDTH_58): string {
+function padLine58(label: string, value: string, width = LINE_WIDTH): string {
   const spaces = width - label.length - value.length;
   return spaces > 0 ? label + ' '.repeat(spaces) + value : `${label} ${value}`;
 }
@@ -361,7 +357,7 @@ export function buildTreatmentPlanESCPOS(
   branch?: BranchHeaderData | null,
 ): Uint8Array {
   const b = new EscPosBuilder();
-  const w = LINE_WIDTH_58;
+  const w = LINE_WIDTH;
 
   // ── Header (branch letterhead) ─────────────────────────────────────────
   buildBranchHeaderESCPOS(b, branch);
@@ -456,19 +452,16 @@ export function buildVisitReceiptESCPOS(
   b.line(padLine('Visit:', data.visitNumber));
   b.line(padLine('Date:', dateStr));
   b.line(padLine('Patient:', data.patientName));
-  b.line(padLine('ID:', data.patientId));
   b.line(padLine('Type:', data.serviceLabel));
-  if (data.procedureType) b.line(padLine('Procedure:', data.procedureType));
   b.separator('=');
 
   b.bold(true);
-  b.line(padLine('TOTAL PAID:', formatCurrency(data.amount)));
+  b.line(padLine('PAID:', formatCurrency(data.amount)));
   b.bold(false);
   b.line(padLine('Method:', data.paymentMethod.toUpperCase()));
   b.separator('=');
 
   b.align('center');
-  b.line(`Printed: ${new Date().toLocaleString('en-GB')}`);
   buildBranchFooterESCPOS(b, branch);
 
   b.feed(2);
@@ -516,18 +509,20 @@ export function buildPrescriptionReceiptESCPOS(
   b.bold(false);
 
   b.align('left');
-  b.line(padLine('Rx No:', data.prescriptionNumber));
+  b.line(padLine('Rx:', data.prescriptionNumber));
   b.line(padLine('Date:', data.dispenseDate));
   b.line(padLine('Patient:', data.patientName));
-  b.line(padLine('ID:', data.patientId));
+  b.separator('-');
 
   data.items.forEach((item, i) => {
-    b.line(`${i + 1}. ${item.medicationName}`);
+    const maxName = LINE_WIDTH - 2;
+    const name = item.medicationName.length > maxName
+      ? item.medicationName.slice(0, maxName - 2) + '..'
+      : item.medicationName;
+    b.line(`${i + 1}. ${name}`);
     if (item.strengthPerDose) {
-      b.line(`   ${item.strengthPerDose}, ${item.dosesPerDay}x/day, ${item.durationDays}d`);
-    }
-    if (item.lineTotalAtDispense != null) {
-      b.line(`   ${item.dispensedSellUnits} x ${formatCurrency(item.priceAtDispense || 0)} = ${formatCurrency(item.lineTotalAtDispense)}`);
+      const details = `${item.strengthPerDose} ${item.dosesPerDay}x ${item.durationDays}d`;
+      b.line(`   ${details.slice(0, LINE_WIDTH - 3)}`);
     }
   });
   b.separator('=');
@@ -536,7 +531,7 @@ export function buildPrescriptionReceiptESCPOS(
   b.bold(true);
   b.line(padLine('TOTAL:', formatCurrency(total)));
   b.bold(false);
-  b.line(padLine('Payment:', data.isPaid ? 'PAID' : 'UNPAID'));
+  b.line(padLine('Status:', data.isPaid ? 'PAID' : 'UNPAID'));
   b.separator('=');
   buildBranchFooterESCPOS(b, branch);
 
@@ -561,7 +556,7 @@ export function buildWalkInReceiptESCPOS(
   branch?: BranchHeaderData | null,
 ): Uint8Array {
   const b = new EscPosBuilder();
-  const w = LINE_WIDTH_58;
+  const w = LINE_WIDTH;
 
   buildBranchHeaderESCPOS(b, branch);
 

@@ -170,15 +170,11 @@ export default function PaymentReceipt() {
 
       {/* Copy Type Badge */}
       <div className="copy-type">
-        {copyType === 'patient' ? '📋 PATIENT COPY' : '🔬 LAB COPY'}
+        {copyType === 'patient' ? '📋 PATIENT COPY' : '📋 CLINIC COPY'}
       </div>
 
       {/* Receipt Info */}
       <div className="section">
-        <div className="info-row">
-          <span className="info-label">Receipt No:</span>
-          <span className="info-value">{receiptData.receiptNumber}</span>
-        </div>
         <div className="info-row">
           <span className="info-label">Order No:</span>
           <span className="info-value">{receiptData.orderNumber}</span>
@@ -191,43 +187,24 @@ export default function PaymentReceipt() {
 
       {/* Patient Info */}
       <div className="section">
-        <div className="section-title">Patient Information</div>
         <div className="info-row">
-          <span className="info-label">Name:</span>
+          <span className="info-label">Patient:</span>
           <span className="info-value">{receiptData.patientName}</span>
         </div>
-        <div className="info-row">
-          <span className="info-label">Patient ID:</span>
-          <span className="info-value">{receiptData.patientId}</span>
-        </div>
-        {receiptData.patientAge && (
+        {(receiptData.patientAge || receiptData.patientGender) && (
           <div className="info-row">
-            <span className="info-label">Age:</span>
-            <span className="info-value">{receiptData.patientAge}</span>
-          </div>
-        )}
-        {receiptData.patientGender && (
-          <div className="info-row">
-            <span className="info-label">Sex:</span>
-            <span className="info-value">{receiptData.patientGender}</span>
-          </div>
-        )}
-        {receiptData.patientPhone && (
-          <div className="info-row">
-            <span className="info-label">Phone:</span>
-            <span className="info-value">{receiptData.patientPhone}</span>
+            <span className="info-label">Age/Sex:</span>
+            <span className="info-value">{[receiptData.patientAge, receiptData.patientGender].filter(Boolean).join('/')}</span>
           </div>
         )}
       </div>
 
       {/* Tests/Items */}
       <div className="items-table">
-        <div className="section-title">Tests Ordered</div>
         {receiptData.tests.map((test, index) => (
           <div key={index} className="item-row">
             <div className="item-name">
-              <div style={{ fontWeight: 'bold' }}>{test.code}</div>
-              <div style={{ fontSize: '10px' }}>{test.name}</div>
+              <div>{test.name}</div>
             </div>
             <div className="item-price">{formatCurrency(test.price)}</div>
           </div>
@@ -236,24 +213,6 @@ export default function PaymentReceipt() {
 
       {/* Totals */}
       <div className="totals">
-        <div className="total-row">
-          <span>Subtotal:</span>
-          <span>{formatCurrency(receiptData.subtotal)}</span>
-        </div>
-        {receiptData.discount > 0 && (
-          <div className="total-row">
-            <span>
-              Discount ({receiptData.discountType === 'percentage' ? `${receiptData.discount}%` : formatCurrency(receiptData.discount)}):
-            </span>
-            <span>
-              -{formatCurrency(
-                receiptData.discountType === 'percentage'
-                  ? (receiptData.subtotal * receiptData.discount) / 100
-                  : receiptData.discount
-              )}
-            </span>
-          </div>
-        )}
         <div className="total-row grand-total">
           <span>TOTAL:</span>
           <span>{formatCurrency(receiptData.total)}</span>
@@ -263,14 +222,14 @@ export default function PaymentReceipt() {
       {/* Payment Info */}
       <div className="payment-info">
         <div className="info-row">
-          <span className="info-label">Payment Method:</span>
+          <span className="info-label">Paid:</span>
+          <span className="info-value">{formatCurrency(receiptData.amountPaid)}</span>
+        </div>
+        <div className="info-row">
+          <span className="info-label">Method:</span>
           <span className="info-value" style={{ textTransform: 'uppercase' }}>
             {receiptData.paymentMethod.replace(/_/g, ' ')}
           </span>
-        </div>
-        <div className="info-row">
-          <span className="info-label">Amount Paid:</span>
-          <span className="info-value">{formatCurrency(receiptData.amountPaid)}</span>
         </div>
         {receiptData.amountPaid > receiptData.total && (
           <div className="info-row">
@@ -278,10 +237,6 @@ export default function PaymentReceipt() {
             <span className="info-value">{formatCurrency(receiptData.amountPaid - receiptData.total)}</span>
           </div>
         )}
-        <div className="info-row">
-          <span className="info-label">Cashier:</span>
-          <span className="info-value">{receiptData.cashier}</span>
-        </div>
       </div>
 
       {/* Collection Info */}
@@ -298,12 +253,8 @@ export default function PaymentReceipt() {
       {/* Instructions — patient copy only */}
       {copyType === 'patient' && (
         <div className="instructions">
-          <div style={{ fontWeight: 'bold', marginBottom: '5px' }}>IMPORTANT INSTRUCTIONS:</div>
-          <div>• Please arrive 15 minutes before your scheduled time</div>
-          <div>• Bring this receipt for sample collection</div>
-          <div>• Fasting may be required for some tests</div>
-          <div>• Results will be ready within 24-48 hours</div>
-          <div>• Contact us for any queries</div>
+          <div>• Bring this receipt for collection</div>
+          <div>• Results within 24-48 hours</div>
         </div>
       )}
 
@@ -316,12 +267,6 @@ export default function PaymentReceipt() {
           <div className="thank-you">THANK YOU!</div>
           <div className="footer">
             <BranchFooterText branch={receiptData.branch} />
-            <div style={{ marginTop: '10px', fontSize: '9px' }}>
-              This is a computer-generated receipt
-            </div>
-            <div style={{ fontSize: '9px' }}>
-              Printed: {format(new Date(), 'dd/MM/yyyy HH:mm:ss')}
-            </div>
           </div>
         </>
       )}
@@ -377,22 +322,22 @@ export default function PaymentReceipt() {
           <div 
             ref={patientReceiptRef}
             className="bg-white border-2 border-dashed border-gray-300 p-4 font-mono text-xs"
-            style={{ width: '302px', margin: '0 auto' }}
+            style={{ width: '228px', margin: '0 auto' }}
           >
             <ReceiptContent copyType="patient" />
           </div>
         </Card>
 
-        {/* Lab Copy Preview */}
+        {/* Clinic Copy Preview */}
         <Card className="p-6">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="font-semibold text-lg">Lab Copy Preview</h3>
+            <h3 className="font-semibold text-lg">Clinic Copy Preview</h3>
             <Badge variant="secondary">Copy 2</Badge>
           </div>
           <div 
             ref={labReceiptRef}
             className="bg-white border-2 border-dashed border-gray-300 p-4 font-mono text-xs"
-            style={{ width: '302px', margin: '0 auto' }}
+            style={{ width: '228px', margin: '0 auto' }}
           >
             <ReceiptContent copyType="lab" />
           </div>
@@ -410,10 +355,10 @@ export default function PaymentReceipt() {
               <h4 className="font-semibold text-blue-900 mb-2">Thermal Printer Setup</h4>
               <ul className="text-sm text-blue-800 space-y-1">
                 <li>• Ensure thermal printer is connected and powered on</li>
-                <li>• Paper width should be set to 80mm</li>
+                <li>• Paper width should be set to 58mm</li>
                 <li>• Both receipts will print automatically in sequence</li>
-                <li>• Patient copy prints first, followed by lab copy</li>
-                <li>• Give patient copy to the patient, keep lab copy for records</li>
+                <li>• Patient copy prints first, followed by clinic copy</li>
+                <li>• Give patient copy to the patient, keep clinic copy for records</li>
               </ul>
             </div>
           </div>

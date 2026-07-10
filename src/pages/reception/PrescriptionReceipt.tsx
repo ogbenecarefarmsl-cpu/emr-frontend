@@ -183,7 +183,7 @@ export default function PrescriptionReceipt() {
         {rx && (
           <style>{thermalPrintStyles}</style>
         )}
-        <div ref={receiptRef} className="receipt bg-white p-4 rounded shadow mx-auto" style={{ maxWidth: '80mm' }}>
+        <div ref={receiptRef} className="receipt bg-white p-4 rounded shadow mx-auto" style={{ maxWidth: '58mm' }}>
           {isLoading ? (
             <div className="text-center p-8 text-muted-foreground">
               <Loader2 className="w-6 h-6 mx-auto animate-spin" />
