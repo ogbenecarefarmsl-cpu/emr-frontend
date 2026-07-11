@@ -253,7 +253,7 @@ const chartOrderResults = (chart: any): LabResult[] => {
 };
 
 export default function DoctorDashboard() {
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, user, exitDoctorMode } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -1061,6 +1061,16 @@ export default function DoctorDashboard() {
     navigate('/login');
   };
 
+  const handleExitDoctorMode = async () => {
+    const { error } = await exitDoctorMode();
+    if (error) {
+      toast.error(typeof error === 'string' ? error : 'Failed to exit doctor mode');
+      return;
+    }
+    toast.success('Exited doctor mode');
+    navigate('/admin');
+  };
+
   // C1: Guard navigation when dirty
   const guardNavigation = useCallback((action: () => void, navType: 'patient' | 'tab', navValue?: any) => {
     if (isDirty) {
@@ -1225,6 +1235,8 @@ export default function DoctorDashboard() {
         onOpenAllPatients={() => { setAllPatientsOpen(true); setAllPatientsPage(1); setAllPatientsSearch(''); setAllPatientsDaysBack(undefined); }}
         onLogout={handleLogout}
         acceptPending={acceptPatient.isPending}
+        doctorMode={!!user?.doctorMode}
+        onExitDoctorMode={user?.doctorMode ? handleExitDoctorMode : undefined}
       />
 
       <div className="flex flex-1 min-h-0 pt-14 h-full">

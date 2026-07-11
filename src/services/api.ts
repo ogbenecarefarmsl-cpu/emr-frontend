@@ -200,6 +200,20 @@ export const authAPI = {
     }
     return response.data;
   },
+
+  enterDoctorMode: async (branchId: string) => {
+    const response = await api.post('/auth/enter-doctor-mode', { branchId });
+    const { accessToken, refreshToken, user } = response.data;
+    setTokens(accessToken, refreshToken);
+    return { user, accessToken, refreshToken };
+  },
+
+  exitDoctorMode: async () => {
+    const response = await api.post('/auth/exit-doctor-mode');
+    const { accessToken, refreshToken, user } = response.data;
+    setTokens(accessToken, refreshToken);
+    return { user, accessToken, refreshToken };
+  },
 };
 
 export const patientsAPI = {

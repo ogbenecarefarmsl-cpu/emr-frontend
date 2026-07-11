@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   UserCheck, Search, Bell, Clock, AlertTriangle, FlaskConical,
-  ChevronDown, X, Stethoscope, LogOut, LayoutDashboard
+  ChevronDown, X, Stethoscope, LogOut, LayoutDashboard, ArrowLeftToLine
 } from 'lucide-react';
 
 interface Patient {
@@ -59,6 +59,8 @@ interface DoctorTopBarProps {
   onOpenAllPatients?: () => void;
   onLogout?: () => void;
   acceptPending?: boolean;
+  doctorMode?: boolean;
+  onExitDoctorMode?: () => void;
 }
 
 const patientDisplayName = (visit?: Visit | null) => {
@@ -109,6 +111,8 @@ export function DoctorTopBar({
   onOpenAllPatients,
   onLogout,
   acceptPending,
+  doctorMode,
+  onExitDoctorMode,
 }: DoctorTopBarProps) {
   const [queueOpen, setQueueOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -512,6 +516,16 @@ export function DoctorTopBar({
             <span className="text-[10px] font-bold">{profile?.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
           </div>
           <span className="text-xs truncate max-w-24">{profile?.fullName}</span>
+          {doctorMode && onExitDoctorMode && (
+            <button
+              type="button"
+              onClick={onExitDoctorMode}
+              className="ml-1 rounded-md p-1.5 text-amber-400 hover:bg-amber-900/30 hover:text-amber-300 transition-colors"
+              title="Exit Doctor Mode"
+            >
+              <ArrowLeftToLine className="h-3.5 w-3.5" />
+            </button>
+          )}
           {onLogout && (
             <button
               type="button"

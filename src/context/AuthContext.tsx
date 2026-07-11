@@ -12,6 +12,8 @@ export interface User {
   branchId?: string;
   branch?: { _id: string; name: string; code: string } | null;
   isActive: boolean;
+  doctorId?: string;
+  doctorMode?: boolean;
 }
 
 export interface Profile {
@@ -34,6 +36,8 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
   primaryRole: AppRole | null;
+  enterDoctorMode: (branchId: string) => Promise<{ error: Error | null }>;
+  exitDoctorMode: () => Promise<{ error: Error | null }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -129,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         branchId: data.user.branchId,
         branch: data.user.branch,
         isActive: true,
+        doctorId: data.user.doctorId,
       };
       setUser(userData);
       setProfile({
@@ -164,6 +169,72 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const hasRole = (role: AppRole) => roles.includes(role);
 
+  const enterDoctorMode = async (branchId: string) => {
+    try {
+      const data = await authAPI.enterDoctorMode(branchId);
+      const userData = {
+        id: data.user.id,
+        email: data.user.email,
+        fullName: data.user.fullName,
+        department: data.user.department,
+        avatarUrl: data.user.avatarUrl,
+        branchId: data.user.branchId,
+        branch: data.user.branch,
+        isActive: true,
+        doctorId: data.user.doctorId,
+        doctorMode: true,
+      };
+      setUser(userData);
+      setProfile({
+        id: data.user.id,
+        email: data.user.email,
+        full_name: data.user.fullName,
+        department: data.user.department,
+        avatar_url: data.user.avatarUrl,
+        branchId: data.user.branchId,
+        branch: data.user.branch,
+      });
+      return { error: null };
+    } catch (error: unknown) {
+      console.error('Enter doctor mode error:', error);
+      const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
+      return { error: axiosError.response?.data?.message || axiosError.message || 'Failed to enter doctor mode' };
+    }
+  };
+
+  const exitDoctorMode = async () => {
+    try {
+      const data = await authAPI.exitDoctorMode();
+      const userData = {
+        id: data.user.id,
+        email: data.user.email,
+        fullName: data.user.fullName,
+        department: data.user.department,
+        avatarUrl: data.user.avatarUrl,
+        branchId: data.user.branchId,
+        branch: data.user.branch,
+        isActive: true,
+        doctorId: undefined,
+        doctorMode: false,
+      };
+      setUser(userData);
+      setProfile({
+        id: data.user.id,
+        email: data.user.email,
+        full_name: data.user.fullName,
+        department: data.user.department,
+        avatar_url: data.user.avatarUrl,
+        branchId: data.user.branchId,
+        branch: data.user.branch,
+      });
+      return { error: null };
+    } catch (error: unknown) {
+      console.error('Exit doctor mode error:', error);
+      const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
+      return { error: axiosError.response?.data?.message || axiosError.message || 'Failed to exit doctor mode' };
+    }
+  };
+
   const primaryRole = roles.length > 0
     ? (roles.includes('admin')
       ? 'admin'
@@ -193,6 +264,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       hasRole,
       primaryRole,
+      enterDoctorMode,
+      exitDoctorMode,
     }}>
       {children}
     </AuthContext.Provider>

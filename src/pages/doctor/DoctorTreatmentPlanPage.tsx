@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { useAuth } from '@/context/AuthContext';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
 export default function DoctorTreatmentPlanPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const { user, exitDoctorMode } = useAuth();
   const [viewPlan, setViewPlan] = useState<TreatmentPlan | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
 
@@ -55,8 +57,24 @@ export default function DoctorTreatmentPlanPage() {
     },
   });
 
+  const handleExitDoctorMode = async () => {
+    const { error } = await exitDoctorMode();
+    if (error) {
+      toast.error(typeof error === 'string' ? error : 'Failed to exit doctor mode');
+      return;
+    }
+    toast.success('Exited doctor mode');
+    navigate('/admin');
+  };
+
   return (
-    <RoleLayout title="Treatment Plans" subtitle="Create and manage treatment plans" role="doctor">
+    <RoleLayout
+      title="Treatment Plans"
+      subtitle="Create and manage treatment plans"
+      role="doctor"
+      doctorMode={!!user?.doctorMode}
+      onExitDoctorMode={user?.doctorMode ? handleExitDoctorMode : undefined}
+    >
       <div className="space-y-6">
         {/* Create button */}
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">

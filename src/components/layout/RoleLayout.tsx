@@ -12,9 +12,11 @@ interface RoleLayoutProps {
   subtitle?: string;
   role: UserRole;
   userName?: string;
+  doctorMode?: boolean;
+  onExitDoctorMode?: () => void;
 }
 
-export function RoleLayout({ children, title, subtitle, role, userName }: RoleLayoutProps) {
+export function RoleLayout({ children, title, subtitle, role, userName, doctorMode, onExitDoctorMode }: RoleLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
@@ -40,6 +42,8 @@ export function RoleLayout({ children, title, subtitle, role, userName }: RoleLa
           userName={userName}
           onClose={() => setSidebarOpen(false)}
           collapsed={sidebarCollapsed}
+          doctorMode={doctorMode}
+          onExitDoctorMode={onExitDoctorMode}
         />
       </div>
 

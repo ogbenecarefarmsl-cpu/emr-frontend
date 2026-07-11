@@ -32,6 +32,7 @@ import {
   HeartPulse,
   Building2,
   Receipt,
+  ArrowLeftToLine,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserRole } from '@/types/lis';
@@ -128,9 +129,11 @@ interface RoleSidebarProps {
   userName?: string;
   onClose?: () => void;
   collapsed?: boolean;
+  doctorMode?: boolean;
+  onExitDoctorMode?: () => void;
 }
 
-export function RoleSidebar({ role, userName, onClose, collapsed = false }: RoleSidebarProps) {
+export function RoleSidebar({ role, userName, onClose, collapsed = false, doctorMode, onExitDoctorMode }: RoleSidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { signOut } = useAuth();
@@ -251,8 +254,22 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false }: Role
         )}
       </nav>
 
-      {/* Logout Button */}
-      <div className="p-4 border-t border-sidebar-border">
+      {/* Exit Doctor Mode + Logout */}
+      <div className="p-4 border-t border-sidebar-border space-y-2">
+        {doctorMode && onExitDoctorMode && (
+          <Button
+            onClick={onExitDoctorMode}
+            variant="ghost"
+            title={collapsed ? 'Exit Doctor Mode' : undefined}
+            className={cn(
+              "w-full gap-3 text-amber-600 hover:bg-amber-50 hover:text-amber-700",
+              collapsed ? "lg:justify-center lg:px-2 justify-start" : "justify-start"
+            )}
+          >
+            <ArrowLeftToLine className="w-5 h-5" />
+            <span className={cn("font-medium", collapsed && "lg:hidden")}>Exit Doctor Mode</span>
+          </Button>
+        )}
         <Button
           onClick={handleLogout}
           variant="ghost"

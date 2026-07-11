@@ -19,6 +19,7 @@ import {
   Printer, Settings, ArrowRight, Loader2, Activity, UserCog,
   Calendar, FileText, FileSearch, Clock, Skull, Database, Trash2,
   HardDriveDownload, Download, Play, RefreshCw, Building2, Tags, FileCheck, ShieldOff,
+  UserRound,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
@@ -73,7 +74,7 @@ function fmtLe(n: number) {
 }
 
 export default function AdminDashboard() {
-  const { profile } = useAuth();
+  const { profile, enterDoctorMode } = useAuth();
   const navigate = useNavigate();
   const [selectedBranchId, setSelectedBranchId] = useState('all');
   const { data: branches = [] } = useAllBranches();
@@ -81,6 +82,21 @@ export default function AdminDashboard() {
   useRealtimeOrders();
   useRealtimeResults();
   useRealtimePatients();
+
+  const handleEnterDoctorMode = async () => {
+    const branchId = profile?.branchId;
+    if (!branchId) {
+      toast.error('Please select a branch first');
+      return;
+    }
+    const { error } = await enterDoctorMode(branchId);
+    if (error) {
+      toast.error(typeof error === 'string' ? error : 'Failed to enter doctor mode');
+      return;
+    }
+    toast.success('Entered doctor mode');
+    navigate('/doctor');
+  };
 
   const { data, isLoading } = useQuery<AdminDashboardData>({
     queryKey: ['admin', 'dashboard', selectedBranchId],
@@ -395,7 +411,16 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 p-4">
             <RoleLink icon={Users} label="Reception" to="/reception" navigate={navigate} />
             <RoleLink icon={Activity} label="Nursing" to="/nurse" navigate={navigate} />
-            <RoleLink icon={Stethoscope} label="Doctor" to="/doctor" navigate={navigate} />
+            <button
+              type="button"
+              onClick={handleEnterDoctorMode}
+              className="group flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary hover:border-primary transition-all"
+            >
+              <div className="w-10 h-10 rounded-lg bg-primary/10 group-hover:bg-white/20 flex items-center justify-center transition-colors">
+                <Stethoscope className="w-5 h-5 text-primary group-hover:text-white transition-colors" />
+              </div>
+              <span className="text-xs font-semibold text-primary group-hover:text-white transition-colors">Doctor Mode</span>
+            </button>
             <RoleLink icon={FlaskConical} label="Lab" to="/lab" navigate={navigate} />
             <RoleLink icon={Pill} label="Pharmacy" to="/pharmacy" navigate={navigate} />
             <RoleLink icon={Package} label="Inventory" to="/inventory" navigate={navigate} />
