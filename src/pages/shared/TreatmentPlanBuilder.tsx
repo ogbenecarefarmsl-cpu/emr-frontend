@@ -71,8 +71,8 @@ interface TreatmentPlanBuilderProps {
   preselectedPatientId?: string;
   /** Pre-selected patient name for display */
   preselectedPatientName?: string;
-  /** Called after plan is created successfully */
-  onPlanCreated?: () => void;
+  /** Called after plan is created successfully, with the items and notes */
+  onPlanCreated?: (plan?: { items: CreateTreatmentPlanItemInput[]; notes?: string }) => void;
   /** Show as inline form (no Card wrapper) */
   inline?: boolean;
 }
@@ -274,9 +274,9 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
         toast.success('Treatment plan saved as draft');
       }
       queryClient.invalidateQueries({ queryKey: ['treatment-plans'] });
+      onPlanCreated?.({ items, notes });
       setItems([]);
       setNotes('');
-      onPlanCreated?.();
     },
     onError: (err: any) => {
       toast.error(err?.response?.data?.message || 'Failed to create treatment plan');

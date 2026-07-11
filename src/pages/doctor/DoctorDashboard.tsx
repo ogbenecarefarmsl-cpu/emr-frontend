@@ -51,8 +51,46 @@ import {
   ChevronDown, AlertTriangle, Search, Plus, Trash2, Save,
   Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
   Pencil, AlertCircle, TestTube, Stethoscope, Calendar, Clock, Eye, Printer,
-  RefreshCw, ShieldCheck
+  RefreshCw, ShieldCheck, Scissors
 } from 'lucide-react';
+import { type CreateTreatmentPlanItemInput } from '@/types/treatment-plan';
+import { treatmentPlanService } from '@/services/treatmentPlanService';
+
+const TYPE_LABELS: Record<string, string> = { drug: 'Drug', iv: 'IV', lab: 'Test', procedure: 'Procedure', other: 'Other' };
+
+const PLAN_STATUS_COLORS: Record<string, string> = {
+  draft: 'bg-slate-100 text-slate-700 border-slate-200',
+  sent_to_reception: 'bg-blue-50 text-blue-700 border-blue-200',
+  paid: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  completed: 'bg-green-50 text-green-700 border-green-200',
+  cancelled: 'bg-red-50 text-red-700 border-red-200',
+};
+
+function generatePlanSummary(items: CreateTreatmentPlanItemInput[], notes?: string): string {
+  const lines: string[] = [];
+  const grouped: Record<string, CreateTreatmentPlanItemInput[]> = {};
+  for (const item of items) {
+    const key = item.type || 'other';
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(item);
+  }
+  for (const [type, group] of Object.entries(grouped)) {
+    lines.push(`--- ${TYPE_LABELS[type] || type} ---`);
+    for (const item of group) {
+      const desc = item.description || item.medicationName || item.testName || 'Untitled';
+      const dose = item.strengthPerDose ? ` ${item.strengthPerDose}` : '';
+      const freq = item.dosesPerDay ? ` ${item.dosesPerDay}x/d` : '';
+      const dur = item.durationDays ? ` x${item.durationDays}d` : '';
+      const qty = item.quantity ? ` (qty: ${item.quantity})` : '';
+      const route = item.route && item.route !== 'oral' ? ` [${item.route}]` : '';
+      const cost = item.amount ? ` Le${item.amount}` : '';
+      lines.push(`  ${desc}${dose}${freq}${dur}${route}${qty}${cost}`);
+    }
+    lines.push('');
+  }
+  if (notes) lines.push(notes);
+  return lines.join('\n').trim();
+}
 
 // Types
 interface Visit {
@@ -431,6 +469,18 @@ export default function DoctorDashboard() {
     queryFn: () => prescriptionService.findByPatient(patientId),
     enabled: !!patientId,
     staleTime: 30 * 1000,
+  });
+
+  // Treatment plans for the current visit
+  const { data: allPlans = [] } = useQuery({
+    queryKey: ['treatment-plans', currentVisitId ? 'visit' : 'patient', currentVisitId || patientId],
+    queryFn: () => currentVisitId ? treatmentPlanService.getForVisit(currentVisitId) : treatmentPlanService.getForPatient(patientId),
+    enabled: !!(currentVisitId || patientId),
+    staleTime: 30 * 1000,
+  });
+  const currentVisitPlans = (Array.isArray(allPlans) ? allPlans : []).filter((p: any) => {
+    const planVisitId = typeof p.visitId === 'object' ? p.visitId?._id : p.visitId;
+    return planVisitId === currentVisitId;
   });
 
   const currentVisitId = selectedVisit?._id || selectedVisit?.id;
@@ -1470,8 +1520,63 @@ export default function DoctorDashboard() {
                                 <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t pt-4">
                                   <div className="pt-7 text-center text-xl font-bold text-teal-700">P</div>
                                   <div className="space-y-2">
-                                    <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Plan</Label>
+                                    <div className="flex items-center justify-between">
+                                      <Label className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Plan</Label>
+                                      <div className="flex gap-1">
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          className="h-6 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                          onClick={() => setTreatmentPlanOpen(true)}
+                                          disabled={isReadOnly || !canWriteConsultation || !contextPatient}
+                                        >
+                                          <ClipboardList className="w-3 h-3" /> Treatment Plan
+                                        </Button>
+                                        {currentVisitPlans.length > 0 && (
+                                          <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            className="h-6 text-[10px] gap-1 text-muted-foreground hover:text-foreground"
+                                            onClick={() => {
+                                              const allItems = currentVisitPlans.flatMap((p: any) => p.items || []);
+                                              const summary = generatePlanSummary(allItems);
+                                              setSoapForm(prev => ({ ...prev, plan: summary }));
+                                              toast.success('Plan text synced from treatment plans');
+                                            }}
+                                          >
+                                            <RefreshCw className="w-3 h-3" /> Sync
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </div>
                                     <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({ ...soapForm, plan: e.target.value })} placeholder="Treatment plan, follow-up, counselling..." rows={5} className="resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                    {currentVisitPlans.length > 0 && (
+                                      <div className="space-y-1.5">
+                                        {currentVisitPlans.map((plan: any) => (
+                                          <div key={plan._id} className="rounded-md border border-slate-200 bg-slate-50/60 px-2.5 py-1.5">
+                                            <div className="flex items-center gap-2 text-[10px] text-muted-foreground mb-1">
+                                              <span className="font-medium text-foreground">{plan.planNumber}</span>
+                                              <Badge variant="outline" className={cn('text-[9px] px-1 py-0 h-3.5', PLAN_STATUS_COLORS[plan.status] || 'bg-slate-100 text-slate-600 border-slate-200')}>{plan.status.replace('_', ' ')}</Badge>
+                                              {plan.totalAmount > 0 && <span>Le{plan.totalAmount.toLocaleString()}</span>}
+                                            </div>
+                                            <div className="flex flex-wrap gap-1">
+                                              {(plan.items || []).slice(0, 6).map((item: any, idx: number) => {
+                                                const Icon = item.type === 'drug' || item.type === 'iv' ? Pill : item.type === 'lab' ? FlaskConical : item.type === 'procedure' ? Scissors : FileText;
+                                                return (
+                                                  <span key={idx} className="inline-flex items-center gap-0.5 rounded bg-white border border-slate-200 px-1.5 py-0.5 text-[10px] text-slate-700">
+                                                    <Icon className="w-2.5 h-2.5 text-slate-500" />
+                                                    {(item.description || item.medicationName || item.testName || '').slice(0, 20)}
+                                                  </span>
+                                                );
+                                              })}
+                                              {(plan.items || []).length > 6 && <span className="text-[10px] text-muted-foreground">+{(plan.items || []).length - 6} more</span>}
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
                               </div>
@@ -2352,10 +2457,18 @@ export default function DoctorDashboard() {
               preselectedVisitId={selectedVisit?._id || selectedVisit?.id}
               preselectedPatientId={!selectedVisit ? contextPatient?._id : undefined}
               preselectedPatientName={!selectedVisit ? [contextPatient?.firstName, contextPatient?.lastName].filter(Boolean).join(' ').trim() : undefined}
-              onPlanCreated={() => {
+              onPlanCreated={(plan) => {
                 setTreatmentPlanOpen(false);
                 queryClient.invalidateQueries({ queryKey: ['visits'] });
                 queryClient.invalidateQueries({ queryKey: ['treatment-plans'] });
+                if (plan?.items && plan.items.length > 0) {
+                  const summary = generatePlanSummary(plan.items, plan.notes);
+                  setSoapForm(prev => ({
+                    ...prev,
+                    plan: prev.plan ? prev.plan + '\n' + summary : summary,
+                  }));
+                  toast.success('Plan summary added to SOAP notes');
+                }
               }}
               inline
             />
