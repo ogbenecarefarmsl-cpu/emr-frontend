@@ -353,7 +353,7 @@ export default function DoctorDashboard() {
       return admissionsAPI.create({
         patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
         visitId: selectedVisit._id || selectedVisit.id,
-        doctorId: profile?.id,  // Profile ID - admission.doctorId now refs Profile
+        doctorId: user?.doctorId || profile?.id,
         wardType: admitForm.wardType,
         bedNumber: admitForm.bedNumber || undefined,
         admissionReason: admitForm.admissionReason,
@@ -638,7 +638,7 @@ export default function DoctorDashboard() {
           await soapNoteService.create({
             patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
             visitId: selectedVisit._id || selectedVisit.id,
-            doctorId: profile?.id,
+            doctorId: user?.doctorId || profile?.id,
             noteType: SoapNoteTypeEnum.CONSULTATION,
             chiefComplaint: selectedVisit.chiefComplaint || undefined,
             historyPresentIllness: soapForm.subjective || undefined,
