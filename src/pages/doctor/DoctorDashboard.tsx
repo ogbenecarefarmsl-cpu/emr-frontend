@@ -471,6 +471,8 @@ export default function DoctorDashboard() {
     staleTime: 30 * 1000,
   });
 
+  const currentVisitId = selectedVisit?._id || selectedVisit?.id;
+
   // Treatment plans for the current visit
   const { data: allPlans = [] } = useQuery({
     queryKey: ['treatment-plans', currentVisitId ? 'visit' : 'patient', currentVisitId || patientId],
@@ -482,8 +484,6 @@ export default function DoctorDashboard() {
     const planVisitId = typeof p.visitId === 'object' ? p.visitId?._id : p.visitId;
     return planVisitId === currentVisitId;
   });
-
-  const currentVisitId = selectedVisit?._id || selectedVisit?.id;
 
   // Current visit prescriptions (pending and unpaid)
   const currentVisitPrescriptions = (Array.isArray(patientPrescriptions) ? patientPrescriptions : [])
