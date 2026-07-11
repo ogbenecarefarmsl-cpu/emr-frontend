@@ -37,8 +37,8 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function AdminInsuranceClaimsPage() {
   const [activeTab, setActiveTab] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [programFilter, setProgramFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [programFilter, setProgramFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClaim, setSelectedClaim] = useState<any>(null);
   const [showDetailDialog, setShowDetailDialog] = useState(false);
@@ -60,8 +60,8 @@ export default function AdminInsuranceClaimsPage() {
   const { data: claims = [], isLoading: claimsLoading } = useQuery({
     queryKey: ['insurance-claims', statusFilter, programFilter, branchId],
     queryFn: () => insuranceClaimsAPI.list({
-      status: statusFilter || undefined,
-      programCode: programFilter || undefined,
+      status: statusFilter !== 'all' ? statusFilter : undefined,
+      programCode: programFilter !== 'all' ? programFilter : undefined,
       branchId: branchId || undefined,
     }),
   });
@@ -238,7 +238,7 @@ export default function AdminInsuranceClaimsPage() {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="submitted">Submitted</SelectItem>
                 <SelectItem value="approved">Approved</SelectItem>
@@ -252,7 +252,7 @@ export default function AdminInsuranceClaimsPage() {
                 <SelectValue placeholder="All Programs" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Programs</SelectItem>
+                <SelectItem value="all">All Programs</SelectItem>
                 <SelectItem value="AIC">AIC - Aureol Insurance</SelectItem>
                 <SelectItem value="RHIP">RHIP</SelectItem>
                 <SelectItem value="ACTIVA">ACTIVA</SelectItem>

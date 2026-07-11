@@ -37,11 +37,11 @@ export default function InsuranceBlockListPage() {
   const [showDetailDialog, setShowDetailDialog] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [programFilter, setProgramFilter] = useState('');
+  const [programFilter, setProgramFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('active');
   const [showInactive, setShowInactive] = useState(false);
   const queryClient = useQueryClient();
-  const { profile } = useAuth();
+  const { profile, hasRole } = useAuth();
 
   // Form state
   const [formPatientId, setFormPatientId] = useState('');
@@ -61,12 +61,13 @@ export default function InsuranceBlockListPage() {
   const { data: stats } = useQuery({
     queryKey: ['insurance-blocks-stats'],
     queryFn: () => insuranceBlocksAPI.getStats(),
+    enabled: hasRole('admin'),
   });
 
   const { data: blocks = [], isLoading } = useQuery({
     queryKey: ['insurance-blocks', programFilter, statusFilter, searchQuery],
     queryFn: () => insuranceBlocksAPI.list({
-      programCode: programFilter || undefined,
+      programCode: programFilter !== 'all' ? programFilter : undefined,
       isActive: statusFilter === 'active' ? 'true' : statusFilter === 'inactive' ? 'false' : undefined,
       search: searchQuery || undefined,
     }),
@@ -233,7 +234,7 @@ export default function InsuranceBlockListPage() {
                 <SelectValue placeholder="All Programs" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Programs</SelectItem>
+                <SelectItem value="all">All Programs</SelectItem>
                 {programs.map((p: any) => (
                   <SelectItem key={p.code} value={p.code}>{p.name}</SelectItem>
                 ))}
