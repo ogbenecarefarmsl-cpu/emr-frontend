@@ -5,9 +5,11 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Loader2, FileText, FlaskConical, Pill, BedDouble,
-  AlertTriangle, Activity, CreditCard, UserCheck, Stethoscope, Wallet, ClipboardList
+  AlertTriangle, Activity, CreditCard, UserCheck, Stethoscope, Wallet,
+  ClipboardList, Heart, ArrowRightLeft, LogOut, StickyNote
 } from 'lucide-react';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
+import api from '@/services/api';
 
 interface TimelineEvent {
   id: string;
@@ -21,6 +23,7 @@ interface TimelineEvent {
   summary?: string;
   detail?: string;
   onClick?: () => void;
+  vitals?: Record<string, any>;
 }
 
 const EVENT_CONFIG: Record<string, { icon: any; color: string; bgColor: string; borderColor: string }> = {
@@ -30,9 +33,14 @@ const EVENT_CONFIG: Record<string, { icon: any; color: string; bgColor: string; 
   lab_resulted: { icon: FlaskConical, color: 'text-emerald-600', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200' },
   prescription: { icon: Pill, color: 'text-indigo-600', bgColor: 'bg-indigo-50', borderColor: 'border-indigo-200' },
   admission: { icon: BedDouble, color: 'text-rose-600', bgColor: 'bg-rose-50', borderColor: 'border-rose-200' },
+  discharge: { icon: LogOut, color: 'text-teal-600', bgColor: 'bg-teal-50', borderColor: 'border-teal-200' },
   wallet: { icon: Wallet, color: 'text-teal-600', bgColor: 'bg-teal-50', borderColor: 'border-teal-200' },
+  payment: { icon: CreditCard, color: 'text-green-600', bgColor: 'bg-green-50', borderColor: 'border-green-200' },
   triage_override: { icon: AlertTriangle, color: 'text-orange-600', bgColor: 'bg-orange-50', borderColor: 'border-orange-200' },
   treatment_plan: { icon: ClipboardList, color: 'text-cyan-600', bgColor: 'bg-cyan-50', borderColor: 'border-cyan-200' },
+  vitals: { icon: Heart, color: 'text-rose-500', bgColor: 'bg-rose-50', borderColor: 'border-rose-200' },
+  referral: { icon: ArrowRightLeft, color: 'text-violet-600', bgColor: 'bg-violet-50', borderColor: 'border-violet-200' },
+  note: { icon: StickyNote, color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-200' },
 };
 
 function groupByDate(events: TimelineEvent[]) {
@@ -46,17 +54,50 @@ function groupByDate(events: TimelineEvent[]) {
   return groups;
 }
 
-function SoapCompact({ event }: { event: TimelineEvent }) {
+function hasVitalsData(vitals: Record<string, any>): boolean {
+  return ['bloodPressure', 'temperature', 'heartRate', 'respiratoryRate', 'weight', 'height', 'oxygenSaturation']
+    .some((k) => vitals[k] !== undefined && vitals[k] !== null && vitals[k] !== '');
+}
+
+function VitalsInline({ vitals }: { vitals: Record<string, any> }) {
+  const items = [
+    { label: 'BP', value: vitals.bloodPressure, unit: 'mmHg' },
+    { label: 'HR', value: vitals.heartRate, unit: 'bpm' },
+    { label: 'Temp', value: vitals.temperature, unit: '°C' },
+    { label: 'RR', value: vitals.respiratoryRate, unit: '/min' },
+    { label: 'SpO2', value: vitals.oxygenSaturation, unit: '%' },
+    { label: 'Wt', value: vitals.weight, unit: 'kg' },
+  ].filter((v) => v.value !== undefined && v.value !== null && v.value !== '');
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-1.5 mt-1.5">
+      {items.map((v) => (
+        <span key={v.label} className="inline-flex items-center gap-1 rounded bg-white/80 border border-white px-1.5 py-0.5 text-[10px] font-mono">
+          <span className="font-semibold text-slate-700">{v.label}</span>
+          <span className="text-slate-900">{v.value}</span>
+          <span className="text-muted-foreground">{v.unit}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function DetailBlock({ event }: { event: TimelineEvent }) {
   const [expanded, setExpanded] = useState(false);
   const summary = event.summary || '';
   const detail = event.detail || '';
 
   return (
     <div className="cursor-pointer" onClick={() => setExpanded(!expanded)}>
+      {event.vitals && hasVitalsData(event.vitals) && (
+        <VitalsInline vitals={event.vitals} />
+      )}
       {expanded ? (
-        <div className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">{detail || summary}</div>
+        <div className="text-xs text-foreground whitespace-pre-wrap leading-relaxed mt-1">{detail || summary}</div>
       ) : (
-        <p className="text-xs text-foreground truncate">{summary}</p>
+        <p className="text-xs text-muted-foreground mt-0.5 truncate">{summary}</p>
       )}
       {detail && detail.length > 80 && (
         <span className="text-[10px] text-primary font-medium mt-0.5 block">{expanded ? 'Click to collapse' : 'Click to expand'}</span>
@@ -91,34 +132,87 @@ export function PatientTimeline({
     staleTime: 30 * 1000,
   });
 
+  const { data: payments = [] } = useQuery({
+    queryKey: ['payments', 'patient', patientId],
+    queryFn: async () => {
+      const res = await api.get(`/payments/patient/${patientId}`);
+      return res.data || [];
+    },
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
+
   const events = useMemo<TimelineEvent[]>(() => {
     const result: TimelineEvent[] = [];
 
-    // Visits
+    // Visits — with doctor name, visit type, consultation fee
     if (patientVisits) {
       for (const v of patientVisits) {
-        const cfg = EVENT_CONFIG.visit;
+        const doctorName = typeof v.doctorId === 'object' ? v.doctorId?.fullName : null;
         result.push({
           id: `visit-${v._id}`,
           type: 'visit',
           date: v.createdAt,
-          ...cfg,
+          ...EVENT_CONFIG.visit,
           title: `Visit #${v.visitNumber || v._id?.slice(-6)}`,
-          summary: v.chiefComplaint || v.status?.replace(/_/g, ' ') || 'Visit created',
+          summary: [
+            v.visitType || '',
+            v.chiefComplaint || v.status?.replace(/_/g, ' ') || 'Visit created',
+            doctorName ? `Dr. ${doctorName}` : '',
+          ].filter(Boolean).join(' · '),
           detail: [
             `Status: ${v.status?.replace(/_/g, ' ')}`,
+            `Type: ${v.visitType || 'N/A'}`,
             v.chiefComplaint ? `CC: ${v.chiefComplaint}` : '',
             v.diagnosis ? `Dx: ${v.diagnosis}` : '',
+            doctorName ? `Doctor: Dr. ${doctorName}` : '',
             v.room ? `Room: ${v.room}` : '',
+            v.consultationFee ? `Fee: Le ${v.consultationFee.toLocaleString()}${v.consultationPaid ? ' (paid)' : ' (unpaid)'}` : '',
+            v.triagePriority ? `Triage: ${v.triagePriority.replace(/_/g, ' ')}` : '',
+            v.triageNotes ? `Triage notes: ${v.triageNotes}` : '',
           ].filter(Boolean).join('\n'),
         });
       }
     }
 
-    // SOAP notes from patient chart
+    // Vitals history from chart (triage, SOAP, admission readings)
+    const vitalsHistory = patientChart?.vitalsHistory || [];
+    for (const entry of vitalsHistory) {
+      if (!hasVitalsData(entry.vitalSigns || {})) continue;
+      const sourceLabel = entry.source === 'triage' ? 'Nurse triage'
+        : entry.source === 'admission' ? 'Inpatient'
+        : 'SOAP';
+      const recordedBy = typeof entry.recordedBy === 'object' ? entry.recordedBy?.fullName : null;
+      result.push({
+        id: `vitals-${entry.source}-${entry.date || Math.random()}`,
+        type: 'vitals',
+        date: entry.date,
+        ...EVENT_CONFIG.vitals,
+        title: `Vitals (${sourceLabel})`,
+        summary: [
+          recordedBy ? `Recorded by ${recordedBy}` : '',
+          entry.visitNumber ? `Visit ${entry.visitNumber}` : '',
+        ].filter(Boolean).join(' · ') || 'Vital signs recorded',
+        detail: [
+          `Source: ${sourceLabel}`,
+          entry.visitNumber ? `Visit: ${entry.visitNumber}` : '',
+          recordedBy ? `Recorded by: ${recordedBy}` : '',
+          `BP: ${entry.vitalSigns?.bloodPressure || '-'}`,
+          `HR: ${entry.vitalSigns?.heartRate || '-'} bpm`,
+          `Temp: ${entry.vitalSigns?.temperature || '-'} °C`,
+          `RR: ${entry.vitalSigns?.respiratoryRate || '-'} /min`,
+          `SpO2: ${entry.vitalSigns?.oxygenSaturation || '-'} %`,
+          `Weight: ${entry.vitalSigns?.weight || '-'} kg`,
+          `Height: ${entry.vitalSigns?.height || '-'} cm`,
+        ].join('\n'),
+        vitals: entry.vitalSigns,
+      });
+    }
+
+    // SOAP notes — with doctor name, vital signs
     const soapNotes = patientChart?.soapNotes || [];
     for (const note of soapNotes) {
-      const cfg = EVENT_CONFIG.soap;
+      const doctorName = typeof note.doctorId === 'object' ? note.doctorId?.fullName : null;
       const parts: string[] = [];
       if (note.historyPresentIllness) parts.push(`S: ${note.historyPresentIllness}`);
       if (note.physicalExamination) parts.push(`O: ${note.physicalExamination}`);
@@ -131,136 +225,341 @@ export function PatientTimeline({
       if (note.diagnosis) summaryParts.push(`A: ${note.diagnosis.slice(0, 60)}${note.diagnosis.length > 60 ? '...' : ''}`);
       if (note.treatmentPlan) summaryParts.push(`P: ${note.treatmentPlan.slice(0, 40)}${note.treatmentPlan.length > 40 ? '...' : ''}`);
 
+      const soapVitals = note.vitalSigns;
+
       result.push({
         id: `soap-${note._id}`,
         type: 'soap',
         date: note.createdAt || note.signedAt,
-        ...cfg,
+        ...EVENT_CONFIG.soap,
         title: note.isSigned ? 'SOAP Note (signed)' : 'SOAP Note',
-        summary: summaryParts.join(' | ') || 'SOAP note recorded',
-        detail: parts.join('\n') || 'No details',
+        summary: [
+          summaryParts.join(' | ') || 'SOAP note recorded',
+          doctorName ? `Dr. ${doctorName}` : '',
+        ].filter(Boolean).join(' · '),
+        detail: [
+          doctorName ? `Doctor: Dr. ${doctorName}` : '',
+          note.isSigned ? 'Status: Signed' : 'Status: Draft',
+          ...parts,
+        ].filter(Boolean).join('\n'),
+        vitals: soapVitals,
       });
     }
 
-    // Lab orders
+    // Lab orders — with amount, doctor, test count
     if (patientOrders) {
       for (const order of patientOrders) {
         const type = order.orderType || order.order_type;
         if (type === 'lab') {
-          const testNames = (order.order_tests || order.tests || []).map((t: any) => t.testName || t.testCode).join(', ');
-          const cfg = EVENT_CONFIG.lab_ordered;
+          const tests = order.order_tests || order.tests || [];
+          const testNames = tests.map((t: any) => t.testName || t.testCode).join(', ');
           const hasResults = order.status === 'completed';
+          const doctorName = typeof order.doctorId === 'object' ? order.doctorId?.fullName : (typeof order.orderedBy === 'object' ? order.orderedBy?.fullName : null);
           result.push({
             id: `lab-${order._id}`,
             type: 'lab_ordered',
             date: order.createdAt,
-            ...cfg,
+            ...EVENT_CONFIG.lab_ordered,
             title: `Lab Order: ${testNames || 'Tests ordered'}`,
-            summary: `Priority: ${order.priority || 'routine'} · Status: ${order.paymentStatus || order.payment_status || 'pending'}`,
+            summary: [
+              `${tests.length} test(s)`,
+              order.total ? `Le ${order.total.toLocaleString()}` : '',
+              `Status: ${(order.paymentStatus || order.payment_status || 'pending').replace(/_/g, ' ')}`,
+              doctorName ? `Dr. ${doctorName}` : '',
+            ].filter(Boolean).join(' · '),
             detail: [
               `Tests: ${testNames}`,
+              `Count: ${tests.length}`,
+              order.total ? `Total: Le ${order.total.toLocaleString()}` : '',
               `Priority: ${order.priority || 'routine'}`,
-              `Payment: ${order.paymentStatus || order.payment_status || 'pending'}`,
-              `Status: ${order.status || 'pending'}`,
-            ].join('\n'),
+              `Payment: ${(order.paymentStatus || order.payment_status || 'pending').replace(/_/g, ' ')}`,
+              `Status: ${(order.status || 'pending').replace(/_/g, ' ')}`,
+              doctorName ? `Ordered by: Dr. ${doctorName}` : '',
+            ].filter(Boolean).join('\n'),
             onClick: hasResults && onNavigate ? () => onNavigate('lab-results') : undefined,
           });
         }
       }
     }
 
-    // Lab results from patient chart
+    // Lab results from patient chart — with flags, reviewed status
     const labResults = patientChart?.labResults || [];
     for (const r of labResults) {
-      const cfg = EVENT_CONFIG.lab_resulted;
+      const isAbnormal = r.flag && r.flag !== 'normal';
       result.push({
         id: `result-${r._id}`,
         type: 'lab_resulted',
         date: r.resulted_at || r.createdAt,
-        ...cfg,
+        ...EVENT_CONFIG.lab_resulted,
         title: `${r.testName}: ${r.value}${r.unit ? ' ' + r.unit : ''}`,
-        summary: r.flag && r.flag !== 'normal' ? `Flag: ${r.flag.replace(/_/g, ' ')}` : 'Normal',
+        summary: isAbnormal ? `Flag: ${r.flag?.replace(/_/g, ' ')}` : 'Normal',
         detail: [
           `Value: ${r.value}${r.unit ? ' ' + r.unit : ''}`,
           r.referenceRange || r.reference_range ? `Ref: ${r.referenceRange || r.reference_range}` : '',
-          `Flag: ${r.flag || 'normal'}`,
+          `Flag: ${(r.flag || 'normal').replace(/_/g, ' ')}`,
+          r.resultedBy ? `Resulted by: ${typeof r.resultedBy === 'object' ? r.resultedBy?.fullName : r.resultedBy}` : '',
+          r.verifiedBy ? `Verified by: ${typeof r.verifiedBy === 'object' ? r.verifiedBy?.fullName : r.verifiedBy}` : '',
         ].filter(Boolean).join('\n'),
         onClick: onNavigate ? () => onNavigate('lab-results') : undefined,
       });
     }
 
-    // Prescriptions
+    // Prescriptions — with doctor, dispensing status, more detail
     if (patientPrescriptions) {
       for (const rx of patientPrescriptions) {
-        const cfg = EVENT_CONFIG.prescription;
-        const medNames = (rx.items || []).map((i: any) => i.medicationName).join(', ');
+        const items = rx.items || [];
+        const medNames = items.map((i: any) => i.medicationName).join(', ');
+        const doctorName = typeof rx.doctorId === 'object' ? rx.doctorId?.fullName : null;
+        const dispensedByName = typeof rx.dispensedBy === 'object' ? rx.dispensedBy?.fullName : null;
+        const totalCost = items.reduce((sum: number, i: any) => sum + (i.unitPrice || 0) * (i.quantity || 0), 0);
+
         result.push({
           id: `rx-${rx._id}`,
           type: 'prescription',
           date: rx.createdAt,
-          ...cfg,
+          ...EVENT_CONFIG.prescription,
           title: `Prescription: ${medNames || 'Medications'}`,
-          summary: `${(rx.items || []).length} medication(s) · ${rx.isPaid ? 'Paid' : 'Pending payment'}`,
-          detail: (rx.items || [])
-            .map((i: any) => `${i.medicationName} ${i.dosage || ''} ${i.frequency || ''}`.trim())
-            .join('\n') || 'No items',
+          summary: [
+            `${items.length} medication(s)`,
+            totalCost > 0 ? `Le ${totalCost.toLocaleString()}` : '',
+            rx.isPaid ? 'Paid' : 'Pending payment',
+            rx.status === 'dispensed' ? 'Dispensed' : '',
+            doctorName ? `Dr. ${doctorName}` : '',
+          ].filter(Boolean).join(' · '),
+          detail: [
+            doctorName ? `Doctor: Dr. ${doctorName}` : '',
+            `Status: ${rx.status || 'pending'}`,
+            `Paid: ${rx.isPaid ? 'Yes' : 'No'}`,
+            dispensedByName ? `Dispensed by: ${dispensedByName}` : '',
+            totalCost > 0 ? `Total: Le ${totalCost.toLocaleString()}` : '',
+            '---',
+            ...items.map((i: any) => [
+              `${i.medicationName}`,
+              i.dosage ? `  Dose: ${i.dosage}` : '',
+              i.frequency ? `  Freq: ${i.frequency}` : '',
+              i.duration ? `  Duration: ${i.duration}` : '',
+              i.quantity ? `  Qty: ${i.quantity}` : '',
+              i.instructions ? `  Instructions: ${i.instructions}` : '',
+            ].filter(Boolean).join('\n')),
+          ].filter(Boolean).join('\n'),
         });
       }
     }
 
-    // Admissions from patient chart
+    // Payments — consultation, lab, prescription, pharmacy
+    if (Array.isArray(payments)) {
+      for (const p of payments) {
+        const methodLabel = p.paymentMethod?.replace(/_/g, ' ') || 'cash';
+        result.push({
+          id: `payment-${p._id}`,
+          type: 'payment',
+          date: p.createdAt,
+          ...EVENT_CONFIG.payment,
+          title: `Payment: Le ${(p.amount || 0).toLocaleString()}`,
+          summary: [
+            (p.paymentType || 'other').replace(/_/g, ' '),
+            methodLabel,
+            p.notes ? p.notes.slice(0, 60) : '',
+          ].filter(Boolean).join(' · '),
+          detail: [
+            `Amount: Le ${(p.amount || 0).toLocaleString()}`,
+            `Method: ${methodLabel}`,
+            `Type: ${(p.paymentType || 'other').replace(/_/g, ' ')}`,
+            p.notes ? `Note: ${p.notes}` : '',
+            p.isRefunded ? 'REFUNDED' : '',
+          ].filter(Boolean).join('\n'),
+        });
+      }
+    }
+
+    // Admissions — with doctor, nursing records, discharge
     const admissions = patientChart?.admissions || [];
     for (const adm of admissions) {
-      const cfg = EVENT_CONFIG.admission;
+      const doctorName = typeof adm.doctorId === 'object' ? adm.doctorId?.fullName : null;
+      const nurseName = typeof adm.primaryNurseId === 'object' ? adm.primaryNurseId?.fullName : null;
+      const isDischarged = adm.status === 'discharged';
+      const isReadmitted = adm.status === 'readmitted';
+
+      // Admission event
       result.push({
         id: `adm-${adm._id}`,
-        type: 'admission',
-        date: adm.createdAt,
-        ...cfg,
-        title: `Admission: ${adm.wardType || 'General'} ward`,
-        summary: adm.admissionReason || adm.diagnosis || 'Admitted',
+        type: isDischarged ? 'discharge' : 'admission',
+        date: adm.admittedAt || adm.createdAt,
+        ...(isDischarged ? EVENT_CONFIG.discharge : EVENT_CONFIG.admission),
+        title: isDischarged
+          ? `Discharged: ${adm.wardType || 'General'} ward`
+          : `Admission: ${adm.wardType || 'General'} ward`,
+        summary: [
+          adm.admissionReason || adm.diagnosis || 'Admitted',
+          doctorName ? `Dr. ${doctorName}` : '',
+          nurseName ? `Nurse: ${nurseName}` : '',
+          isDischarged ? 'Discharged' : '',
+          isReadmitted ? 'Readmitted' : '',
+        ].filter(Boolean).join(' · '),
         detail: [
           `Ward: ${adm.wardType}`,
+          adm.admissionNumber ? `Admission #: ${adm.admissionNumber}` : '',
           adm.bedNumber ? `Bed: ${adm.bedNumber}` : '',
           `Reason: ${adm.admissionReason || 'N/A'}`,
           adm.diagnosis ? `Dx: ${adm.diagnosis}` : '',
-          `Status: ${adm.status || 'active'}`,
+          doctorName ? `Doctor: Dr. ${doctorName}` : '',
+          nurseName ? `Primary nurse: ${nurseName}` : '',
+          `Status: ${(adm.status || 'active').replace(/_/g, ' ')}`,
+          adm.dischargedAt ? `Discharged: ${new Date(adm.dischargedAt).toLocaleString()}` : '',
+          adm.dischargeNotes ? `Discharge notes: ${adm.dischargeNotes}` : '',
+          adm.dischargeDiagnosis ? `Discharge Dx: ${adm.dischargeDiagnosis}` : '',
+          adm.lengthOfStay ? `Length of stay: ${adm.lengthOfStay} day(s)` : '',
         ].filter(Boolean).join('\n'),
       });
+
+      // Admission vitals log entries (inpatient nursing vitals)
+      const vitalsLog = adm.vitalsLog || [];
+      for (const reading of vitalsLog) {
+        if (!hasVitalsData(reading)) continue;
+        const recordedByName = typeof reading.recordedBy === 'object' ? reading.recordedBy?.fullName : null;
+        result.push({
+          id: `adm-vitals-${adm._id}-${reading.recordedAt || Math.random()}`,
+          type: 'vitals',
+          date: reading.recordedAt || adm.admittedAt,
+          ...EVENT_CONFIG.vitals,
+          title: `Inpatient Vitals (${adm.admissionNumber || 'Admission'})`,
+          summary: [
+            recordedByName ? `By ${recordedBy}` : '',
+            `Ward: ${adm.wardType || 'General'}`,
+          ].filter(Boolean).join(' · ') || 'Inpatient vital signs',
+          detail: [
+            `Admission: ${adm.admissionNumber || adm._id?.slice(-6)}`,
+            `Ward: ${adm.wardType}`,
+            recordedByName ? `Recorded by: ${recordedBy}` : '',
+            `BP: ${reading.bloodPressure || '-'}`,
+            `HR: ${reading.heartRate || '-'} bpm`,
+            `Temp: ${reading.temperature || '-'} °C`,
+            `RR: ${reading.respiratoryRate || '-'} /min`,
+            `SpO2: ${reading.oxygenSaturation || '-'} %`,
+            `Weight: ${reading.weight || '-'} kg`,
+          ].filter(Boolean).join('\n'),
+          vitals: reading,
+        });
+      }
+
+      // Admission nursing notes
+      const nursingNotes = adm.nursingNotes || [];
+      for (const nNote of nursingNotes) {
+        const authoredByName = typeof nNote.authoredBy === 'object' ? nNote.authoredBy?.fullName : null;
+        if (!nNote.content) continue;
+        result.push({
+          id: `adm-note-${adm._id}-${nNote.createdAt || Math.random()}`,
+          type: 'note',
+          date: nNote.createdAt || adm.admittedAt,
+          ...EVENT_CONFIG.note,
+          title: `Nursing Note (${adm.admissionNumber || 'Admission'})`,
+          summary: nNote.content?.slice(0, 80) || 'Nursing note',
+          detail: [
+            `Admission: ${adm.admissionNumber || adm._id?.slice(-6)}`,
+            authoredByName ? `By: ${authoredByName}` : '',
+            nNote.category ? `Category: ${nNote.category}` : '',
+            `---`,
+            nNote.content || '',
+          ].filter(Boolean).join('\n'),
+        });
+      }
+    }
+
+    // Referral events — from visits that were referred
+    for (const v of (patientVisits || [])) {
+      if (v.referredToSpecialistId) {
+        const specialistName = typeof v.referredToSpecialistId === 'object' ? v.referredToSpecialistId?.fullName : null;
+        const referringDoctor = typeof v.doctorId === 'object' ? v.doctorId?.fullName : null;
+        if (specialistName) {
+          result.push({
+            id: `referral-${v._id}`,
+            type: 'referral',
+            date: v.referredAt || v.updatedAt || v.createdAt,
+            ...EVENT_CONFIG.referral,
+            title: `Referral to ${specialistName}`,
+            summary: [
+              v.referredReason || 'Specialist consultation',
+              referringDoctor ? `From Dr. ${referringDoctor}` : '',
+            ].filter(Boolean).join(' · '),
+            detail: [
+              `Referred to: Dr. ${specialistName}`,
+              referringDoctor ? `From: Dr. ${referringDoctor}` : '',
+              `Visit: ${v.visitNumber || 'N/A'}`,
+              `Reason: ${v.referredReason || 'N/A'}`,
+              `Status: ${v.status?.replace(/_/g, ' ')}`,
+            ].filter(Boolean).join('\n'),
+          });
+        }
+      }
     }
 
     // Treatment plans
     for (const plan of treatmentPlans) {
-      const cfg = EVENT_CONFIG.treatment_plan;
+      const totalAmount = (plan.items || []).reduce((sum: number, i: any) => sum + (i.amount || 0), 0);
       result.push({
         id: `tp-${plan._id}`,
         type: 'treatment_plan',
         date: plan.createdAt,
-        ...cfg,
+        ...EVENT_CONFIG.treatment_plan,
         title: `Treatment Plan ${plan.planNumber}`,
-        summary: `${plan.createdByName} (${plan.createdByRole}) · ${plan.status.replace(/_/g, ' ')} · ${(plan.items || []).length} item(s)`,
-        detail: (plan.items || []).map((i: any) => `${i.description} — Le ${i.amount?.toLocaleString()}`).join('\n') || 'No items',
+        summary: [
+          plan.createdByName ? `${plan.createdByName}` : '',
+          plan.status?.replace(/_/g, ' '),
+          `${(plan.items || []).length} item(s)`,
+          totalAmount > 0 ? `Le ${totalAmount.toLocaleString()}` : '',
+        ].filter(Boolean).join(' · '),
+        detail: [
+          plan.createdByName ? `Created by: ${plan.createdByName} (${plan.createdByRole || ''})` : '',
+          `Status: ${(plan.status || 'pending').replace(/_/g, ' ')}`,
+          totalAmount > 0 ? `Total: Le ${totalAmount.toLocaleString()}` : '',
+          '---',
+          ...(plan.items || []).map((i: any) => `${i.type || 'item'}: ${i.description} — Le ${(i.amount || 0).toLocaleString()}`),
+        ].filter(Boolean).join('\n'),
+      });
+    }
+
+    // Patient notes from chart
+    const notes = patientChart?.notes || [];
+    for (const note of notes) {
+      const createdByName = typeof note.createdBy === 'object' ? note.createdBy?.fullName : null;
+      result.push({
+        id: `note-${note._id}`,
+        type: 'note',
+        date: note.createdAt,
+        ...EVENT_CONFIG.note,
+        title: `Patient Note${note.category ? `: ${note.category}` : ''}`,
+        summary: note.content?.slice(0, 80) || 'Note recorded',
+        detail: [
+          createdByName ? `By: ${createdByName}` : '',
+          note.category ? `Category: ${note.category}` : '',
+          note.priority ? `Priority: ${note.priority}` : '',
+          '---',
+          note.content || '',
+        ].filter(Boolean).join('\n'),
       });
     }
 
     // Triage overrides
     for (const v of (patientVisits || [])) {
       if (v.triageOverride_priority || v.triageOverridePriority) {
-        const cfg = EVENT_CONFIG.triage_override;
         result.push({
           id: `triage-${v._id}`,
           type: 'triage_override',
           date: v.updatedAt || v.createdAt,
-          ...cfg,
+          ...EVENT_CONFIG.triage_override,
           title: `Triage Override: ${(v.triageOverride_priority || v.triageOverridePriority).replace(/_/g, ' ')}`,
-          summary: v.triageNotes || 'Doctor adjusted triage priority',
-          detail: `New priority: ${(v.triageOverride_priority || v.triageOverridePriority).replace(/_/g, ' ')}`,
+          summary: v.doctorTriageNotes || v.triageNotes || 'Doctor adjusted triage priority',
+          detail: [
+            `New priority: ${(v.triageOverride_priority || v.triageOverridePriority).replace(/_/g, ' ')}`,
+            v.doctorTriageNotes ? `Doctor notes: ${v.doctorTriageNotes}` : '',
+            v.triageNotes ? `Triage notes: ${v.triageNotes}` : '',
+          ].filter(Boolean).join('\n'),
         });
       }
     }
 
     return result;
-  }, [patientChart, patientVisits, patientOrders, patientPrescriptions, treatmentPlans, onNavigate]);
+  }, [patientChart, patientVisits, patientOrders, patientPrescriptions, treatmentPlans, payments, onNavigate]);
 
   const grouped = useMemo(() => groupByDate(events), [events]);
 
@@ -318,11 +617,7 @@ export function PatientTimeline({
                             {new Date(event.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </span>
                         </div>
-                        {event.type === 'soap' ? (
-                          <SoapCompact event={event} />
-                        ) : (
-                          event.summary && <p className="text-xs text-muted-foreground mt-0.5 truncate">{event.summary}</p>
-                        )}
+                        <DetailBlock event={event} />
                         {event.onClick && (
                           <span className="text-[10px] text-primary font-medium mt-0.5 block">Click to view details</span>
                         )}
