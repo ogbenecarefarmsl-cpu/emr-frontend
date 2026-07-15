@@ -5,9 +5,10 @@ import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadg
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { LIS_LOGO_ALT, LIS_LOGO_URL } from '@/lib/branding';
 import {
   UserCheck, Search, Bell, Clock, AlertTriangle, FlaskConical,
-  ChevronDown, X, Stethoscope, LogOut, LayoutDashboard, ArrowLeftToLine
+  ChevronDown, X, LogOut, LayoutDashboard, ArrowLeftToLine, Menu
 } from 'lucide-react';
 
 interface Patient {
@@ -231,12 +232,15 @@ export function DoctorTopBar({
   const activeOverflow = activePatients.length > 4;
 
   return (
-    <div className="fixed top-0 left-0 right-0 h-14 bg-slate-900 text-white z-[60] flex items-center justify-between gap-3 px-4 shadow-md">
+    <div className="fixed top-0 left-0 right-0 h-16 bg-[#061a2d] text-white z-[60] flex items-center justify-between gap-3 px-4 shadow-md">
       {/* Left: logo + active patients */}
       <div className="flex items-center gap-3 min-w-0">
-        <div className="flex items-center gap-2 shrink-0">
-          <Stethoscope className="w-4 h-4 text-primary" />
-          <span className="font-semibold text-sm hidden sm:block">Harbour EMR</span>
+        <div className="flex items-center gap-3 shrink-0">
+          <Menu className="h-5 w-5 text-slate-200" />
+          <div className="hidden h-9 items-center rounded bg-white px-2 sm:flex">
+            <img src={LIS_LOGO_URL} alt={LIS_LOGO_ALT} className="h-7 w-auto object-contain" />
+          </div>
+          <span className="hidden text-sm font-semibold lg:block">Doctor Workbench</span>
         </div>
 
         <div className="h-6 w-px bg-slate-700 hidden sm:block" />
@@ -252,9 +256,9 @@ export function DoctorTopBar({
                 key={visit._id}
                 onClick={() => onSelectVisit(visit)}
                 className={cn(
-                  "flex items-center gap-1.5 px-2 py-1 rounded-full text-xs shrink-0 transition-colors border",
+                  "flex h-11 min-w-[126px] items-center gap-2 rounded-md border px-2.5 py-1 text-xs shrink-0 transition-colors",
                   isSelected
-                    ? "bg-primary text-primary-foreground border-primary"
+                    ? "bg-teal-600 text-white border-teal-500"
                     : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
                 )}
                 title={`${patientDisplayName(visit)} · ${statusLabel(visit.status)}${visit.room ? ` · ${visit.room}` : ''}`}
@@ -263,7 +267,10 @@ export function DoctorTopBar({
                   {initials || '?'}
                   <span className={cn("absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-900", statusTone(visit.status))} />
                 </span>
-                <span className="hidden md:inline max-w-[80px] truncate">{patientDisplayName(visit)}</span>
+                <span className="hidden min-w-0 flex-col text-left md:flex">
+                  <span className="max-w-[92px] truncate font-semibold">{patientDisplayName(visit)}</span>
+                  <span className="max-w-[92px] truncate text-[9px] opacity-75">{visit.patientId?.patientId || visit.visitNumber}</span>
+                </span>
                 {hasResults && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-red-400" />}
               </button>
             );
