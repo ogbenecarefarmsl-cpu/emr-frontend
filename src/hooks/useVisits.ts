@@ -312,8 +312,8 @@ export function useCompleteVisit() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (visitId: string) => {
-      return await visitsAPI.complete(visitId);
+    mutationFn: async ({ visitId, data }: { visitId: string; data: any }) => {
+      return await visitsAPI.complete(visitId, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
@@ -329,7 +329,7 @@ export function useUpdateVisit() {
 
   return useMutation({
     mutationFn: async ({ visitId, data }: { visitId: string; data: any }) => {
-      return await visitsAPI.update(visitId, data);
+      return await visitsAPI.updateClinicalDraft(visitId, data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });

@@ -35,7 +35,7 @@ export function ProblemList({ visitId, problems = [] }: ProblemListProps) {
         status: 'active',
         notedAt: new Date(),
       }];
-      return visitsAPI.update(visitId, { problemList: updatedProblems });
+      return visitsAPI.updateClinicalDraft(visitId, { problemList: updatedProblems });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
@@ -57,7 +57,7 @@ export function ProblemList({ visitId, problems = [] }: ProblemListProps) {
       if (updatedProblems[index]) {
         updatedProblems[index] = { ...updatedProblems[index], status: 'resolved' };
       }
-      return visitsAPI.update(visitId, { problemList: updatedProblems });
+      return visitsAPI.updateClinicalDraft(visitId, { problemList: updatedProblems });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
@@ -70,7 +70,7 @@ export function ProblemList({ visitId, problems = [] }: ProblemListProps) {
     mutationFn: async (index: number) => {
       const visit = await visitsAPI.getById(visitId);
       const updatedProblems = (visit.problemList || []).filter((_: any, i: number) => i !== index);
-      return visitsAPI.update(visitId, { problemList: updatedProblems });
+      return visitsAPI.updateClinicalDraft(visitId, { problemList: updatedProblems });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['visits'] });

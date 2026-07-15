@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useDoctorQueue, useAcceptPatient, useCompleteVisit } from '@/hooks/useVisits';
+import { useDoctorQueue, useAcceptPatient } from '@/hooks/useVisits';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,7 +15,6 @@ export function DoctorQueue({ onSelectPatient }: DoctorQueueProps) {
   useAuth();
   const { data: queue = [], isLoading, refetch } = useDoctorQueue();
   const acceptPatient = useAcceptPatient();
-  const completeVisit = useCompleteVisit();
 
   const handleAcceptPatient = async (visitId: string) => {
     try {
@@ -24,16 +23,6 @@ export function DoctorQueue({ onSelectPatient }: DoctorQueueProps) {
       refetch();
     } catch (error: any) {
       toast.error(error.message || 'Failed to accept patient');
-    }
-  };
-
-  const handleCompleteVisit = async (visitId: string) => {
-    try {
-      await completeVisit.mutateAsync(visitId);
-      toast.success('Visit completed');
-      refetch();
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to complete visit');
     }
   };
 
@@ -139,18 +128,6 @@ export function DoctorQueue({ onSelectPatient }: DoctorQueueProps) {
                         >
                           <User className="h-4 w-4 mr-1" />
                           Open
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="default"
-                          onClick={() => handleCompleteVisit(visit._id || visit.id)}
-                          disabled={completeVisit.isPending}
-                        >
-                          {completeVisit.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            'Complete'
-                          )}
                         </Button>
                       </>
                     )}

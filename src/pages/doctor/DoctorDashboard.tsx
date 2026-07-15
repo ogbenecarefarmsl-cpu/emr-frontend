@@ -7,9 +7,7 @@ import { useAuth } from '@/context/AuthContext';
 import { visitsAPI, ordersAPI, doctorsAPI, admissionsAPI } from '@/services/api';
 import { medicationService } from '@/services/medicationService';
 import { prescriptionService } from '@/services/prescriptionService';
-import { soapNoteService } from '@/services/soapNoteService';
 import { patientService } from '@/services/patientService';
-import { SoapNoteTypeEnum } from '@/types/soap-note';
 import { useDoctorDashboard, useDoctorPatients, useAcceptPatient, useUpdateVisit, useCompleteVisit, usePatientVisits, useReferToSpecialist } from '@/hooks/useVisits';
 import { useResults } from '@/hooks/useResults';
 import { useRealtimeResults } from '@/hooks/useRealtimeResults';
@@ -131,6 +129,8 @@ interface Visit {
   orders?: { _id: string; orderType: string }[];
   createdAt: string;
   consultationStartedAt?: string;
+  soapNoteId?: string;
+  soapNoteSigned?: boolean;
 }
 
 interface LabResult {
@@ -655,6 +655,24 @@ export default function DoctorDashboard() {
     }
   };
 
+  const buildClinicalDraft = () => ({
+    temperature: vitalsForm.temperature ? parseFloat(vitalsForm.temperature) : undefined,
+    bloodPressure: vitalsForm.bloodPressure || undefined,
+    heartRate: vitalsForm.heartRate ? parseInt(vitalsForm.heartRate) : undefined,
+    respiratoryRate: vitalsForm.respiratoryRate ? parseInt(vitalsForm.respiratoryRate) : undefined,
+    weight: vitalsForm.weight ? parseFloat(vitalsForm.weight) : undefined,
+    height: vitalsForm.height ? parseFloat(vitalsForm.height) : undefined,
+    oxygenSaturation: vitalsForm.oxygenSaturation ? parseInt(vitalsForm.oxygenSaturation) : undefined,
+    chiefComplaint: chiefComplaintForm.trim() || undefined,
+    subjectiveNotes: soapForm.subjective || undefined,
+    objectiveNotes: soapForm.objective || undefined,
+    assessmentNotes: soapForm.assessment || undefined,
+    planNotes: soapForm.plan || undefined,
+    diagnosis: soapForm.diagnosis || undefined,
+    triageOverridePriority: triageOverride || undefined,
+    doctorTriageNotes: doctorTriageNotes.trim() || undefined,
+  });
+
   const handleSaveVitalsAndSOAP = async () => {
     if (!selectedVisit) return;
     if (!canWriteConsultation) {
@@ -665,23 +683,7 @@ export default function DoctorDashboard() {
     try {
       await updateVisit.mutateAsync({
         visitId: selectedVisit._id || selectedVisit.id || '',
-        data: {
-          temperature: vitalsForm.temperature ? parseFloat(vitalsForm.temperature) : undefined,
-          bloodPressure: vitalsForm.bloodPressure || undefined,
-          heartRate: vitalsForm.heartRate ? parseInt(vitalsForm.heartRate) : undefined,
-          respiratoryRate: vitalsForm.respiratoryRate ? parseInt(vitalsForm.respiratoryRate) : undefined,
-          weight: vitalsForm.weight ? parseFloat(vitalsForm.weight) : undefined,
-          height: vitalsForm.height ? parseFloat(vitalsForm.height) : undefined,
-          oxygenSaturation: vitalsForm.oxygenSaturation ? parseInt(vitalsForm.oxygenSaturation) : undefined,
-          chiefComplaint: chiefComplaintForm.trim() || undefined,
-          subjectiveNotes: soapForm.subjective || undefined,
-          objectiveNotes: soapForm.objective || undefined,
-          assessmentNotes: soapForm.assessment || undefined,
-          planNotes: soapForm.plan || undefined,
-          diagnosis: soapForm.diagnosis || undefined,
-          triageOverride_priority: triageOverride || undefined,
-          doctorTriageNotes: doctorTriageNotes.trim() || undefined,
-        },
+        data: buildClinicalDraft(),
       });
       queryClient.invalidateQueries({ queryKey: ['patient-chart', selectedVisit.patientId?._id || selectedVisit.patientId] });
       queryClient.invalidateQueries({ queryKey: ['visits'] });
@@ -700,35 +702,10 @@ export default function DoctorDashboard() {
     }
 
     try {
-      if (soapForm.subjective || soapForm.objective || soapForm.assessment || soapForm.plan || soapForm.diagnosis) {
-        try {
-          await soapNoteService.create({
-            patientId: selectedVisit.patientId?._id || selectedVisit.patientId,
-            visitId: selectedVisit._id || selectedVisit.id,
-            doctorId: user?.doctorId || profile?.id,
-            noteType: SoapNoteTypeEnum.CONSULTATION,
-            chiefComplaint: selectedVisit.chiefComplaint || undefined,
-            historyPresentIllness: soapForm.subjective || undefined,
-            vitalSigns: {
-              temperature: vitalsForm.temperature ? parseFloat(vitalsForm.temperature) : undefined,
-              bloodPressure: vitalsForm.bloodPressure || undefined,
-              heartRate: vitalsForm.heartRate ? parseInt(vitalsForm.heartRate) : undefined,
-              respiratoryRate: vitalsForm.respiratoryRate ? parseInt(vitalsForm.respiratoryRate) : undefined,
-              weight: vitalsForm.weight ? parseFloat(vitalsForm.weight) : undefined,
-              height: vitalsForm.height ? parseFloat(vitalsForm.height) : undefined,
-              oxygenSaturation: vitalsForm.oxygenSaturation ? parseInt(vitalsForm.oxygenSaturation) : undefined,
-            },
-            physicalExamination: soapForm.objective || undefined,
-            diagnosis: soapForm.diagnosis || soapForm.assessment || undefined,
-            treatmentPlan: soapForm.plan || undefined,
-            followUpInstructions: soapForm.plan || undefined,
-            isSigned: true,
-          });
-        } catch (e) {
-          // Non-blocking: SOAP note creation is best-effort
-        }
-      }
-      await completeVisit.mutateAsync(selectedVisit._id || selectedVisit.id || '');
+      await completeVisit.mutateAsync({
+        visitId: selectedVisit._id || selectedVisit.id || '',
+        data: buildClinicalDraft(),
+      });
       toast.success('Visit completed');
       setIsDirty(false);
       setSelectedVisit(null);
@@ -1103,8 +1080,8 @@ export default function DoctorDashboard() {
     'results_ready',
     'awaiting_doctor_review',
   ].includes(selectedVisit.status);
-  const isReadOnly = !canContinueClinicalWork;
-  const canWriteConsultation = canContinueClinicalWork && selectedVisit?.consultationPaid === true;
+  const isReadOnly = !canContinueClinicalWork || selectedVisit?.soapNoteSigned === true;
+  const canWriteConsultation = canContinueClinicalWork && selectedVisit?.soapNoteSigned !== true && selectedVisit?.consultationPaid === true;
   const consultationPaymentBlocksWriting = canContinueClinicalWork && selectedVisit?.consultationPaid === false;
   const isChartReviewMode = !selectedVisit && !!searchedPatient;
   const canCloseEncounter = !!selectedVisit && !['awaiting_lab', 'awaiting_results', 'awaiting_pharmacy', 'awaiting_dispensing'].includes(selectedVisit.status);

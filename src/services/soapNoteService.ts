@@ -14,6 +14,7 @@ export const soapNoteService = {
     vitalSigns?: any;
     physicalExamination?: string;
     laboratoryResults?: string;
+    assessment?: string;
     diagnosis?: string;
     treatmentPlan?: string;
     medications?: string;
@@ -54,10 +55,13 @@ export const soapNoteService = {
     return response.data;
   },
 
-  async sign(id: string, signedBy: string): Promise<any> {
-    const response = await api.patch(`/soap-notes/${id}/sign`, {
-      signedBy,
-    });
+  async sign(id: string): Promise<any> {
+    const response = await api.patch(`/soap-notes/${id}/sign`);
+    return response.data;
+  },
+
+  async createAddendum(id: string, text: string): Promise<any> {
+    const response = await api.post(`/soap-notes/${id}/addenda`, { text });
     return response.data;
   },
 };

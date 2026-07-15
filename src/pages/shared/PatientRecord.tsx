@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useNavigate } from 'react-router-dom';
 import { patientService } from '@/services/patientService';
+import { soapNoteService } from '@/services/soapNoteService';
 import { ordersAPI } from '@/services/api';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
@@ -10,6 +11,8 @@ import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadg
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical,
@@ -36,6 +39,19 @@ const PatientRecord = () => {
   const { primaryRole, profile } = useAuth();
   const layoutRole = primaryRole || 'doctor';
   const queryClient = useQueryClient();
+  const [addendumTarget, setAddendumTarget] = useState<string | null>(null);
+  const [addendumText, setAddendumText] = useState('');
+
+  const createAddendum = useMutation({
+    mutationFn: ({ noteId, text }: { noteId: string; text: string }) => soapNoteService.createAddendum(noteId, text),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['patient-chart', patientId] });
+      setAddendumTarget(null);
+      setAddendumText('');
+      toast.success('Signed addendum recorded');
+    },
+    onError: (error: any) => toast.error(error?.response?.data?.message || 'Failed to record addendum'),
+  });
 
   const { data: chart, isLoading: chartLoading } = useQuery({
     queryKey: ['patient-chart', patientId],
@@ -624,20 +640,39 @@ const PatientRecord = () => {
                     <div className="flex justify-between items-start">
                       <div>
                         <CardTitle className="text-base flex items-center gap-2">
-                          <Stethoscope className="w-4 h-4" />Consultation Note
+                          <Stethoscope className="w-4 h-4" />{note.addendumTo ? 'Signed Addendum' : 'Consultation Note'}
                         </CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {note.doctorId?.fullName ? `Dr. ${note.doctorId.fullName}` : 'Clinical staff'} &bull; {formatDate(note.createdAt)} {formatTime(note.createdAt)}
                         </p>
                       </div>
-                      {note.isSigned && <Badge className="text-[10px]">Signed</Badge>}
+                      <div className="flex items-center gap-2">
+                        {note.isSigned && <Badge className="text-[10px]">Signed</Badge>}
+                        {note.isSigned && !note.addendumTo && ['admin', 'doctor', 'specialist'].includes((primaryRole || '').toLowerCase()) && (
+                          <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAddendumTarget(note._id)}>
+                            Add correction
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
+                    {note.addendumText && (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-xs font-semibold uppercase text-amber-700">Addendum</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm">{note.addendumText}</p>
+                      </div>
+                    )}
                     {note.chiefComplaint && (
                       <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
                         <p className="text-xs font-semibold text-blue-700 uppercase">Subjective</p>
                         <p className="text-sm mt-1">{note.chiefComplaint}</p>
+                      </div>
+                    )}
+                    {note.historyPresentIllness && (
+                      <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                        <p className="text-xs font-semibold uppercase text-blue-700">History of present illness</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm">{note.historyPresentIllness}</p>
                       </div>
                     )}
                     {note.vitalSigns && (
@@ -657,6 +692,12 @@ const PatientRecord = () => {
                       <div className="p-3 bg-orange-50 rounded-lg border border-orange-200">
                         <p className="text-xs font-semibold text-orange-700 uppercase">Assessment</p>
                         <p className="text-sm mt-1">{note.diagnosis}</p>
+                      </div>
+                    )}
+                    {note.assessment && (
+                      <div className="rounded-lg border border-orange-200 bg-orange-50 p-3">
+                        <p className="text-xs font-semibold uppercase text-orange-700">Clinical assessment</p>
+                        <p className="mt-1 whitespace-pre-wrap text-sm">{note.assessment}</p>
                       </div>
                     )}
                     {note.treatmentPlan && (
@@ -725,6 +766,25 @@ const PatientRecord = () => {
           </TabsContent>
         </Tabs>
       </div>
+      <Dialog open={!!addendumTarget} onOpenChange={(open) => { if (!open) { setAddendumTarget(null); setAddendumText(''); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add correction to signed SOAP note</DialogTitle>
+            <DialogDescription>The original note remains unchanged. This correction will be signed and timestamped separately.</DialogDescription>
+          </DialogHeader>
+          <Textarea value={addendumText} onChange={(event) => setAddendumText(event.target.value)} rows={5} placeholder="State the correction and clinical reason…" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAddendumTarget(null); setAddendumText(''); }}>Cancel</Button>
+            <Button
+              onClick={() => addendumTarget && createAddendum.mutate({ noteId: addendumTarget, text: addendumText.trim() })}
+              disabled={!addendumText.trim() || createAddendum.isPending}
+            >
+              {createAddendum.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Sign addendum
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </RoleLayout>
   );
 };

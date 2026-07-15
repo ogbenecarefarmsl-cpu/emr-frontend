@@ -18,6 +18,10 @@ export interface VitalSigns {
 
 export interface SoapNote {
   _id: string;
+  branchId?: string;
+  visitId?: string;
+  addendumTo?: string;
+  addendumText?: string;
   patientId: {
     _id: string;
     firstName: string;
@@ -46,6 +50,7 @@ export interface SoapNote {
   radiologyResults?: string;
   
   // Assessment
+  assessment?: string;
   diagnosis?: string;
   differentialDiagnosis?: string[];
   

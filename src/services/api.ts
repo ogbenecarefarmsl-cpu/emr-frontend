@@ -1039,6 +1039,11 @@ export const visitsAPI = {
     return response.data;
   },
 
+  updateClinicalDraft: async (id: string, data: any) => {
+    const response = await api.patch(`/visits/${id}/clinical-draft`, data);
+    return response.data;
+  },
+
   getDoctorQueue: async (doctorId?: string) => {
     const response = await api.get('/visits/doctor-queue', {
       params: doctorId ? { doctorId } : {},
@@ -1128,8 +1133,8 @@ export const visitsAPI = {
     return response.data;
   },
 
-  complete: async (id: string) => {
-    const response = await api.patch(`/visits/${id}/complete`);
+  complete: async (id: string, data: any) => {
+    const response = await api.patch(`/visits/${id}/complete`, data);
     return response.data;
   },
 
