@@ -63,7 +63,7 @@ export function PaymentDialog({
   const { printBothCopies } = useThermalPrint();
   const { settings, thermalConnected } = usePrinterContext();
   const addPayment = useAddPayment();
-  const { data: wallet } = usePatientWallet(order.patientObjectId || '');
+  const { data: wallet, isLoading: walletLoading } = usePatientWallet(order.patientObjectId || '');
   const { data: branch } = useMyBranch();
   const patientReceiptRef = useRef<HTMLDivElement>(null);
   const labReceiptRef = useRef<HTMLDivElement>(null);
@@ -73,17 +73,27 @@ export function PaymentDialog({
   const [isProcessing, setIsProcessing] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [paymentComplete, setPaymentComplete] = useState(false);
+  const hasUserSelectedMethodRef = useRef(false);
 
   const receiptNumber = `RCP-${format(new Date(), 'yyyyMMdd')}-${order.id.slice(0, 3).toUpperCase()}`;
   const walletBalance = Number(wallet?.balance || 0);
   const canUseWallet = !!order.patientObjectId && walletBalance >= order.total;
 
   useEffect(() => {
-    if (open && canUseWallet && !paymentComplete) {
-      setPaymentMethod('wallet');
-      setAmountPaid(order.total.toString());
+    if (!open) {
+      hasUserSelectedMethodRef.current = false;
+      setPaymentMethod('cash');
+      return;
     }
-  }, [open, canUseWallet, order.total, paymentComplete]);
+    setAmountPaid(order.total.toString());
+    setPaymentComplete(false);
+  }, [open, order.id, order.total]);
+
+  useEffect(() => {
+    if (open && !walletLoading && canUseWallet && !hasUserSelectedMethodRef.current) {
+      setPaymentMethod('wallet');
+    }
+  }, [open, walletLoading, canUseWallet]);
   
   const receiptData = {
     receiptNumber,
@@ -115,6 +125,7 @@ export function PaymentDialog({
       : undefined,
   };
 
+  const appliedAmount = Math.min(receiptData.amountPaid, order.total);
   const change = receiptData.amountPaid - order.total;
 
   const handlePrintReceipts = async () => {
@@ -176,7 +187,7 @@ export function PaymentDialog({
       await addPayment.mutateAsync({
         orderId: order.id,
         data: {
-          amount: receiptData.amountPaid,
+          amount: appliedAmount,
           paymentMethod: paymentMethod,
         },
       });
@@ -275,7 +286,7 @@ export function PaymentDialog({
                     type="button"
                     variant={paymentMethod === 'cash' ? 'default' : 'outline'}
                     className="h-20 flex flex-col gap-2"
-                    onClick={() => setPaymentMethod('cash')}
+                    onClick={() => { hasUserSelectedMethodRef.current = true; setPaymentMethod('cash'); }}
                   >
                     <Banknote className="w-6 h-6" />
                     <span>Cash</span>
@@ -284,7 +295,7 @@ export function PaymentDialog({
                     type="button"
                     variant={paymentMethod === 'orange_money' ? 'default' : 'outline'}
                     className="h-20 flex flex-col gap-2"
-                    onClick={() => setPaymentMethod('orange_money')}
+                    onClick={() => { hasUserSelectedMethodRef.current = true; setPaymentMethod('orange_money'); }}
                   >
                     <Smartphone className="w-6 h-6" />
                     <span>Orange Money</span>
@@ -293,7 +304,7 @@ export function PaymentDialog({
                     type="button"
                     variant={paymentMethod === 'afrimoney' ? 'default' : 'outline'}
                     className="h-20 flex flex-col gap-2"
-                    onClick={() => setPaymentMethod('afrimoney')}
+                    onClick={() => { hasUserSelectedMethodRef.current = true; setPaymentMethod('afrimoney'); }}
                   >
                     <Smartphone className="w-6 h-6" />
                     <span>Afrimoney</span>
@@ -303,7 +314,7 @@ export function PaymentDialog({
                     variant={paymentMethod === 'wallet' ? 'default' : 'outline'}
                     className="h-20 flex flex-col gap-2"
                     disabled={!canUseWallet}
-                    onClick={() => setPaymentMethod('wallet')}
+                    onClick={() => { hasUserSelectedMethodRef.current = true; setPaymentMethod('wallet'); setAmountPaid(order.total.toString()); }}
                   >
                     <Wallet className="w-6 h-6" />
                     <span>Wallet</span>

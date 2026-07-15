@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { insuranceBlocksAPI, insuranceAPI } from '@/services/api';
+import { insuranceBlocksAPI, insuranceAPI, patientsAPI } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import {
   ShieldOff, Loader2, Plus, Search, Filter, Ban, CheckCircle, Trash2, Eye,
@@ -150,7 +151,27 @@ export default function InsuranceBlockListPage() {
 
   const getReasonLabel = (reason: string) => REASON_OPTIONS.find(r => r.value === reason)?.label || reason;
 
+  const lookupPatient = async (patientId: string) => {
+    if (!patientId || patientId.length < 10) return;
+    try {
+      const patient = await patientsAPI.getById(patientId);
+      if (patient) {
+        setFormPatientName(`${patient.firstName || ''} ${patient.lastName || ''}`.trim());
+        if (patient.insurance?.memberNumber) {
+          setFormMemberNumber(patient.insurance.memberNumber);
+        }
+        if (patient.insurance?.programCode) {
+          setFormProgramCode(patient.insurance.programCode);
+        }
+        toast.success(`Patient found: ${patient.firstName} ${patient.lastName}`);
+      }
+    } catch {
+      // Patient not found — leave fields manual
+    }
+  };
+
   return (
+    <RoleLayout title="Insurance Block List" subtitle="Manage patients blocked from insurance billing" role={profile?.role || 'admin'} userName={profile?.fullName || profile?.email}>
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
@@ -379,7 +400,8 @@ export default function InsuranceBlockListPage() {
                 <Input
                   value={formPatientId}
                   onChange={(e) => setFormPatientId(e.target.value)}
-                  placeholder="If patient exists..."
+                  onBlur={(e) => lookupPatient(e.target.value)}
+                  placeholder="Enter ID to auto-fill..."
                 />
               </div>
               <div>
@@ -559,5 +581,6 @@ export default function InsuranceBlockListPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </RoleLayout>
   );
 }

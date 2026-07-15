@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +11,7 @@ import { configSyncService } from '@/services/configSyncService';
 import api from '@/services/api';
 import { joinApiUrl } from '@/services/apiUrl';
 import { Server, Cloud, Wifi, Save, RefreshCw, AlertCircle, CheckCircle, Users } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 interface ConnectionConfig {
   localUrl: string;
@@ -20,6 +22,7 @@ interface ConnectionConfig {
 }
 
 export default function ConnectionSettings() {
+  const { profile } = useAuth();
   const isSecureBrowserContext = typeof window !== 'undefined' && window.location.protocol === 'https:';
   const [config, setConfig] = useState<ConnectionConfig>({
     localUrl: '',
@@ -212,6 +215,7 @@ export default function ConnectionSettings() {
   };
 
   return (
+    <RoleLayout title="Connection Settings" subtitle="Configure backend servers and connection behavior" role="admin" userName={profile?.fullName || profile?.email}>
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Connection Settings</h1>
@@ -493,5 +497,6 @@ export default function ConnectionSettings() {
         </CardContent>
       </Card>
     </div>
+    </RoleLayout>
   );
 }

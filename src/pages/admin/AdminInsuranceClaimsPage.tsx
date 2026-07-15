@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
 import { insuranceClaimsAPI } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
@@ -133,24 +135,21 @@ export default function AdminInsuranceClaimsPage() {
 
   if (statsLoading || claimsLoading) {
     return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+      <RoleLayout title="Insurance Claims" subtitle="Manage and process insurance claims" role={profile?.role || 'admin'} userName={profile?.fullName || profile?.email}>
+        <div className="space-y-6" aria-busy="true" aria-label="Loading insurance claims">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {[0, 1, 2, 3].map((index) => <Skeleton key={index} className="h-24 rounded-xl" />)}
+          </div>
+          <Skeleton className="h-12 w-full" />
+          <Skeleton className="h-72 w-full rounded-xl" />
+        </div>
+      </RoleLayout>
     );
   }
 
   return (
+    <RoleLayout title="Insurance Claims" subtitle="Manage and process insurance claims" role={profile?.role || 'admin'} userName={profile?.fullName || profile?.email}>
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <Shield className="h-6 w-6 text-blue-600" />
-            Insurance Claims
-          </h1>
-          <p className="text-muted-foreground">Manage and process insurance claims</p>
-        </div>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
@@ -584,5 +583,6 @@ export default function AdminInsuranceClaimsPage() {
         </DialogContent>
       </Dialog>
     </div>
+    </RoleLayout>
   );
 }

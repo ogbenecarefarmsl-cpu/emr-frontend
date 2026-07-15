@@ -87,7 +87,7 @@ export async function offlineFirstRequest<T = any>(
 
   // Request deduplication - return existing promise if same request is in flight
   if (pendingRequests.has(requestKey)) {
-    console.log(`[OfflineFirst] Deduplicating request: ${requestKey}`);
+    import.meta.env.DEV && console.log(`[OfflineFirst] Deduplicating request: ${requestKey}`);
     return pendingRequests.get(requestKey)!;
   }
 
@@ -112,7 +112,7 @@ export async function offlineFirstRequest<T = any>(
     try {
       const cached = await db[cacheTable].toArray();
       if (cached.length > 0) {
-        console.log(`[OfflineFirst] Returning ${cached.length} cached items from ${cacheTable}`);
+        import.meta.env.DEV && console.log(`[OfflineFirst] Returning ${cached.length} cached items from ${cacheTable}`);
         
         // Return cached data immediately, fetch in background
         if (await isOnline()) {
@@ -128,7 +128,7 @@ export async function offlineFirstRequest<T = any>(
 
   // Optimistic update for mutations
   if (optimistic && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
-    console.log('[OfflineFirst] Optimistic update, queueing mutation');
+    import.meta.env.DEV && console.log('[OfflineFirst] Optimistic update, queueing mutation');
     await queueMutation(url, method as any, data);
     return data as T;
   }
@@ -151,14 +151,14 @@ export async function offlineFirstRequest<T = any>(
       // Retry logic for network errors
       if (isNetworkError && attemptNumber < maxRetries) {
         const delay = backoffMs * Math.pow(2, attemptNumber);
-        console.log(`[OfflineFirst] Retry ${attemptNumber + 1}/${maxRetries} after ${delay}ms`);
+        import.meta.env.DEV && console.log(`[OfflineFirst] Retry ${attemptNumber + 1}/${maxRetries} after ${delay}ms`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return executeRequest(attemptNumber + 1);
       }
       
       // Queue mutation if offline and not a GET request
       if (isNetworkError && !skipOfflineQueue && method !== 'GET') {
-        console.log('[OfflineFirst] Network error, queueing mutation for later sync');
+        import.meta.env.DEV && console.log('[OfflineFirst] Network error, queueing mutation for later sync');
         await queueMutation(url, method as any, data);
         
         // Return optimistic response
@@ -194,7 +194,7 @@ async function performBackgroundFetch(
     const response = await axios(config);
     if (response.data) {
       await cacheResponseData(response.data, cacheTable as any);
-      console.log(`[OfflineFirst] Background cache updated for ${cacheTable}`);
+      import.meta.env.DEV && console.log(`[OfflineFirst] Background cache updated for ${cacheTable}`);
     }
   } catch (err) {
     console.warn('[OfflineFirst] Background fetch failed:', err);
@@ -263,7 +263,7 @@ export async function prefetchTestCatalog(): Promise<void> {
       cacheResponse: true,
       cacheTable: 'tests',
     });
-    console.log('[OfflineFirst] Test catalog prefetched');
+    import.meta.env.DEV && console.log('[OfflineFirst] Test catalog prefetched');
   } catch (err) {
     console.warn('[OfflineFirst] Failed to prefetch test catalog:', err);
   }
@@ -278,7 +278,7 @@ export async function prefetchPatients(limit = 500): Promise<void> {
       cacheResponse: true,
       cacheTable: 'patients',
     });
-    console.log('[OfflineFirst] Patients prefetched');
+    import.meta.env.DEV && console.log('[OfflineFirst] Patients prefetched');
   } catch (err) {
     console.warn('[OfflineFirst] Failed to prefetch patients:', err);
   }
@@ -293,7 +293,7 @@ export async function prefetchOrders(limit = 200): Promise<void> {
       cacheResponse: true,
       cacheTable: 'orders',
     });
-    console.log('[OfflineFirst] Orders prefetched');
+    import.meta.env.DEV && console.log('[OfflineFirst] Orders prefetched');
   } catch (err) {
     console.warn('[OfflineFirst] Failed to prefetch orders:', err);
   }
@@ -303,11 +303,11 @@ export async function prefetchOrders(limit = 200): Promise<void> {
  * Prefetch all critical data for offline operation
  */
 export async function prefetchAllCriticalData(): Promise<void> {
-  console.log('[OfflineFirst] Starting critical data prefetch...');
+  import.meta.env.DEV && console.log('[OfflineFirst] Starting critical data prefetch...');
   await Promise.allSettled([
     prefetchTestCatalog(),
     prefetchPatients(),
     prefetchOrders(),
   ]);
-  console.log('[OfflineFirst] Critical data prefetch complete');
+  import.meta.env.DEV && console.log('[OfflineFirst] Critical data prefetch complete');
 }

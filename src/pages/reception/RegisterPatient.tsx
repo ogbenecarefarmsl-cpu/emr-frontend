@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
@@ -9,7 +9,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { UserPlus, ArrowRight, Loader2, Shield, ChevronDown, ChevronUp } from 'lucide-react';
+import { UserPlus, ArrowRight, Loader2, Shield, AlertTriangle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { patientsAPI } from '@/services/api';
 
 type AgeUnit = 'years' | 'months' | 'weeks' | 'days';
 
@@ -52,7 +54,6 @@ export default function RegisterPatient() {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
-    dateOfBirth: '',
     age: '',
     ageUnit: 'years' as AgeUnit,
     gender: '' as 'M' | 'F' | 'O' | '',
@@ -60,7 +61,6 @@ export default function RegisterPatient() {
     email: '',
     address: '',
     bloodType: '' as string,
-    allergies: '',
   });
 
   const [insuranceForm, setInsuranceForm] = useState({
@@ -72,7 +72,43 @@ export default function RegisterPatient() {
     responsiblePhone: '',
     responsibleAddress: '',
   });
-  const [showInsurance, setShowInsurance] = useState(false);
+  const [isInsurancePatient, setIsInsurancePatient] = useState(false);
+
+  type DuplicateMatch = { patientId: string; firstName: string; lastName: string; phone?: string; createdAt: string };
+  const [duplicateMatches, setDuplicateMatches] = useState<DuplicateMatch[]>([]);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const duplicateRequestRef = useRef(0);
+
+  const checkForDuplicates = useCallback(async (firstName: string, lastName: string, phone: string) => {
+    const normalizedPhone = normalizeSierraLeonePhone(phone);
+    const hasName = Boolean(firstName && lastName);
+    const hasPhone = normalizedPhone.length >= 10;
+    if (!hasName && !hasPhone) {
+      duplicateRequestRef.current += 1;
+      setDuplicateMatches([]);
+      setCheckingDuplicates(false);
+      return;
+    }
+    const requestId = ++duplicateRequestRef.current;
+    setCheckingDuplicates(true);
+    try {
+      const matches = await patientsAPI.checkDuplicates({ firstName: hasName ? firstName : undefined, lastName: hasName ? lastName : undefined, phone: hasPhone ? normalizedPhone : undefined });
+      if (requestId === duplicateRequestRef.current) setDuplicateMatches(matches || []);
+    } catch {
+      if (requestId === duplicateRequestRef.current) setDuplicateMatches([]);
+    } finally {
+      if (requestId === duplicateRequestRef.current) setCheckingDuplicates(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      checkForDuplicates(formData.firstName.trim(), formData.lastName.trim(), formData.phone);
+    }, 500);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [formData.firstName, formData.lastName, formData.phone, checkForDuplicates]);
 
   const [createdPatient, setCreatedPatient] = useState<{ id?: string; _id?: string; patientId: string } | null>(null);
 
@@ -102,7 +138,6 @@ export default function RegisterPatient() {
       const newPatient = await createPatient.mutateAsync({
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
-        dateOfBirth: formData.dateOfBirth ? new Date(formData.dateOfBirth) : undefined,
         age: normalizedAge,
         ageValue,
         ageUnit: formData.ageUnit,
@@ -111,8 +146,7 @@ export default function RegisterPatient() {
         email: formData.email.trim() || undefined,
         address: formData.address.trim() || undefined,
         bloodType: formData.bloodType || undefined,
-        allergies: formData.allergies ? formData.allergies.split(',').map(a => a.trim()).filter(Boolean) : undefined,
-        insurance: insuranceForm.programCode ? {
+        insurance: isInsurancePatient && insuranceForm.programCode ? {
           programCode: insuranceForm.programCode || undefined,
           subEntityCode: insuranceForm.subEntityCode || undefined,
           memberNumber: insuranceForm.memberNumber || undefined,
@@ -135,7 +169,6 @@ export default function RegisterPatient() {
     setFormData({
       firstName: '',
       lastName: '',
-      dateOfBirth: '',
       age: '',
       ageUnit: 'years',
       gender: '',
@@ -143,7 +176,6 @@ export default function RegisterPatient() {
       email: '',
       address: '',
       bloodType: '',
-      allergies: '',
     });
     setInsuranceForm({
       programCode: '',
@@ -154,7 +186,7 @@ export default function RegisterPatient() {
       responsiblePhone: '',
       responsibleAddress: '',
     });
-    setShowInsurance(false);
+    setIsInsurancePatient(false);
     setCreatedPatient(null);
   };
 
@@ -276,6 +308,18 @@ export default function RegisterPatient() {
               </div>
             </div>
 
+            <div className="md:col-span-2 flex items-center gap-3 rounded-lg border bg-muted/30 px-4 py-3">
+              <Checkbox
+                id="isInsurancePatient"
+                checked={isInsurancePatient}
+                onCheckedChange={(checked) => setIsInsurancePatient(checked === true)}
+              />
+              <div>
+                <Label htmlFor="isInsurancePatient" className="cursor-pointer font-medium">This is an insurance patient</Label>
+                <p className="text-xs text-muted-foreground">Select this to enter the patient’s insurance details.</p>
+              </div>
+            </div>
+
             {/* Gender */}
             <div className="space-y-2">
               <Label>Gender *</Label>
@@ -334,20 +378,8 @@ export default function RegisterPatient() {
               />
             </div>
 
-            {/* Date of Birth */}
-            <div className="space-y-2">
-              <Label htmlFor="dateOfBirth">Date of Birth</Label>
-              <Input
-                id="dateOfBirth"
-                type="date"
-                value={formData.dateOfBirth}
-                onChange={e => setFormData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-              />
-              <p className="text-xs text-muted-foreground">Optional. Age will be calculated automatically.</p>
-            </div>
-
             {/* Blood Type */}
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="bloodType">Blood Type</Label>
               <Select
                 value={formData.bloodType}
@@ -369,31 +401,13 @@ export default function RegisterPatient() {
               </Select>
             </div>
 
-            {/* Allergies */}
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="allergies">Allergies</Label>
-              <Input
-                id="allergies"
-                value={formData.allergies}
-                onChange={e => setFormData(prev => ({ ...prev, allergies: e.target.value }))}
-                placeholder="e.g. Penicillin, Sulfa drugs, Latex (comma-separated)"
-              />
-              <p className="text-xs text-muted-foreground">Separate multiple allergies with commas.</p>
-            </div>
-
             {/* Insurance Section */}
+            {isInsurancePatient && (
             <div className="md:col-span-2 space-y-2">
-              <button
-                type="button"
-                onClick={() => setShowInsurance(!showInsurance)}
-                className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-              >
+              <div className="flex items-center gap-2 text-sm font-medium text-primary">
                 <Shield className="w-4 h-4" />
-                Insurance Information (Optional)
-                {showInsurance ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-              </button>
-
-              {showInsurance && (
+                Insurance Details
+              </div>
                 <div className="border rounded-lg p-4 space-y-3 bg-muted/20">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1">
@@ -477,9 +491,42 @@ export default function RegisterPatient() {
                     />
                   </div>
                 </div>
-              )}
             </div>
+            )}
           </div>
+
+          {checkingDuplicates && (
+            <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground" aria-live="polite">
+              <Loader2 className="w-4 h-4 animate-spin" /> Checking for existing patients…
+            </div>
+          )}
+
+          {duplicateMatches.length > 0 && (
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-medium text-amber-800">
+                    {duplicateMatches.length} potential duplicate{duplicateMatches.length > 1 ? 's' : ''} found
+                  </p>
+                  <p className="text-sm text-amber-700 mt-1">
+                    A patient with similar details may already exist. Please review before registering.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {duplicateMatches.map((match) => (
+                      <div key={match.patientId} className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between bg-white rounded-md px-3 py-2 border border-amber-100 text-sm">
+                        <div>
+                          <span className="font-medium">{match.firstName} {match.lastName}</span>
+                          {match.phone && <span className="sm:ml-2 text-muted-foreground break-all">{match.phone}</span>}
+                        </div>
+                        <span className="text-xs text-muted-foreground font-mono">{match.patientId}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 mt-6 pt-6 border-t">
             <Button type="button" variant="outline" onClick={() => navigate('/reception')}>

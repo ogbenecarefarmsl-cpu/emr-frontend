@@ -673,7 +673,7 @@ export default function ReceptionDispensePage() {
                     <SelectContent>
                       <SelectItem value="cash">Cash</SelectItem>
                       <SelectItem value="orange_money">Orange Money</SelectItem>
-                      <SelectItem value="africell_money">Africell Money</SelectItem>
+                      <SelectItem value="afrimoney">Afrimoney</SelectItem>
                       <SelectItem value="qmoney">QMoney</SelectItem>
                       <SelectItem value="card">Card</SelectItem>
                       <SelectItem value="bank_transfer">Bank Transfer</SelectItem>

@@ -13,6 +13,11 @@ function parseStoolValue(value: string): { label: string; val: string }[] | null
   return pairs.length >= 2 ? pairs : null;
 }
 
+function clinicalComment(comment?: string): string | undefined {
+  const normalized = comment?.trim().toLowerCase();
+  return normalized === 'imported from lis' ? undefined : comment;
+}
+
 const PANEL_RESULT_ORDER: Record<string, string[]> = {
   FBC: [
     'WBC', 'NEUTA', 'LYMPHA', 'MONOA', 'EOSA', 'BASOA',
@@ -185,8 +190,9 @@ export function PaginatedCategorySection({ pageCategory, template }: PaginatedCa
                         {results.map((result, resultIndex) => {
                           const firstColumnValue = result.testName || result.testCode;
                           // Exclude WBC comments from third column (FBC panel messages shown as panel footer instead)
+                          const resultComment = clinicalComment(result.comments);
                           const thirdColumnValue = isSerologyLayout
-                            ? (result.testCode !== 'WBC' ? (result.comments || result.referenceRange || '-') : (result.referenceRange || '-'))
+                            ? (result.testCode !== 'WBC' ? (resultComment || result.referenceRange || '-') : (result.referenceRange || '-'))
                             : (result.referenceRange || '-');
 
                           // Check if this is a hormone test with multiple ranges
@@ -258,7 +264,7 @@ export function PaginatedCategorySection({ pageCategory, template }: PaginatedCa
                                     )}
                                   </span>
                                   {/* Show interpretation subtitle for immunoassay/chemistry tests - exclude WBC in FBC panels (shown as panel footer instead) */}
-                                  {!isSerologyLayout && result.comments && result.testCode !== 'WBC' && (
+                                  {!isSerologyLayout && resultComment && result.testCode !== 'WBC' && (
                                     <div
                                       className="text-[10px] font-normal mt-0.5"
                                       style={{
@@ -268,7 +274,7 @@ export function PaginatedCategorySection({ pageCategory, template }: PaginatedCa
                                             : '#64748b',
                                       }}
                                     >
-                                      {result.comments}
+                                      {resultComment}
                                     </div>
                                   )}
                                 </td>
@@ -324,8 +330,9 @@ export function PaginatedCategorySection({ pageCategory, template }: PaginatedCa
                     return orderedResults.map((result, resultIndex) => {
                       const firstColumnValue = result.testName || result.testCode;
                     // Exclude WBC comments from third column (FBC panel messages shown as panel footer instead)
+                    const resultComment = clinicalComment(result.comments);
                     const thirdColumnValue = isSerologyLayout
-                      ? (result.testCode !== 'WBC' ? (result.comments || result.referenceRange || '-') : (result.referenceRange || '-'))
+                      ? (result.testCode !== 'WBC' ? (resultComment || result.referenceRange || '-') : (result.referenceRange || '-'))
                       : (result.referenceRange || '-');
 
                     // Check if this is a hormone test with multiple ranges
@@ -397,7 +404,7 @@ export function PaginatedCategorySection({ pageCategory, template }: PaginatedCa
                               )}
                             </span>
                             {/* Show interpretation subtitle for immunoassay/chemistry tests - exclude WBC in FBC panels (shown as panel footer instead) */}
-                            {!isSerologyLayout && result.comments && result.testCode !== 'WBC' && (
+                            {!isSerologyLayout && resultComment && result.testCode !== 'WBC' && (
                               <div
                                 className="text-[10px] font-normal mt-0.5"
                                 style={{
@@ -407,7 +414,7 @@ export function PaginatedCategorySection({ pageCategory, template }: PaginatedCa
                                       : '#64748b',
                                 }}
                               >
-                                {result.comments}
+                                {resultComment}
                               </div>
                             )}
                           </td>

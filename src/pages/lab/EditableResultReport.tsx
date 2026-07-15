@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -7,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Printer, Save, Edit2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useMyBranch } from '@/hooks/useBranch';
+import { useAuth } from '@/context/AuthContext';
 
 interface TestResult {
   id: string;
@@ -37,6 +39,7 @@ interface PatientInfo {
 export default function EditableResultReport() {
   const printRef = useRef<HTMLDivElement>(null);
   const { data: branch } = useMyBranch();
+  const { profile } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   
   const [patientInfo, setPatientInfo] = useState<PatientInfo>({
@@ -126,7 +129,8 @@ export default function EditableResultReport() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
+    <RoleLayout title="Lab Result Report" subtitle="View and edit result report" role={profile?.role || 'lab_tech'} userName={profile?.fullName || profile?.email}>
+    <div className="bg-gray-50 p-4 md:p-8">
       {/* Action Buttons */}
       <div className="max-w-5xl mx-auto mb-4 flex justify-end gap-2 print:hidden">
         {!isEditing ? (
@@ -493,5 +497,6 @@ export default function EditableResultReport() {
         }
       `}</style>
     </div>
+    </RoleLayout>
   );
 }

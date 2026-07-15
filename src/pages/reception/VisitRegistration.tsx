@@ -102,6 +102,7 @@ export default function VisitRegistration() {
   const [insuranceBlock, setInsuranceBlock] = useState<any>(null);
   const [checkingBlock, setCheckingBlock] = useState(false);
   const [acknowledgedBlock, setAcknowledgedBlock] = useState(false);
+  const [selfPayOverride, setSelfPayOverride] = useState(false);
   const isBlocked = !!insuranceBlock;
 
   // Check for insurance block when patient is selected
@@ -109,6 +110,7 @@ export default function VisitRegistration() {
     if (!selectedPatient) {
       setInsuranceBlock(null);
       setAcknowledgedBlock(false);
+      setSelfPayOverride(false);
       return;
     }
 
@@ -207,7 +209,7 @@ export default function VisitRegistration() {
         visitType: visitType as any,
         consultationFee: parseFloat(consultationFee) || 0,
         chiefComplaint,
-        selfPayOverride: isBlocked || undefined,
+        selfPayOverride: (isBlocked || selfPayOverride) || undefined,
         notes: [
           `Service: ${selectedService.label}`,
           procedureType ? `Procedure: ${procedureType}` : undefined,
@@ -222,7 +224,7 @@ export default function VisitRegistration() {
       });
 
       if ((visit as any).consultationFeeWaived) {
-        toast.success('Consultation fee waived — patient had a paid visit within 30 days. Sent to nurse vitals.');
+        toast.success('Included follow-up visit. Patient sent to nurse vitals.');
       } else if ((visit as any).consultationCoveredByInsurance) {
         toast.success('Consultation covered by insurance. Patient sent to nurse vitals.');
       } else {
@@ -368,6 +370,20 @@ export default function VisitRegistration() {
             </div>
           </CardContent>
         </Card>
+
+        {hasInsurance && !isBlocked && (
+          <Card className="border-blue-200 bg-blue-50">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <Checkbox id="selfPayOverride" checked={selfPayOverride} onCheckedChange={(checked) => setSelfPayOverride(checked === true)} />
+                <div>
+                  <Label htmlFor="selfPayOverride" className="cursor-pointer font-medium text-blue-900">Register this visit as self-pay</Label>
+                  <p className="mt-1 text-sm text-blue-800">Insurance covers one consultation every 14 days. Select self-pay if the patient wants another visit before their next eligible date.</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Insurance Block Warning */}
         {isBlocked && (
@@ -531,12 +547,12 @@ export default function VisitRegistration() {
 
                 <div className="space-y-2">
                   <Label htmlFor="consultationFee">Service Fee (Le)</Label>
-                  {hasInsurance && !isBlocked ? (
+                  {hasInsurance && !isBlocked && !selfPayOverride ? (
                     <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
                       <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">Insurance</Badge>
                       <span className="text-sm text-blue-700">Consultation covered — no payment required</span>
                     </div>
-                  ) : isBlocked ? (
+                  ) : (isBlocked || selfPayOverride) ? (
                     <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
                       <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">Self-Pay</Badge>
                       <span className="text-sm text-amber-700">Insurance blocked — patient pays out of pocket</span>
@@ -553,13 +569,13 @@ export default function VisitRegistration() {
                         min="0"
                       />
                       <p className="text-[11px] text-muted-foreground">
-                        Fee is auto-waived if the patient had a paid visit within the last 30 days.
+                        A paid consultation includes this visit and one follow-up visit.
                       </p>
                     </>
                   )}
                 </div>
 
-                {(!hasInsurance || isBlocked) && (
+                {(!hasInsurance || isBlocked || selfPayOverride) && (
                   <div className="space-y-2">
                     <Label htmlFor="paymentMethod">Payment Method</Label>
                     <Select value={paymentMethod} onValueChange={setPaymentMethod}>

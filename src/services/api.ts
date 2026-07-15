@@ -246,6 +246,11 @@ export const patientsAPI = {
     return response.data;
   },
 
+  checkDuplicates: async (params: { firstName?: string; lastName?: string; phone?: string }) => {
+    const response = await api.get('/patients/check-duplicates', { params });
+    return response.data;
+  },
+
   getOrders: async (id: string) => {
     const response = await api.get(`/patients/${id}/orders`);
     return response.data;
