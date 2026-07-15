@@ -18,6 +18,7 @@ import {
   Plus, Pencil, Loader2, Store, Users, FlaskConical, Pill, KeyRound, Link2, PlugZap, Info,
 } from 'lucide-react';
 import BranchSetupWizard from './BranchSetupWizard';
+import { LIS_LOGO_ALT, LIS_LOGO_URL } from '@/lib/branding';
 
 export default function BranchManagementPage() {
   const { profile } = useAuth();
@@ -158,11 +159,7 @@ export default function BranchManagementPage() {
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded bg-primary/10 flex items-center justify-center text-lg">
-                        {branch.logoUrl ? (
-                          <img src={branch.logoUrl} alt="" className="w-10 h-10 object-contain" />
-                        ) : (
-                          <Store className="w-5 h-5 text-primary" />
-                        )}
+                        <img src={LIS_LOGO_URL} alt={LIS_LOGO_ALT} className="w-10 h-10 object-contain" />
                       </div>
                       <div>
                         <p className="font-semibold">{branch.name}</p>
@@ -314,12 +311,11 @@ export default function BranchManagementPage() {
               />
             </div>
             <div className="col-span-2 space-y-1">
-              <Label>Logo URL</Label>
-              <Input
-                placeholder="https://...logo.png"
-                value={editForm.logoUrl || ''}
-                onChange={(e) => setEditForm({ ...editForm, logoUrl: e.target.value })}
-              />
+              <Label>Outlet Logo</Label>
+              <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-3">
+                <img src={LIS_LOGO_URL} alt={LIS_LOGO_ALT} className="h-10 w-auto object-contain" />
+                <span className="text-xs text-muted-foreground">Fixed to the LIS brand mark</span>
+              </div>
             </div>
             <div className="col-span-2 space-y-1">
               <Label><FileText className="w-3 h-3 inline" /> Custom Footer Text</Label>

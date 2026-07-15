@@ -16,6 +16,7 @@ import { thermalPrintStyles } from '@/components/receipts/ThermalReceipt';
 import { BranchLetterhead, BranchFooterText } from '@/components/receipts/BranchLetterhead';
 import { useMyBranch } from '@/hooks/useBranch';
 import { cn } from '@/lib/utils';
+import { LIS_LOGO_URL } from '@/lib/branding';
 
 function padLine(label: string, value: string, width = LINE_WIDTH): string {
   const spaces = width - label.length - value.length;
@@ -157,7 +158,7 @@ export default function PriceListPage() {
       ? `<div class="total-row grand-total" style="margin-top:8px"><span>TOTAL:</span><span>${formatCurrency(selectedTotal)}</span></div>`
       : '';
 
-    const br = branch || FALLBACK_BRANCH;
+    const br = { ...(branch || FALLBACK_BRANCH), logoUrl: LIS_LOGO_URL };
     const headerLines = [
       br.logoUrl ? `<img class="logo-image" src="${br.logoUrl}" alt="Logo" />` : '<div class="logo">🏥</div>',
       `<div class="company-name">${(br.name || '').toUpperCase()}</div>`,

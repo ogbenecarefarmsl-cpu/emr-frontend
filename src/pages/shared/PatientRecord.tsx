@@ -6,6 +6,7 @@ import { ordersAPI } from '@/services/api';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { Badge } from '@/components/ui/badge';
+import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +14,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import {
   Loader2, ArrowLeft, User, Activity, Stethoscope, Pill, FileText, FlaskConical,
   Clock, AlertTriangle, ChevronDown, Calendar, Droplets, ExternalLink, RefreshCw,
-  Phone, Hash, TrendingUp, ClipboardList, Shield
+  Phone, Hash, TrendingUp, ClipboardList
 } from 'lucide-react';
 import { PatientTreatmentPlans } from './PatientTreatmentPlans';
 import { toast } from 'sonner';
@@ -225,13 +226,7 @@ const PatientRecord = () => {
                   {patient.chronicConditions?.length > 0 && (
                     <Badge variant="secondary" className="text-[10px]">{patient.chronicConditions.join(', ')}</Badge>
                   )}
-                  {patient.insurance?.programCode && (
-                    <Badge variant="outline" className="text-[10px] gap-1">
-                      <Shield className="w-3 h-3" />
-                      {patient.insurance.programCode}
-                      {patient.insurance.subEntityCode && ` / ${patient.insurance.subEntityCode}`}
-                    </Badge>
-                  )}
+                  <InsuranceStatusBadge insurance={patient.insurance} compact className="text-[10px]" />
                 </div>
               </div>
             </div>

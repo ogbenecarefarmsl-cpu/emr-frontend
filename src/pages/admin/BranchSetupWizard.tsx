@@ -16,6 +16,7 @@ import {
   ArrowLeft, ArrowRight, Plus, Trash2, CheckCircle2, Info,
   Eye, EyeOff, Sparkles, Loader2,
 } from 'lucide-react';
+import { LIS_LOGO_ALT, LIS_LOGO_URL } from '@/lib/branding';
 
 interface StaffUser {
   fullName: string;
@@ -364,8 +365,11 @@ function StepDetails({ form, update }: { form: WizardState; update: (f: keyof Wi
           <Input value={form.operatingHours} onChange={(e) => update('operatingHours', e.target.value)} placeholder="Mon-Sat 8am-8pm" />
         </div>
         <div className="col-span-2 space-y-1">
-          <Label>Logo URL</Label>
-          <Input value={form.logoUrl} onChange={(e) => update('logoUrl', e.target.value)} placeholder="https://...logo.png" />
+          <Label>Outlet Logo</Label>
+          <div className="flex items-center gap-3 rounded-md border bg-muted/30 p-3">
+            <img src={LIS_LOGO_URL} alt={LIS_LOGO_ALT} className="h-10 w-auto object-contain" />
+            <span className="text-xs text-muted-foreground">All outlets use the LIS brand mark</span>
+          </div>
         </div>
         <div className="col-span-2 space-y-1">
           <Label>Footer Text</Label>

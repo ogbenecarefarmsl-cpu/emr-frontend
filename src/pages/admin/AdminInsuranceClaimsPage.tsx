@@ -49,6 +49,7 @@ export default function AdminInsuranceClaimsPage() {
   const [approveAmount, setApproveAmount] = useState('');
   const [rejectionReason, setRejectionReason] = useState('');
   const [actionNotes, setActionNotes] = useState('');
+  const [verificationReference, setVerificationReference] = useState('');
   const queryClient = useQueryClient();
 
   const { profile } = useAuth();
@@ -73,6 +74,12 @@ export default function AdminInsuranceClaimsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['insurance-claims'] });
       queryClient.invalidateQueries({ queryKey: ['insurance-claims-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-outstanding'] });
+      queryClient.invalidateQueries({ queryKey: ['outstanding-balances'] });
+      queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['daily-income'] });
+      queryClient.invalidateQueries({ queryKey: ['revenue'] });
       toast.success('Claim updated');
       setShowDetailDialog(false);
       setShowApproveDialog(false);
@@ -80,6 +87,7 @@ export default function AdminInsuranceClaimsPage() {
       setApproveAmount('');
       setRejectionReason('');
       setActionNotes('');
+      setVerificationReference('');
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to update claim');
@@ -103,6 +111,7 @@ export default function AdminInsuranceClaimsPage() {
       status: 'approved',
       approvedAmount: approveAmount ? Number(approveAmount) : selectedClaim.claimedAmount,
       notes: actionNotes || undefined,
+      verificationReference: verificationReference || undefined,
     });
   };
 
@@ -492,6 +501,13 @@ export default function AdminInsuranceClaimsPage() {
                   <span className="font-medium">Notes:</span> {selectedClaim.notes}
                 </div>
               )}
+              {selectedClaim.verificationReference ? (
+                <div className="rounded border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                  <span className="font-medium">Verified by Reception/Admin:</span>{' '}
+                  {selectedClaim.verificationReference}
+                  {selectedClaim.verifiedAt ? ` · ${new Date(selectedClaim.verifiedAt).toLocaleString()}` : ''}
+                </div>
+              ) : null}
             </div>
           )}
         </DialogContent>
@@ -518,6 +534,20 @@ export default function AdminInsuranceClaimsPage() {
               <p className="text-xs text-muted-foreground mt-1">
                 Claimed: Le {selectedClaim?.claimedAmount?.toLocaleString()}
               </p>
+              {Number(approveAmount || 0) < Number(selectedClaim?.claimedAmount || 0) ? (
+                <p className="mt-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                  The difference becomes a patient balance and will reappear in Accounts Receivable.
+                </p>
+              ) : null}
+            </div>
+            <div>
+              <label className="text-sm font-medium">Verification reference (optional)</label>
+              <Input
+                value={verificationReference}
+                onChange={(e) => setVerificationReference(e.target.value)}
+                placeholder="Phone approval, card check, letter or reference"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Reception can record reasonable due diligence without waiting for Admin.</p>
             </div>
             <div>
               <label className="text-sm font-medium">Notes (optional)</label>

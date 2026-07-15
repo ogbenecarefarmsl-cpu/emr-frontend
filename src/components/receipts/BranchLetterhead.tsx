@@ -1,17 +1,7 @@
 import { useMyBranch, type Branch } from '@/hooks/useBranch';
+import { LIS_LOGO_ALT, LIS_LOGO_URL } from '@/lib/branding';
 
-/**
- * BranchLetterhead
- *
- * Renders the receipt header (logo, branch name, address, phone, email,
- * tagline, website, operating hours) from the current user's branch.
- *
- * Used by every thermal receipt HTML view. The byte-level ESC/POS path
- * uses escpos.buildBranchHeaderESCPOS() (same data, different renderer).
- *
- * If the user has no branch assigned, falls back to a generic placeholder
- * so the receipt still prints.
- */
+/** Shared LIS logo with the current outlet's branch-specific letterhead. */
 export function BranchLetterhead({
   compact = false,
   branch: suppliedBranch,
@@ -25,7 +15,7 @@ export function BranchLetterhead({
   if (isLoading) {
     return (
       <div className="branch-letterhead" data-state="loading">
-        <div className="logo">🏥</div>
+        <img className="logo logo-image" src={LIS_LOGO_URL} alt={LIS_LOGO_ALT} />
         <div className="company-name">Loading…</div>
       </div>
     );
@@ -34,10 +24,10 @@ export function BranchLetterhead({
   if (!branch) {
     return (
       <div className="branch-letterhead" data-state="no-branch">
-        <div className="logo">🏥</div>
+        <img className="logo logo-image" src={LIS_LOGO_URL} alt={LIS_LOGO_ALT} />
         <div className="company-name">Harbour Medical Diagnostic</div>
         <div className="company-info company-info-warn">
-          ⚠ Branch not assigned — contact admin
+          Branch not assigned — contact admin
         </div>
       </div>
     );
@@ -45,11 +35,7 @@ export function BranchLetterhead({
 
   return (
     <div className="branch-letterhead" data-state="ready">
-      {branch.logoUrl ? (
-        <img className="logo logo-image" src={branch.logoUrl} alt="Logo" />
-      ) : (
-        <div className="logo">🏥</div>
-      )}
+      <img className="logo logo-image" src={LIS_LOGO_URL} alt={LIS_LOGO_ALT} />
       <div className="company-name">{branch.name}</div>
       {branch.tagline && !compact && (
         <div className="company-tagline">{branch.tagline}</div>
@@ -67,12 +53,6 @@ export function BranchLetterhead({
   );
 }
 
-/**
- * BranchFooterText
- *
- * Renders the receipt footer (thank-you message, hours, etc.) from
- * the current branch's settings. Falls back to a generic message.
- */
 export function BranchFooterText({ branch: suppliedBranch }: { branch?: Partial<Branch> | null } = {}) {
   const { data: currentBranch } = useMyBranch(!suppliedBranch);
   const branch = suppliedBranch || currentBranch;
@@ -82,15 +62,6 @@ export function BranchFooterText({ branch: suppliedBranch }: { branch?: Partial<
   return <div className="footer-text">{text}</div>;
 }
 
-/**
- * Plain-data access for non-React code (e.g. ESC/POS byte builder).
- * Same source of truth as the React component above — pulls from the
- * cached React Query key.
- *
- * Returns null if the branch is still loading or the user has no branch.
- * Callers that need a non-null fallback should use escpos.buildBranchHeaderESCPOS
- * which uses a generic placeholder.
- */
 export function useBranchHeader() {
   const { data: branch, isLoading } = useMyBranch();
   return { branch: branch || null, isLoading };

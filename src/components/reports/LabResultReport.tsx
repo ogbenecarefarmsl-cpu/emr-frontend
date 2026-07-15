@@ -4,6 +4,7 @@ import { useDefaultTemplate } from '../../hooks/useReportTemplates';
 import { usePrinterContext } from '@/context/PrinterContext';
 import { usePaginatedReport } from './SmartPaginatedReport';
 import { ReportHeader } from './ReportHeader';
+import { LIS_LOGO_URL } from '@/lib/branding';
 import { PatientInfoSection } from './PatientInfoSection';
 import { PaginatedCategorySection } from './PaginatedCategorySection';
 import { VerificationSection } from './VerificationSection';
@@ -60,7 +61,7 @@ export function LabResultReport({ orderId, onPrintComplete }: LabResultReportPro
 
   // Use admin-configured paper size and orientation
   const pageSize = `${printerSettings.a4.paperSize} ${printerSettings.a4.orientation}`;
-  const reportWatermarkSrc = reportData?.laboratoryInfo.logo || import.meta.env.VITE_REPORT_HEADER_LOGO || '/harbour-emr-logo.svg';
+  const reportWatermarkSrc = LIS_LOGO_URL;
 
   // Use smart pagination to split results across pages intelligently
   // Heights calibrated to print layout (mm) - COMPACT VERSION

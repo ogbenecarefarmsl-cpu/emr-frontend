@@ -1046,6 +1046,11 @@ export const visitsAPI = {
     return response.data;
   },
 
+  getReceptionDashboard: async () => {
+    const response = await api.get('/visits/reception-dashboard');
+    return response.data;
+  },
+
   getDoctorDashboard: async () => {
     const response = await api.get('/visits/doctor-dashboard');
     return response.data;
@@ -1100,6 +1105,11 @@ export const visitsAPI = {
 
   getByPatient: async (patientId: string) => {
     const response = await api.get(`/visits/patient/${patientId}`);
+    return response.data;
+  },
+
+  getInsuranceEligibility: async (patientId: string) => {
+    const response = await api.get(`/visits/insurance-eligibility/${patientId}`);
     return response.data;
   },
 
@@ -1557,12 +1567,17 @@ export const insuranceClaimsAPI = {
     const response = await api.patch(`/insurance-claims/${claimId}/items/${itemIndex}/coverage`, { coveredByInsurance });
     return response.data;
   },
-  updateStatus: async (claimId: string, data: { status: string; approvedAmount?: number; paidAmount?: number; rejectionReason?: string; notes?: string }) => {
+  updateStatus: async (claimId: string, data: { status: string; approvedAmount?: number; paidAmount?: number; rejectionReason?: string; notes?: string; verificationReference?: string }) => {
     const response = await api.patch(`/insurance-claims/${claimId}/status`, data);
     return response.data;
   },
-  markOrderInsurance: async (orderId: string) => {
-    const response = await api.post('/insurance-claims/mark-order-insurance', { orderId });
+  markOrderInsurance: async (orderId: string, insuranceAmount?: number, verificationReference?: string, verificationNotes?: string) => {
+    const response = await api.post('/insurance-claims/mark-order-insurance', {
+      orderId,
+      insuranceAmount,
+      verificationReference,
+      verificationNotes,
+    });
     return response.data;
   },
 };

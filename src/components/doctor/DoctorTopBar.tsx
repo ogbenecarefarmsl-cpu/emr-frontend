@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -180,12 +181,11 @@ export function DoctorTopBar({
     });
 
     setNotifications((prev) => {
-      const merged = [...prev];
-      next.forEach((n) => {
-        const idx = merged.findIndex((p) => p.id === n.id);
-        if (idx === -1) merged.push(n);
-      });
-      return merged.slice(-50);
+      const previousById = new Map(prev.map((notification) => [notification.id, notification]));
+      return next.slice(-50).map((notification) => ({
+        ...notification,
+        read: previousById.get(notification.id)?.read ?? false,
+      }));
     });
   }, [waitingQueue, resultsReady, activePatients]);
 
@@ -473,9 +473,7 @@ export function DoctorTopBar({
                         >
                           <p className="text-xs font-medium">{name}</p>
                           <p className="text-[10px] text-muted-foreground">{p.patientId || p._id} · {p.age ? `${p.age}y` : ''} {p.gender || ''}</p>
-                          {p.insurance?.programCode && (
-                            <p className="text-[10px] text-blue-600 font-medium">{p.insurance.programCode}{p.insurance.subEntityCode ? ` / ${p.insurance.subEntityCode}` : ''}</p>
-                          )}
+                          <InsuranceStatusBadge insurance={p.insurance} compact className="mt-1 h-4 px-1 py-0 text-[9px]" />
                         </button>
                       );
                     })}

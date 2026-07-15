@@ -4,7 +4,6 @@ import { useAuth } from '@/context/AuthContext';
 import {
   useDefaultTemplate,
   useUpdateTemplate,
-  useUploadLogo,
 } from '@/hooks/useReportTemplates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,51 +12,26 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Save, Upload, Loader2, Eye } from 'lucide-react';
+import { Save, Loader2, Eye } from 'lucide-react';
+import { LIS_LOGO_ALT, LIS_LOGO_URL } from '@/lib/branding';
 
 export default function ReportTemplateEditor() {
   const { profile } = useAuth();
   const { data: template, isLoading } = useDefaultTemplate();
   const updateTemplate = useUpdateTemplate();
-  const uploadLogo = useUploadLogo();
 
   const [formData, setFormData] = useState<any>(null);
-  const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string>('');
 
   useEffect(() => {
     if (template) {
       setFormData(template);
-      if (template.header?.logoUrl) {
-        setLogoPreview(`${import.meta.env.VITE_API_URL || 'http://localhost:3000'}${template.header.logoUrl}`);
-      }
     }
   }, [template]);
-
-  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setLogoFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setLogoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
 
   const handleSave = async () => {
     if (!formData) return;
 
     try {
-      let logoUrl = formData.header?.logoUrl;
-
-      // Upload logo if changed
-      if (logoFile) {
-        const uploadResult = await uploadLogo.mutateAsync(logoFile);
-        logoUrl = uploadResult.url;
-      }
-
       // Update template
       await updateTemplate.mutateAsync({
         id: formData._id || formData.id,
@@ -65,7 +39,7 @@ export default function ReportTemplateEditor() {
           ...formData,
           header: {
             ...formData.header,
-            logoUrl,
+            logoUrl: LIS_LOGO_URL,
           },
         },
       });
@@ -121,18 +95,10 @@ export default function ReportTemplateEditor() {
                 <div>
                   <Label>Lab Logo</Label>
                   <div className="mt-2 flex items-center gap-4">
-                    {logoPreview && (
-                      <img src={logoPreview} alt="Logo" className="h-20 w-auto border rounded" />
-                    )}
+                    <img src={LIS_LOGO_URL} alt={LIS_LOGO_ALT} className="h-20 w-auto border rounded" />
                     <div>
-                      <Input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleLogoChange}
-                        className="max-w-xs"
-                      />
                       <p className="text-xs text-muted-foreground mt-1">
-                        Recommended: 120x80px, PNG or JPG
+                        The LIS logo is the fixed brand mark for every outlet.
                       </p>
                     </div>
                   </div>
@@ -454,10 +420,10 @@ export default function ReportTemplateEditor() {
             <div className="flex gap-2 mt-6">
               <Button
                 onClick={handleSave}
-                disabled={updateTemplate.isPending || uploadLogo.isPending}
+                disabled={updateTemplate.isPending}
                 className="flex-1"
               >
-                {(updateTemplate.isPending || uploadLogo.isPending) && (
+                {updateTemplate.isPending && (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 )}
                 <Save className="w-4 h-4 mr-2" />
@@ -477,9 +443,7 @@ export default function ReportTemplateEditor() {
             <div className="bg-white border rounded p-4 text-xs" style={{ fontSize: '10px' }}>
               {/* Mini Preview */}
               <div className="border-b-2 pb-2 mb-2" style={{ borderColor: formData.header?.headerBorderColor }}>
-                {logoPreview && (
-                  <img src={logoPreview} alt="Logo" className="h-8 mb-1" />
-                )}
+                <img src={LIS_LOGO_URL} alt={LIS_LOGO_ALT} className="h-8 mb-1" />
                 <div className="font-bold">{formData.header?.labName}</div>
                 <div className="text-gray-600 text-[8px]">{formData.header?.motto}</div>
                 <div className="text-gray-600 text-[8px]">{formData.header?.phone}</div>

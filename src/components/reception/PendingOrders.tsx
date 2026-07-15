@@ -5,11 +5,15 @@ import { usePendingClinicalOrders, useMarkOrderPaid } from '@/hooks/useVisits';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle, ArrowRight, User, Shield, ShieldOff } from 'lucide-react';
 import { prescriptionService } from '@/services/prescriptionService';
 import { insuranceClaimsAPI, insuranceBlocksAPI } from '@/services/api';
+import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
 
 type PatientGroup = {
   patientId: string;
@@ -22,6 +26,10 @@ type PatientGroup = {
 export function PendingOrders() {
   const [activeTab, setActiveTab] = useState('all');
   const [selectedMethods, setSelectedMethods] = useState<Record<string, string>>({});
+  const [insuranceOrder, setInsuranceOrder] = useState<any>(null);
+  const [insuranceAmount, setInsuranceAmount] = useState('');
+  const [insuranceReference, setInsuranceReference] = useState('');
+  const [insuranceNotes, setInsuranceNotes] = useState('');
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: allOrders = [], isLoading, refetch } = usePendingClinicalOrders();
@@ -34,9 +42,10 @@ export function PendingOrders() {
   });
   const markPaid = useMarkOrderPaid();
   const markOrderInsuranceMutation = useMutation({
-    mutationFn: (orderId: string) => insuranceClaimsAPI.markOrderInsurance(orderId),
+    mutationFn: ({ orderId, amount, reference, notes }: { orderId: string; amount: number; reference?: string; notes?: string }) =>
+      insuranceClaimsAPI.markOrderInsurance(orderId, amount, reference, notes),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['pendingClinicalOrders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['payment-stats'] });
       queryClient.invalidateQueries({ queryKey: ['daily-income'] });
     },
@@ -103,10 +112,29 @@ export function PendingOrders() {
     }
   };
 
-  const handleMarkInsurance = async (orderId: string) => {
+  const handleMarkInsurance = async () => {
+    if (!insuranceOrder) return;
+    const amount = Number(insuranceAmount);
+    const balance = Number(insuranceOrder.balance ?? insuranceOrder.total ?? 0);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > balance) {
+      toast.error(`Enter an insurance amount between Le 0.01 and Le ${balance.toLocaleString()}`);
+      return;
+    }
     try {
-      await markOrderInsuranceMutation.mutateAsync(orderId);
-      toast.success('Insurance coverage recorded for this order');
+      const result = await markOrderInsuranceMutation.mutateAsync({
+        orderId: insuranceOrder._id || insuranceOrder.id,
+        amount,
+        reference: insuranceReference.trim() || undefined,
+        notes: insuranceNotes.trim() || undefined,
+      });
+      const patientBalance = Number(result.patientBalance || 0);
+      toast.success(patientBalance > 0
+        ? `Insurance recorded. Patient balance: Le ${patientBalance.toLocaleString()}`
+        : 'Insurance coverage recorded for this order');
+      setInsuranceOrder(null);
+      setInsuranceAmount('');
+      setInsuranceReference('');
+      setInsuranceNotes('');
       refetch();
     } catch (error: any) {
       toast.error(error.message || 'Failed to record insurance coverage');
@@ -256,12 +284,14 @@ export function PendingOrders() {
                 <div className="min-w-0">
                   <div className="font-medium truncate flex items-center gap-2">
                     {patientName}
-                    {isInsurancePatient && !isBlocked && (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
-                        <Shield className="h-3 w-3 mr-0.5" />
-                        {item.visitId.insurance.programCode}
-                      </Badge>
-                    )}
+                    {isInsurancePatient && !isBlocked ? (
+                      <InsuranceStatusBadge
+                        insurance={item.visitId.insurance}
+                        patientBalance={item.paymentStatus === 'partial' ? Number(item.balance || 0) : 0}
+                        compact
+                        className="text-[10px]"
+                      />
+                    ) : null}
                     {isBlocked && (
                       <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px]">
                         <ShieldOff className="h-3 w-3 mr-0.5" />
@@ -301,7 +331,12 @@ export function PendingOrders() {
                   {isInsurancePatient && !isBlocked ? (
                     <>
                       <Button
-                        onClick={() => handleMarkInsurance(item._id || item.id)}
+                        onClick={() => {
+                          setInsuranceOrder(item);
+                          setInsuranceAmount(String(Number(item.balance ?? item.total ?? 0)));
+                          setInsuranceReference('');
+                          setInsuranceNotes('');
+                        }}
                         disabled={markOrderInsuranceMutation.isPending}
                         className="bg-blue-600 hover:bg-blue-700"
                       >
@@ -385,6 +420,7 @@ export function PendingOrders() {
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
@@ -443,5 +479,66 @@ export function PendingOrders() {
         </Tabs>
       </CardContent>
     </Card>
+    <Dialog open={!!insuranceOrder} onOpenChange={(open) => !open && setInsuranceOrder(null)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Record insurance coverage</DialogTitle>
+          <DialogDescription>
+            Enter only the authorized amount. Any uncovered balance remains payable by the patient.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="rounded-md border bg-muted/30 p-3 text-sm">
+            <div className="flex justify-between"><span>Order total</span><strong>Le {Number(insuranceOrder?.total || 0).toLocaleString()}</strong></div>
+            <div className="mt-1 flex justify-between"><span>Current balance</span><strong>Le {Number(insuranceOrder?.balance ?? insuranceOrder?.total ?? 0).toLocaleString()}</strong></div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="insurance-amount">Amount covered by insurance (Le)</Label>
+            <Input
+              id="insurance-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              max={Number(insuranceOrder?.balance ?? insuranceOrder?.total ?? 0)}
+              value={insuranceAmount}
+              onChange={(event) => setInsuranceAmount(event.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="insurance-reference">Verification reference (optional)</Label>
+            <Input
+              id="insurance-reference"
+              value={insuranceReference}
+              onChange={(event) => setInsuranceReference(event.target.value)}
+              placeholder="Card checked, phone authorization, letter or reference number"
+            />
+            <p className="text-xs text-muted-foreground">Reception may continue after reasonable verification; a formal code is not required.</p>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="insurance-notes">Verification notes (optional)</Label>
+            <Input
+              id="insurance-notes"
+              value={insuranceNotes}
+              onChange={(event) => setInsuranceNotes(event.target.value)}
+              placeholder="Who was contacted or what was checked"
+            />
+          </div>
+          {Number(insuranceAmount) > 0 ? (
+            <div className="flex items-center justify-between rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+              <span>Patient pays</span>
+              <strong>Le {Math.max(0, Number(insuranceOrder?.balance ?? insuranceOrder?.total ?? 0) - Number(insuranceAmount)).toLocaleString()}</strong>
+            </div>
+          ) : null}
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setInsuranceOrder(null)}>Cancel</Button>
+          <Button onClick={handleMarkInsurance} disabled={markOrderInsuranceMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
+            {markOrderInsuranceMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Shield className="mr-2 h-4 w-4" />}
+            Apply coverage
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }

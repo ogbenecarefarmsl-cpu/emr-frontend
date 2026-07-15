@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/context/AuthContext';
+import { LIS_LOGO_ALT, LIS_LOGO_URL } from '@/lib/branding';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -130,8 +131,8 @@ export default function Login() {
           {/* Logo */}
           <div className="flex justify-center mb-8">
             <img 
-              src="/harbour-emr-logo.svg" 
-              alt="Harbour EMR Logo" 
+              src={LIS_LOGO_URL}
+              alt={LIS_LOGO_ALT}
               className="h-20 object-contain"
             />
           </div>
@@ -229,8 +230,8 @@ export default function Login() {
           {/* Footer */}
           <div className="mt-8 flex justify-center">
             <img 
-              src="/harbour-emr-logo.svg" 
-              alt="Harbour EMR" 
+              src={LIS_LOGO_URL}
+              alt={LIS_LOGO_ALT}
               className="h-12 object-contain opacity-70"
             />
           </div>

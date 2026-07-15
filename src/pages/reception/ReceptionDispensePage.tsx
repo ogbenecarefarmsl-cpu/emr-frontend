@@ -677,10 +677,14 @@ export default function ReceptionDispensePage() {
                       <SelectItem value="qmoney">QMoney</SelectItem>
                       <SelectItem value="card">Card</SelectItem>
                       <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                      <SelectItem value="insurance">Insurance</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
+                {(rx.patientId as any)?.insurance?.programCode ? (
+                  <p className="max-w-sm text-xs text-amber-700">
+                    This dispense screen records patient payments only. Insurance cannot be selected as a payment method without a linked claim.
+                  </p>
+                ) : null}
                 <Button variant="outline" onClick={() => navigate(-1)}>Cancel</Button>
                 <Button
                   onClick={() => setConfirmOpen(true)}

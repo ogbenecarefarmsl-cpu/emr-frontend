@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import { Loader2, Pill, CheckCircle, Clock, User } from 'lucide-react';
+import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
 
 interface PharmacyQueueProps {
   onDispense?: (order: any) => void;
@@ -74,7 +75,15 @@ export function PharmacyQueue({ onDispense }: PharmacyQueueProps) {
                       </span>
                     </div>
                     <div>
-                      <div className="font-medium">{patientName}</div>
+                      <div className="flex items-center gap-2 font-medium">
+                        {patientName}
+                        <InsuranceStatusBadge
+                          insurance={order.visitId?.insurance}
+                          coverageType={order.visitId?.consultationCoverageType}
+                          compact
+                          className="h-4 px-1 py-0 text-[9px]"
+                        />
+                      </div>
                       <div className="text-sm text-muted-foreground">
                         {patient?.patientId} • {patient?.age}y • {patient?.gender === 'M' ? 'Male' : 'Female'}
                       </div>

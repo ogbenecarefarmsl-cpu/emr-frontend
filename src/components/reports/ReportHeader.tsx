@@ -1,4 +1,5 @@
 import { LaboratoryInfo } from '../../hooks/useLabReport';
+import { LIS_LOGO_ALT, LIS_LOGO_URL } from '@/lib/branding';
 
 interface ReportHeaderProps {
   laboratoryInfo: LaboratoryInfo;
@@ -9,7 +10,7 @@ export function ReportHeader({ laboratoryInfo }: ReportHeaderProps) {
   const secondaryColor = '#16a34a';
   const showLogo = true;
 
-  const logoSrc = laboratoryInfo.logo || import.meta.env.VITE_REPORT_HEADER_LOGO || '/harbour-emr-logo.svg';
+  const logoSrc = LIS_LOGO_URL;
   const labName = laboratoryInfo.name;
   const motto = 'Automated Precision...';
   const address = laboratoryInfo.address;
@@ -33,7 +34,7 @@ export function ReportHeader({ laboratoryInfo }: ReportHeaderProps) {
             <div className="flex items-center justify-start">
               <img
                 src={logoSrc}
-                alt="Laboratory Logo"
+                alt={LIS_LOGO_ALT}
                 className="h-[76px] w-auto object-contain"
               />
             </div>

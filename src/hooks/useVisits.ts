@@ -14,6 +14,23 @@ interface CreateVisitData {
   specialistId?: string;
   procedureType?: string;
   rapidTestsRequested?: ('malaria' | 'typhoid')[];
+  selfPayOverride?: boolean;
+}
+
+export interface InsuranceEligibility {
+  patientId: string;
+  hasInsurance: boolean;
+  status: 'self_pay' | 'eligible' | 'waiting_period' | 'blocked';
+  eligible: boolean;
+  reason: string;
+  nextEligibleAt?: string;
+  lastCoveredVisitAt?: string;
+  insurance?: {
+    programCode?: string;
+    subEntityCode?: string;
+    memberNumber?: string;
+  };
+  block?: any;
 }
 
 export function useVisits(status?: string) {
@@ -75,6 +92,15 @@ export function useDoctorQueue(doctorId?: string) {
   });
 }
 
+export function useReceptionDashboard() {
+  return useQuery({
+    queryKey: ['reception-dashboard'],
+    queryFn: async () => visitsAPI.getReceptionDashboard(),
+    staleTime: 10 * 1000,
+    refetchInterval: 30 * 1000,
+  });
+}
+
 export function useDoctorDashboard() {
   return useQuery({
     queryKey: ['visits', 'doctor-dashboard'],
@@ -86,12 +112,14 @@ export function useDoctorDashboard() {
   });
 }
 
-export function useDoctorPatients(params: { page?: number; limit?: number; search?: string; daysBack?: number }) {
+export function useDoctorPatients(params: { page?: number; limit?: number; search?: string; daysBack?: number; enabled?: boolean }) {
+  const { enabled = true, ...requestParams } = params;
   return useQuery({
-    queryKey: ['visits', 'doctor-patients', params],
+    queryKey: ['visits', 'doctor-patients', requestParams],
     queryFn: async () => {
-      return await visitsAPI.getDoctorPatients(params);
+      return await visitsAPI.getDoctorPatients(requestParams);
     },
+    enabled,
     staleTime: 30 * 1000,
   });
 }
@@ -102,6 +130,15 @@ export function usePatientVisits(patientId: string) {
     queryFn: async () => {
       return await visitsAPI.getByPatient(patientId);
     },
+    enabled: !!patientId,
+    staleTime: 30 * 1000,
+  });
+}
+
+export function useInsuranceEligibility(patientId?: string) {
+  return useQuery<InsuranceEligibility>({
+    queryKey: ['visits', 'insurance-eligibility', patientId],
+    queryFn: () => visitsAPI.getInsuranceEligibility(patientId!),
     enabled: !!patientId,
     staleTime: 30 * 1000,
   });

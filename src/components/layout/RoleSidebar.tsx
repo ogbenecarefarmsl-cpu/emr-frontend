@@ -35,6 +35,7 @@ import {
   ArrowLeftToLine,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LIS_LOGO_ALT, LIS_LOGO_URL } from '@/lib/branding';
 import { UserRole } from '@/types/lis';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -161,9 +162,9 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false, doctor
         <div className={cn("flex items-center justify-between", collapsed && "lg:justify-center")}>
           <div className="flex items-center gap-3 min-w-0">
             <img 
-              src="/harbour-emr-logo.svg" 
-              alt="Harbour EMR Logo" 
-              className={cn("h-12 w-auto object-contain transition-all", collapsed && "lg:h-9")}
+              src={LIS_LOGO_URL}
+              alt={LIS_LOGO_ALT}
+              className={cn("h-12 max-w-[190px] w-auto object-contain transition-all", collapsed && "lg:h-9 lg:max-w-12")}
             />
           </div>
           {/* Close button for mobile */}

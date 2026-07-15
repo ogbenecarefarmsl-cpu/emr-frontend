@@ -147,6 +147,18 @@ export function usePatients() {
   });
 }
 
+export function useRecentPatients(limit = 5) {
+  return useQuery({
+    queryKey: ['patients', 'recent', limit],
+    queryFn: async () => {
+      const response = await patientsAPI.getAll({ page: 1, limit });
+      const list = Array.isArray(response) ? response : response?.data || [];
+      return list.map((patient: any) => normalizePatient(patient));
+    },
+    staleTime: 30 * 1000,
+  });
+}
+
 export function usePatient(id: string) {
   return useQuery({
     queryKey: ['patients', id],

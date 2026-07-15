@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useCreateVisit, useMarkConsultationPaid } from '@/hooks/useVisits';
+import { useCreateVisit, useInsuranceEligibility, useMarkConsultationPaid } from '@/hooks/useVisits';
 import { useSearchPatients } from '@/hooks/usePatients';
 import { useDoctors } from '@/hooks/useDoctors';
 import { useMyServicePrices } from '@/hooks/useServicePrices';
@@ -12,12 +12,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
+import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { Loader2, Search, UserPlus, Stethoscope, ArrowLeft, Thermometer, Scissors, UserCog, ShieldOff, AlertTriangle } from 'lucide-react';
-import { insuranceBlocksAPI } from '@/services/api';
 
 type ServiceId = 'normal_consultation' | 'specialist_consultation' | 'observation_4h' | 'procedure';
 
@@ -99,45 +98,24 @@ export default function VisitRegistration() {
   );
   const selectedService = pricedServices.find((service) => service.id === selectedServiceId) || pricedServices[0];
   const hasInsurance = !!selectedPatient?.insurance?.programCode;
-  const [insuranceBlock, setInsuranceBlock] = useState<any>(null);
-  const [checkingBlock, setCheckingBlock] = useState(false);
   const [acknowledgedBlock, setAcknowledgedBlock] = useState(false);
   const [selfPayOverride, setSelfPayOverride] = useState(false);
-  const isBlocked = !!insuranceBlock;
+  const selectedPatientId = selectedPatient?._id || selectedPatient?.id;
+  const {
+    data: insuranceEligibility,
+    isLoading: checkingBlock,
+    isError: eligibilityCheckFailed,
+    refetch: retryEligibilityCheck,
+  } = useInsuranceEligibility(selectedPatientId);
+  const insuranceBlock = insuranceEligibility?.block ? insuranceEligibility : null;
+  const isBlocked = insuranceEligibility?.status === 'blocked';
+  const isWaitingPeriod = insuranceEligibility?.status === 'waiting_period';
+  const insuranceEligible = insuranceEligibility?.status === 'eligible';
 
-  // Check for insurance block when patient is selected
   useEffect(() => {
-    if (!selectedPatient) {
-      setInsuranceBlock(null);
-      setAcknowledgedBlock(false);
-      setSelfPayOverride(false);
-      return;
-    }
-
-    const checkBlock = async () => {
-      setCheckingBlock(true);
-      try {
-        const result = await insuranceBlocksAPI.check({
-          patientId: selectedPatient._id || selectedPatient.id,
-          memberNumber: selectedPatient.insurance?.memberNumber,
-          programCode: selectedPatient.insurance?.programCode,
-        });
-        if (result.blocked) {
-          setInsuranceBlock(result);
-          setAcknowledgedBlock(false);
-        } else {
-          setInsuranceBlock(null);
-          setAcknowledgedBlock(false);
-        }
-      } catch {
-        setInsuranceBlock(null);
-      } finally {
-        setCheckingBlock(false);
-      }
-    };
-
-    checkBlock();
-  }, [selectedPatient]);
+    setAcknowledgedBlock(false);
+    setSelfPayOverride(false);
+  }, [selectedPatientId]);
 
   const recentPatients = useMemo(() => {
     if (!Array.isArray(allPatients)) return [];
@@ -186,6 +164,10 @@ export default function VisitRegistration() {
       toast.error('Please acknowledge the insurance block before proceeding');
       return;
     }
+    if (isWaitingPeriod && !selfPayOverride) {
+      toast.error('This insurance consultation is not eligible yet. Select self-pay to continue.');
+      return;
+    }
 
     try {
       if (selectedService.flag === 'specialist' && !specialistId) {
@@ -200,9 +182,6 @@ export default function VisitRegistration() {
       const rapidTestsRequested: ('malaria' | 'typhoid')[] = [];
       if (wantsMalariaTest) rapidTestsRequested.push('malaria');
       if (wantsTyphoidTest) rapidTestsRequested.push('typhoid');
-
-      // When blocked, force self-pay (send consultation fee as normal, no insurance)
-      const effectiveFee = isBlocked ? parseFloat(consultationFee) || 0 : parseFloat(consultationFee) || 0;
 
       const visit = await createVisit.mutateAsync({
         patientId: selectedPatient._id || selectedPatient.id,
@@ -336,11 +315,12 @@ export default function VisitRegistration() {
                         <p className="font-semibold text-green-800">
                           {selectedPatient.firstName} {selectedPatient.lastName}
                         </p>
-                        {hasInsurance && (
-                          <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
-                            {selectedPatient.insurance.programCode}
-                          </Badge>
-                        )}
+                        <InsuranceStatusBadge
+                          insurance={selectedPatient.insurance}
+                          eligibility={insuranceEligibility}
+                          compact
+                          className="text-xs"
+                        />
                       </div>
                       <p className="text-sm text-green-600">
                         {selectedPatient.patientId} • {selectedPatient.age}y • {selectedPatient.gender === 'M' ? 'Male' : 'Female'}
@@ -377,13 +357,31 @@ export default function VisitRegistration() {
               <div className="flex items-start gap-3">
                 <Checkbox id="selfPayOverride" checked={selfPayOverride} onCheckedChange={(checked) => setSelfPayOverride(checked === true)} />
                 <div>
-                  <Label htmlFor="selfPayOverride" className="cursor-pointer font-medium text-blue-900">Register this visit as self-pay</Label>
-                  <p className="mt-1 text-sm text-blue-800">Insurance covers one consultation every 14 days. Select self-pay if the patient wants another visit before their next eligible date.</p>
+                  <Label htmlFor="selfPayOverride" className="cursor-pointer font-medium text-blue-900">
+                    {isWaitingPeriod ? 'Insurance is not eligible yet — register as self-pay' : 'Register this visit as self-pay'}
+                  </Label>
+                  <p className="mt-1 text-sm text-blue-800">
+                    {isWaitingPeriod && insuranceEligibility?.nextEligibleAt
+                      ? `The next covered consultation is ${new Date(insuranceEligibility.nextEligibleAt).toLocaleDateString()}. Select self-pay to continue today.`
+                      : 'Insurance covers one consultation every 14 days. Self-pay can be used for an additional visit.'}
+                  </p>
                 </div>
               </div>
             </CardContent>
           </Card>
         )}
+
+        {hasInsurance && eligibilityCheckFailed ? (
+          <Card className="border-amber-300 bg-amber-50">
+            <CardContent className="flex items-center justify-between gap-3 p-4">
+              <div>
+                <p className="font-medium text-amber-900">Insurance eligibility could not be verified</p>
+                <p className="text-sm text-amber-800">Retry, or select self-pay above to continue without delaying care.</p>
+              </div>
+              <Button variant="outline" onClick={() => retryEligibilityCheck()}>Retry</Button>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {/* Insurance Block Warning */}
         {isBlocked && (
@@ -397,7 +395,7 @@ export default function VisitRegistration() {
                     Insurance Coverage Blocked
                   </h3>
                   <p className="text-sm text-red-700 mt-1">
-                    <strong>{insuranceBlock.reasonLabel}</strong>
+                    <strong>{insuranceBlock.reason}</strong>
                     {insuranceBlock.block?.programCode && ` — ${insuranceBlock.block.programCode}`}
                     {insuranceBlock.block?.effectiveDate && ` (effective ${new Date(insuranceBlock.block.effectiveDate).toLocaleDateString()})`}
                   </p>
@@ -547,14 +545,14 @@ export default function VisitRegistration() {
 
                 <div className="space-y-2">
                   <Label htmlFor="consultationFee">Service Fee (Le)</Label>
-                  {hasInsurance && !isBlocked && !selfPayOverride ? (
+                  {hasInsurance && insuranceEligible && !selfPayOverride ? (
                     <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">Insurance</Badge>
+                      <InsuranceStatusBadge insurance={selectedPatient.insurance} eligibility={insuranceEligibility} compact />
                       <span className="text-sm text-blue-700">Consultation covered — no payment required</span>
                     </div>
-                  ) : (isBlocked || selfPayOverride) ? (
+                  ) : (isBlocked || isWaitingPeriod || selfPayOverride) ? (
                     <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
-                      <Badge variant="outline" className="bg-amber-100 text-amber-800 border-amber-300">Self-Pay</Badge>
+                      <InsuranceStatusBadge insurance={selectedPatient.insurance} coverageType="paid" compact />
                       <span className="text-sm text-amber-700">Insurance blocked — patient pays out of pocket</span>
                     </div>
                   ) : (
@@ -575,7 +573,7 @@ export default function VisitRegistration() {
                   )}
                 </div>
 
-                {(!hasInsurance || isBlocked || selfPayOverride) && (
+                {(!hasInsurance || isBlocked || isWaitingPeriod || selfPayOverride) && (
                   <div className="space-y-2">
                     <Label htmlFor="paymentMethod">Payment Method</Label>
                     <Select value={paymentMethod} onValueChange={setPaymentMethod}>
@@ -650,7 +648,7 @@ export default function VisitRegistration() {
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!selectedPatient || createVisit.isPending || markConsultationPaid.isPending || (isBlocked && !acknowledgedBlock)}
+            disabled={!selectedPatient || checkingBlock || (hasInsurance && eligibilityCheckFailed && !selfPayOverride) || createVisit.isPending || markConsultationPaid.isPending || (isBlocked && !acknowledgedBlock) || (isWaitingPeriod && !selfPayOverride)}
           >
             {createVisit.isPending || markConsultationPaid.isPending ? (
               <>
@@ -662,7 +660,7 @@ export default function VisitRegistration() {
                 <UserPlus className="h-4 w-4 mr-2" />
                 Create Visit (Self-Pay Override)
               </>
-            ) : hasInsurance ? (
+            ) : hasInsurance && insuranceEligible && !selfPayOverride ? (
               <>
                 <UserPlus className="h-4 w-4 mr-2" />
                 Create Visit (Insurance)

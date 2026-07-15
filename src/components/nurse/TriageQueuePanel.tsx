@@ -4,6 +4,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { AlertTriangle, Clock, Loader2, Stethoscope, TestTube, Scissors, UserCog, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { patientName } from './nurseUtils';
+import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
 
 interface TriageQueuePanelProps {
   visits: any[];
@@ -69,6 +70,12 @@ export function TriageQueuePanel({
                             <Check className="w-3 h-3" /> Result on file
                           </span>
                         )}
+                        <InsuranceStatusBadge
+                          insurance={visit.insurance}
+                          coverageType={visit.consultationCoverageType}
+                          compact
+                          className="h-4 px-1 py-0 text-[9px]"
+                        />
                       </div>
                       <p className="clinical-label">
                         {visit.visitNumber} - {visit.patientId?.patientId}

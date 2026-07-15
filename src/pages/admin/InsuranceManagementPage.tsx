@@ -203,16 +203,18 @@ export default function InsuranceManagementPage() {
                         >
                           <Pencil className="w-3.5 h-3.5" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setDeleteConfirm({ type: 'program', id: prog._id, name: prog.name });
-                          }}
-                        >
-                          <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                        </Button>
+                        {profile?.role === 'admin' ? (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDeleteConfirm({ type: 'program', id: prog._id, name: prog.name });
+                            }}
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                          </Button>
+                        ) : null}
                         {isExpanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                       </div>
                     </div>
@@ -250,13 +252,15 @@ export default function InsuranceManagementPage() {
                                   <Button variant="ghost" size="sm" onClick={() => openEditSub(sub)}>
                                     <Pencil className="w-3 h-3" />
                                   </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setDeleteConfirm({ type: 'sub', id: sub._id, name: sub.name })}
-                                  >
-                                    <Trash2 className="w-3 h-3 text-destructive" />
-                                  </Button>
+                                  {profile?.role === 'admin' ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setDeleteConfirm({ type: 'sub', id: sub._id, name: sub.name })}
+                                    >
+                                      <Trash2 className="w-3 h-3 text-destructive" />
+                                    </Button>
+                                  ) : null}
                                 </div>
                               </div>
                             ))}

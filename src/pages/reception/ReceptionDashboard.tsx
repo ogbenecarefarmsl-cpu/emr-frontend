@@ -1,10 +1,8 @@
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
-import { useSearchPatients, useDepositWallet } from '@/hooks/usePatients';
+import { useRecentPatients, useDepositWallet } from '@/hooks/usePatients';
 import { usePaymentStats, useDailyIncome, useOutstandingBalances } from '@/hooks/useOrders';
-import { useRealtimeOrders } from '@/hooks/useRealtimeOrders';
 import { useRealtimePatients } from '@/hooks/useRealtimePatients';
-import { useRealtimeResults } from '@/hooks/useRealtimeResults';
 import { MetricCard } from '@/components/dashboard/MetricCard';
 import { PendingOrders } from '@/components/reception/PendingOrders';
 import { Button } from '@/components/ui/button';
@@ -35,7 +33,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { prescriptionService } from '@/services/prescriptionService';
 import { ordersAPI } from '@/services/api';
-import { useDoctorQueue, useVisitStats } from '@/hooks/useVisits';
+import { useReceptionDashboard } from '@/hooks/useVisits';
 import { useExpenditureSummary } from '@/hooks/useExpenditures';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -50,11 +48,9 @@ const formatLocalDate = (date: Date) => {
 export default function ReceptionDashboard() {
   const { profile } = useAuth();
   
-  useRealtimeOrders();
   useRealtimePatients();
-  useRealtimeResults();
-  
-  const { data: patients = [], isLoading: patientsLoading } = useSearchPatients('');
+
+  const { data: patients = [], isLoading: patientsLoading } = useRecentPatients(5);
   const navigate = useNavigate();
 
   const recentRegistrations = useMemo(() => {
@@ -88,14 +84,11 @@ export default function ReceptionDashboard() {
     });
   };
 
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-
-  const todayPatients = Array.isArray(patients) ? patients.filter(p => new Date(p.createdAt) >= todayStart).length : 0;
   const todayStr = formatLocalDate(new Date());
   const { data: paymentStats } = usePaymentStats(todayStr, todayStr);
-  const { data: visitStats } = useVisitStats(todayStr);
-  const { data: doctorQueue = [], isLoading: queueLoading } = useDoctorQueue();
+  const { data: receptionSnapshot, isLoading: snapshotLoading } = useReceptionDashboard();
+  const doctorQueue = receptionSnapshot?.doctorQueue ?? [];
+  const visitStats = receptionSnapshot?.todayStats;
   const { data: dailyIncome = [] } = useDailyIncome(todayStr, todayStr);
   const { data: outstandingBalances = [] } = useOutstandingBalances();
   const { data: expenditureSummary } = useExpenditureSummary(todayStr, todayStr);
@@ -114,9 +107,12 @@ export default function ReceptionDashboard() {
   const pendingLabPayments = paymentStats?.pendingOrders ?? 0;
   const pendingPrescriptionPayments = Array.isArray(pendingPrescriptions) ? pendingPrescriptions : [];
   const pendingPayments = pendingLabPayments + pendingPrescriptionPayments.length;
-  const totalOutstanding = Array.isArray(outstandingBalances)
-    ? outstandingBalances.reduce((sum: number, o: any) => sum + (o.balance || o.outstanding || 0), 0)
-    : 0;
+  const totalOutstanding = Number(
+    outstandingBalances?.summary?.totalOutstanding
+      ?? (Array.isArray(outstandingBalances)
+        ? outstandingBalances.reduce((sum: number, o: any) => sum + (o.balance || o.outstanding || 0), 0)
+        : 0),
+  );
   const cashByMethod = useMemo(() => {
     const methods: Record<string, number> = {
       cash: 0,
@@ -208,7 +204,7 @@ export default function ReceptionDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         <MetricCard
           title="Patients Today"
-          value={visitStats?.totalVisits || todayPatients}
+          value={visitStats?.totalVisits ?? 0}
           icon={Users}
         />
         <MetricCard
@@ -372,7 +368,7 @@ export default function ReceptionDashboard() {
             </Button>
           </div>
           <div className="divide-y">
-            {queueLoading ? (
+            {snapshotLoading ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
               </div>

@@ -12,9 +12,13 @@ import { patientService } from '@/services/patientService';
 import { SoapNoteTypeEnum } from '@/types/soap-note';
 import { useDoctorDashboard, useDoctorPatients, useAcceptPatient, useUpdateVisit, useCompleteVisit, usePatientVisits, useReferToSpecialist } from '@/hooks/useVisits';
 import { useResults } from '@/hooks/useResults';
+import { useRealtimeResults } from '@/hooks/useRealtimeResults';
+import { useMyBranch } from '@/hooks/useBranch';
+import { LIS_LOGO_URL } from '@/lib/branding';
 
 // UI Components
 import { Badge } from '@/components/ui/badge';
+import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -24,12 +28,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 // Dashboard components
 import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
 import { PatientTimeline } from '@/components/doctor/PatientTimeline';
 import { DoctorTopBar } from '@/components/doctor/DoctorTopBar';
 import { DoctorTreatmentPlanCard } from '@/components/doctor/DoctorTreatmentPlanCard';
+import { ReportHeader } from '@/components/reports/ReportHeader';
 import { MedicationPicker } from '@/components/medications/MedicationPicker';
 import {
   buildSmartInstruction,
@@ -294,8 +300,9 @@ export default function DoctorDashboard() {
   const { profile, signOut, user, exitDoctorMode } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  useRealtimeResults();
 
-  const { data: dashboardData, isLoading } = useDoctorDashboard();
+  const { data: dashboardData, isLoading, isError: dashboardError, refetch: refetchDashboard } = useDoctorDashboard();
   const acceptPatient = useAcceptPatient();
   const updateVisit = useUpdateVisit();
   const completeVisit = useCompleteVisit();
@@ -312,6 +319,7 @@ export default function DoctorDashboard() {
 
   // Lab order modal state
   const [labOrderModalOpen, setLabOrderModalOpen] = useState(false);
+  const { data: branch } = useMyBranch(labOrderModalOpen);
   const [selectedTests, setSelectedTests] = useState<Test[]>([]);
   const [searchTest, setSearchTest] = useState('');
 
@@ -332,6 +340,7 @@ export default function DoctorDashboard() {
     limit: 25,
     search: allPatientsSearch,
     daysBack: allPatientsDaysBack,
+    enabled: allPatientsOpen,
   });
   const doctorPatients = doctorPatientsQuery.data?.patients || [];
   const doctorPatientsTotal = doctorPatientsQuery.data?.total || 0;
@@ -348,6 +357,7 @@ export default function DoctorDashboard() {
     queryKey: ['doctors', 'specialists'],
     queryFn: () => doctorsAPI.getSpecialists(),
     staleTime: 5 * 60 * 1000,
+    enabled: referralOpen,
   });
 
   // Admission modal state
@@ -371,7 +381,7 @@ export default function DoctorDashboard() {
   // C1: Unsaved changes tracking
   const [isDirty, setIsDirty] = useState(false);
   const [discardConfirmOpen, setDiscardConfirmOpen] = useState(false);
-  const [pendingNavigation, setPendingNavigation] = useState<{ type: 'patient' | 'tab'; value?: any } | null>(null);
+  const [pendingNavigation, setPendingNavigation] = useState<{ type: 'accept' | 'select' | 'search' | 'tab' | 'dashboard'; value?: any } | null>(null);
 
   // C2: Allergy override modal
   const [allergyOverrideOpen, setAllergyOverrideOpen] = useState(false);
@@ -438,6 +448,7 @@ export default function DoctorDashboard() {
     queryKey: ['orders', 'lis-catalog'],
     queryFn: () => ordersAPI.getLisCatalog(),
     staleTime: 60 * 1000,
+    enabled: labOrderModalOpen,
   });
 
   // Fetch medications for prescription modal
@@ -445,6 +456,7 @@ export default function DoctorDashboard() {
     queryKey: ['medications'],
     queryFn: () => medicationService.findAll(),
     staleTime: 5 * 60 * 1000,
+    enabled: prescriptionModalOpen,
   });
 
   // Fetch patient's previous visits when a patient is selected
@@ -619,6 +631,11 @@ export default function DoctorDashboard() {
 
   // Handlers
   const handleSelectSearchPatient = (patient: any) => {
+    if (isDirty) {
+      setPendingNavigation({ type: 'search', value: patient });
+      setDiscardConfirmOpen(true);
+      return;
+    }
     setSearchedPatient(patient);
     setSelectedVisit(null);
     setActiveTab('timeline');
@@ -1076,8 +1093,6 @@ export default function DoctorDashboard() {
   // Global search across all visit queues
   const searchHits: Visit[] = []; // Replaced by DoctorTopBar patient search
 
-  // Get the active visit for the doctor (if any)
-  const currentActiveVisit = activePatients.find((v: Visit) => v.status === 'in_consultation') || activePatients[0];
   const canContinueClinicalWork = !!selectedVisit && ['in_consultation', 'results_ready', 'awaiting_doctor_review'].includes(selectedVisit.status);
   const isReadOnly = !canContinueClinicalWork;
   const canWriteConsultation = canContinueClinicalWork && selectedVisit?.consultationPaid === true;
@@ -1122,7 +1137,7 @@ export default function DoctorDashboard() {
   };
 
   // C1: Guard navigation when dirty
-  const guardNavigation = useCallback((action: () => void, navType: 'patient' | 'tab', navValue?: any) => {
+  const guardNavigation = useCallback((action: () => void, navType: 'accept' | 'select' | 'search' | 'tab' | 'dashboard', navValue?: any) => {
     if (isDirty) {
       setPendingNavigation({ type: navType, value: navValue });
       setDiscardConfirmOpen(true);
@@ -1135,10 +1150,22 @@ export default function DoctorDashboard() {
     setIsDirty(false);
     setDiscardConfirmOpen(false);
     if (!pendingNavigation) return;
-    if (pendingNavigation.type === 'patient' && pendingNavigation.value) {
+    if (pendingNavigation.type === 'accept' && pendingNavigation.value) {
       handleAcceptPatient(pendingNavigation.value);
+    } else if (pendingNavigation.type === 'select' && pendingNavigation.value) {
+      setSearchedPatient(null);
+      setSelectedVisit(pendingNavigation.value.visit);
+      setActiveTab(pendingNavigation.value.tab);
+    } else if (pendingNavigation.type === 'search' && pendingNavigation.value) {
+      setSearchedPatient(pendingNavigation.value);
+      setSelectedVisit(null);
+      setActiveTab('timeline');
     } else if (pendingNavigation.type === 'tab' && pendingNavigation.value) {
       setActiveTab(pendingNavigation.value);
+    } else if (pendingNavigation.type === 'dashboard') {
+      setSelectedVisit(null);
+      setSearchedPatient(null);
+      setActiveTab('soap');
     }
     setPendingNavigation(null);
   }, [pendingNavigation]);
@@ -1148,24 +1175,53 @@ export default function DoctorDashboard() {
     setIsDirty(false);
     setDiscardConfirmOpen(false);
     if (!pendingNavigation) return;
-    if (pendingNavigation.type === 'patient' && pendingNavigation.value) {
+    if (pendingNavigation.type === 'accept' && pendingNavigation.value) {
       handleAcceptPatient(pendingNavigation.value);
+    } else if (pendingNavigation.type === 'select' && pendingNavigation.value) {
+      setSearchedPatient(null);
+      setSelectedVisit(pendingNavigation.value.visit);
+      setActiveTab(pendingNavigation.value.tab);
+    } else if (pendingNavigation.type === 'search' && pendingNavigation.value) {
+      setSearchedPatient(pendingNavigation.value);
+      setSelectedVisit(null);
+      setActiveTab('timeline');
     } else if (pendingNavigation.type === 'tab' && pendingNavigation.value) {
       setActiveTab(pendingNavigation.value);
+    } else if (pendingNavigation.type === 'dashboard') {
+      setSelectedVisit(null);
+      setSearchedPatient(null);
+      setActiveTab('soap');
     }
     setPendingNavigation(null);
   }, [pendingNavigation]);
 
-  // Auto-select the active patient if available
-  useEffect(() => {
-    if (currentActiveVisit && !selectedVisit) {
-      setSelectedVisit(currentActiveVisit);
-    }
-  }, [currentActiveVisit?._id]);
+  const selectVisit = useCallback((visit: Visit, tab = visit.status === 'results_ready' ? 'lab-results' : 'soap') => {
+    guardNavigation(
+      () => {
+        setSearchedPatient(null);
+        setSelectedVisit(visit);
+        setActiveTab(tab);
+      },
+      'select',
+      { visit, tab },
+    );
+  }, [guardNavigation]);
+
+  const acceptVisit = useCallback((visit: Visit) => {
+    guardNavigation(() => { void handleAcceptPatient(visit); }, 'accept', visit);
+  }, [guardNavigation]);
+
+  const openDashboard = useCallback(() => {
+    guardNavigation(() => {
+      setSelectedVisit(null);
+      setSearchedPatient(null);
+      setActiveTab('soap');
+    }, 'dashboard');
+  }, [guardNavigation]);
 
   // Keep selectedVisit in sync with the latest dashboard data
   useEffect(() => {
-    if (!selectedVisit) return;
+    if (!selectedVisit || isDirty) return;
     const allKnownVisits = [
       ...waitingQueue, ...activePatients, ...resultsReady,
       ...awaitingLabPayment, ...awaitingResults, ...awaitingPharmacy, ...awaitingDispensing,
@@ -1174,7 +1230,7 @@ export default function DoctorDashboard() {
     if (refreshed && JSON.stringify(refreshed) !== JSON.stringify(selectedVisit)) {
       setSelectedVisit(refreshed);
     }
-  }, [waitingQueue, activePatients, resultsReady, awaitingLabPayment, awaitingResults, awaitingPharmacy, awaitingDispensing]);
+  }, [waitingQueue, activePatients, resultsReady, awaitingLabPayment, awaitingResults, awaitingPharmacy, awaitingDispensing, isDirty]);
 
   // C1: Track dirty state when forms change
   useEffect(() => {
@@ -1258,10 +1314,31 @@ export default function DoctorDashboard() {
 
   if (isLoading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-background">
-        <div className="flex items-center gap-3">
-          <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <span className="text-sm text-muted-foreground">Loading workbench…</span>
+      <div className="min-h-screen bg-slate-100 p-4 md:p-6" aria-busy="true" aria-label="Loading doctor workbench">
+        <div className="mx-auto max-w-7xl space-y-5">
+          <Skeleton className="h-14 w-full rounded-xl bg-slate-200" />
+          <div className="grid gap-4 md:grid-cols-4">
+            {[0, 1, 2, 3].map((index) => <Skeleton key={index} className="h-28 rounded-xl bg-slate-200" />)}
+          </div>
+          <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+            <Skeleton className="h-[540px] rounded-xl bg-slate-200" />
+            <Skeleton className="h-[540px] rounded-xl bg-slate-200" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (dashboardError) {
+    return (
+      <div className="min-h-screen bg-slate-100 p-4 md:p-6">
+        <div className="mx-auto flex min-h-[60vh] max-w-xl flex-col items-center justify-center rounded-xl border bg-white p-8 text-center shadow-sm">
+          <AlertTriangle className="mb-4 h-10 w-10 text-amber-600" />
+          <h1 className="text-lg font-semibold">Doctor workbench could not load</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Check your connection, then retry. No clinical information has been changed.</p>
+          <Button className="mt-5" onClick={() => refetchDashboard()}>
+            <RefreshCw className="mr-2 h-4 w-4" /> Retry
+          </Button>
         </div>
       </div>
     );
@@ -1276,12 +1353,12 @@ export default function DoctorDashboard() {
         waitingQueue={waitingQueue}
         resultsReady={resultsReady}
         selectedVisitId={selectedVisit?._id}
-        onSelectVisit={(visit) => { setSearchedPatient(null); setSelectedVisit(visit); setActiveTab(visit.status === 'results_ready' ? 'lab-results' : 'soap'); }}
-        onAcceptVisit={handleAcceptPatient}
+        onSelectVisit={selectVisit}
+        onAcceptVisit={acceptVisit}
         onSelectPatient={handleSelectSearchPatient}
-        onAcceptNext={() => { if (waitingQueue.length > 0) handleAcceptPatient(waitingQueue[0]); }}
-        onOpenDashboard={() => { setSelectedVisit(null); setSearchedPatient(null); setActiveTab('soap'); }}
-        onOpenResults={() => { if (resultsReady.length > 0) { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); } }}
+        onAcceptNext={() => { if (waitingQueue.length > 0) acceptVisit(waitingQueue[0]); }}
+        onOpenDashboard={openDashboard}
+        onOpenResults={() => { if (resultsReady.length > 0) selectVisit(resultsReady[0], 'lab-results'); }}
         onOpenAllPatients={() => { setAllPatientsOpen(true); setAllPatientsPage(1); setAllPatientsSearch(''); setAllPatientsDaysBack(undefined); }}
         onLogout={handleLogout}
         acceptPending={acceptPatient.isPending}
@@ -1324,12 +1401,12 @@ export default function DoctorDashboard() {
                               <span className="text-[10px] text-muted-foreground">NKDA</span>
                             )}
                             {selectedVisit && isReadOnly && <Badge className="h-5 bg-amber-500 text-[10px] text-white hover:bg-amber-500">View-only</Badge>}
-                            {contextPatient?.insurance?.programCode && (
-                              <Badge variant="outline" className="h-5 border-blue-200 bg-blue-50 text-[10px] text-blue-700">
-                                {contextPatient.insurance.programCode}{contextPatient.insurance.subEntityCode ? ` / ${contextPatient.insurance.subEntityCode}` : ''}
-                                {contextPatient.insurance.memberNumber ? ` #${contextPatient.insurance.memberNumber}` : ''}
-                              </Badge>
-                            )}
+                            <InsuranceStatusBadge
+                              insurance={contextPatient?.insurance}
+                              coverageType={selectedVisit?.consultationCoverageType}
+                              compact
+                              className="h-5 text-[10px]"
+                            />
                           </div>
                           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
                             <span className="font-mono">{contextPatient?.patientId || 'PID N/A'}</span>
@@ -1896,7 +1973,7 @@ export default function DoctorDashboard() {
                 <div className="flex-1 flex flex-col gap-6">
                   {/* Today's Stats */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-white border border-border rounded-xl p-5 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => { if (activePatients.length > 0) { setSelectedVisit(activePatients[0]); setActiveTab('soap'); } }}>
+                    <div className="bg-white border border-border rounded-xl p-5 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => { if (activePatients.length > 0) selectVisit(activePatients[0]); }}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
                           <Activity className="w-5 h-5 text-blue-600" />
@@ -1907,7 +1984,7 @@ export default function DoctorDashboard() {
                       <p className="text-xs text-muted-foreground mt-1">Patients seen today</p>
                     </div>
 
-                    <div className="bg-white border border-border rounded-xl p-5 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => { if (waitingQueue.length > 0) handleAcceptPatient(waitingQueue[0]); }}>
+                    <div className="bg-white border border-border rounded-xl p-5 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => { if (waitingQueue.length > 0) acceptVisit(waitingQueue[0]); }}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
                           <User className="w-5 h-5 text-amber-600" />
@@ -1918,7 +1995,7 @@ export default function DoctorDashboard() {
                       <p className="text-xs text-muted-foreground mt-1">Patients waiting</p>
                     </div>
 
-                    <div className="bg-white border border-border rounded-xl p-5 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => { if (resultsReady.length > 0) { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); } }}>
+                    <div className="bg-white border border-border rounded-xl p-5 hover:shadow-lg transition-shadow cursor-pointer" onClick={() => { if (resultsReady.length > 0) selectVisit(resultsReady[0], 'lab-results'); }}>
                       <div className="flex items-center justify-between mb-3">
                         <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
                           <FlaskConical className="w-5 h-5 text-green-600" />
@@ -1949,14 +2026,14 @@ export default function DoctorDashboard() {
                           <User className="w-4 h-4 text-muted-foreground" />
                           Waiting Queue ({waitingQueue.length})
                         </h3>
-                        <Button size="sm" onClick={() => handleAcceptPatient(waitingQueue[0])} disabled={acceptPatient.isPending}>
+                        <Button size="sm" onClick={() => acceptVisit(waitingQueue[0])} disabled={acceptPatient.isPending}>
                           {acceptPatient.isPending ? <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" /> : <UserCheck className="w-3.5 h-3.5 mr-1.5" />}
                           Accept Next
                         </Button>
                       </div>
                       <div className="space-y-2">
                         {waitingQueue.slice(0, 5).map((visit: Visit) => (
-                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => handleAcceptPatient(visit)}>
+                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => acceptVisit(visit)}>
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                                 <span className="text-xs font-bold text-primary">
@@ -1991,14 +2068,14 @@ export default function DoctorDashboard() {
                           <FlaskConical className="w-4 h-4 text-green-600" />
                           Lab Results Ready ({resultsReady.length})
                         </h3>
-                        <Button size="sm" variant="outline" onClick={() => { setSelectedVisit(resultsReady[0]); setActiveTab('lab-results'); }}>
+                        <Button size="sm" variant="outline" onClick={() => selectVisit(resultsReady[0], 'lab-results')}>
                           <FlaskConical className="w-3.5 h-3.5 mr-1.5" />
                           Review Results
                         </Button>
                       </div>
                       <div className="space-y-2">
                         {resultsReady.slice(0, 3).map((visit: Visit) => (
-                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50/50 hover:bg-green-100/50 transition-colors cursor-pointer" onClick={() => { setSelectedVisit(visit); setActiveTab('lab-results'); }}>
+                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-green-200 bg-green-50/50 hover:bg-green-100/50 transition-colors cursor-pointer" onClick={() => selectVisit(visit, 'lab-results')}>
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center shrink-0">
                                 <span className="text-xs font-bold text-green-700">
@@ -2031,7 +2108,7 @@ export default function DoctorDashboard() {
                       </div>
                       <div className="space-y-2">
                         {activePatients.map((visit: Visit) => (
-                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => { setSelectedVisit(visit); setActiveTab('soap'); }}>
+                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => selectVisit(visit)}>
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                                 <span className="text-xs font-bold text-blue-700">
@@ -2061,7 +2138,7 @@ export default function DoctorDashboard() {
                       </div>
                       <div className="space-y-2">
                         {incomingReferrals.slice(0, 5).map((visit: Visit) => (
-                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-purple-200 bg-purple-50/50 hover:bg-purple-100/50 transition-colors cursor-pointer" onClick={() => { setSelectedVisit(visit); setActiveTab('soap'); }}>
+                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-purple-200 bg-purple-50/50 hover:bg-purple-100/50 transition-colors cursor-pointer" onClick={() => selectVisit(visit)}>
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
                                 <span className="text-xs font-bold text-purple-700">
@@ -2094,7 +2171,7 @@ export default function DoctorDashboard() {
                       </div>
                       <div className="space-y-2">
                         {admittedPatients.slice(0, 5).map((visit: Visit) => (
-                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-blue-200 bg-blue-50/50 hover:bg-blue-100/50 transition-colors cursor-pointer" onClick={() => { setSelectedVisit(visit); setActiveTab('soap'); }}>
+                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-blue-200 bg-blue-50/50 hover:bg-blue-100/50 transition-colors cursor-pointer" onClick={() => selectVisit(visit)}>
                             <div className="flex items-center gap-3 min-w-0">
                               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                                 <span className="text-xs font-bold text-blue-700">
@@ -2140,11 +2217,19 @@ export default function DoctorDashboard() {
 
       {/* Lab Order Modal */}
       <Dialog open={labOrderModalOpen} onOpenChange={(open) => { if (!open) cancelEdit(); setLabOrderModalOpen(open); }}>
-        <DialogContent className="max-w-2xl max-h-[85vh]">
-          <DialogHeader>
-            <DialogTitle>{editingOrder ? 'Edit Lab Order' : 'Order Lab Tests'}</DialogTitle>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="border-b bg-white px-6 pb-4 pt-6">
+            <ReportHeader laboratoryInfo={{
+              name: 'Harbour Medical Diagnostic',
+              logo: LIS_LOGO_URL,
+              address: branch?.address || '',
+              phone: branch?.phone || '',
+              email: branch?.email || '',
+              website: branch?.website,
+            }} />
+            <DialogTitle className="pt-2 text-left text-base">{editingOrder ? 'Edit LIS Test Request' : 'Create LIS Test Request'}</DialogTitle>
           </DialogHeader>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 px-6 md:grid-cols-2">
             <div>
               <Label className="text-sm font-medium">Search Tests</Label>
               <Input value={searchTest} onChange={(e) => setSearchTest(e.target.value)} placeholder="Search by test name or code..." className="mt-1" />
@@ -2214,7 +2299,7 @@ export default function DoctorDashboard() {
               )}
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="border-t bg-slate-50 px-6 py-4">
             <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
             <Button onClick={() => editingOrder ? updateLabOrder.mutate() : createLabOrder.mutate()} disabled={(editingOrder ? updateLabOrder.isPending : createLabOrder.isPending) || selectedTests.length === 0}>
               {(editingOrder ? updateLabOrder.isPending : createLabOrder.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
@@ -2591,11 +2676,7 @@ export default function DoctorDashboard() {
                                 {p.chronicConditions.length} chronic
                               </Badge>
                             )}
-                            {p.insurance?.programCode && (
-                              <Badge variant="outline" className="text-[9px] px-1 py-0 h-4 bg-blue-50 text-blue-700 border-blue-200">
-                                {p.insurance.programCode}
-                              </Badge>
-                            )}
+                            <InsuranceStatusBadge insurance={p.insurance} compact className="h-4 px-1 py-0 text-[9px]" />
                           </div>
                           <p className="text-[11px] text-muted-foreground truncate">
                             {p.patientId} · {p.age ? `${p.age}${p.ageUnit || 'y'}` : '—'} · {p.gender || 'N/A'}

@@ -300,6 +300,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       
       // Invalidate ALL order queries so the status change is reflected everywhere
       queryClient.invalidateQueries({ queryKey: ['orders'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['reception-dashboard'], exact: false });
+      invalidateRevenueFlow();
       
       toast.info('Order status updated', {
         description: `${data.orderNumber}: ${data.status}`,
@@ -479,6 +481,8 @@ export function WebSocketProvider({ children }: { children: ReactNode }) {
       queryClient.invalidateQueries({ queryKey: ['prescriptions'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['visits'], exact: false });
       queryClient.invalidateQueries({ queryKey: ['doctor-dashboard'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['reception-dashboard'], exact: false });
+      invalidateRevenueFlow();
       if (hasRole('pharmacist', 'admin')) {
         soundService.play('payment-received');
         toast.success('Paid prescription ready', {
