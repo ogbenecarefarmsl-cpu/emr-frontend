@@ -9,8 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { LIS_LOGO_ALT, LIS_LOGO_URL } from '@/lib/branding';
 import {
   UserCheck, Search, Bell, Clock, AlertTriangle, FlaskConical,
-  ChevronDown, X, LogOut, LayoutDashboard, ArrowLeftToLine, Menu,
-  ClipboardList, FileText
+  ChevronDown, ChevronLeft, ChevronRight, X, LogOut, LayoutDashboard, ArrowLeftToLine, Menu,
+  ClipboardList, FileText, ArrowRight, Activity
 } from 'lucide-react';
 
 interface Patient {
@@ -131,6 +131,7 @@ export function DoctorTopBar({
   const notifRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const activeStripRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(queueRef, () => setQueueOpen(false));
   useClickOutside(notifRef, () => setNotifOpen(false));
@@ -234,13 +235,10 @@ export function DoctorTopBar({
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
-  const activeVisible = activePatients.slice(0, 4);
-  const activeOverflow = activePatients.length > 4;
-
   return (
-    <div className="fixed top-0 left-0 right-0 h-16 bg-[#061a2d] text-white z-[60] flex items-center justify-between gap-3 px-4 shadow-md">
+    <div className="fixed top-0 left-0 right-0 z-[60] flex h-16 items-center justify-between gap-3 bg-[#061a2d] px-4 text-white shadow-md md:h-[76px]">
       {/* Left: logo + active patients */}
-      <div className="flex items-center gap-3 min-w-0">
+      <div className="flex min-w-0 flex-1 items-center gap-3">
         <div className="flex items-center gap-3 shrink-0">
           <div className="relative" ref={mobileMenuRef}>
             <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="rounded-md p-1 hover:bg-slate-800 transition-colors">
@@ -312,11 +310,20 @@ export function DoctorTopBar({
           <span className="hidden text-sm font-semibold lg:block">Doctor Workbench</span>
         </div>
 
-        <div className="h-6 w-px bg-slate-700 hidden sm:block" />
+        <div className="hidden" aria-hidden="true" />
 
         {/* Active patients chips */}
-        <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
-          {activeVisible.map((visit) => {
+        <div className="absolute left-0 right-0 top-16 flex h-[52px] min-w-0 items-center gap-2 border-t border-slate-700 bg-[#0a2238] px-4 shadow-md md:top-[76px] md:h-14">
+          <div className="flex h-full shrink-0 items-center gap-2 border-r border-slate-600 pr-3 text-xs font-semibold text-slate-200">
+            <Activity className="h-4 w-4 text-teal-400" />
+            <span className="hidden sm:inline">Active encounters</span>
+            <Badge className="h-5 min-w-5 bg-teal-700 px-1.5 text-[10px] text-white hover:bg-teal-700">{activePatients.length}</Badge>
+          </div>
+          <button type="button" className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-600 text-slate-300 hover:bg-slate-700 disabled:opacity-30 sm:flex" onClick={() => activeStripRef.current?.scrollBy({ left: -380, behavior: 'smooth' })} disabled={activePatients.length === 0} aria-label="Previous active encounters">
+            <ChevronLeft className="h-4 w-4" />
+          </button>
+          <div ref={activeStripRef} className="flex min-w-0 flex-1 snap-x items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {activePatients.map((visit) => {
             const isSelected = visit._id === selectedVisitId;
             const initials = `${visit.patientId?.firstName?.[0] || ''}${visit.patientId?.lastName?.[0] || ''}`.toUpperCase();
             const hasResults = resultsReady.some((r) => r._id === visit._id);
@@ -325,38 +332,39 @@ export function DoctorTopBar({
                 key={visit._id}
                 onClick={() => onSelectVisit(visit)}
                 className={cn(
-                  "flex h-11 min-w-[126px] items-center gap-2 rounded-md border px-2.5 py-1 text-xs shrink-0 transition-colors",
+                  "flex h-10 w-[178px] min-w-[178px] snap-start items-center gap-2 rounded-md border px-3 text-xs shrink-0 transition-colors",
                   isSelected
                     ? "bg-teal-600 text-white border-teal-500"
                     : "bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-200"
                 )}
                 title={`${patientDisplayName(visit)} · ${statusLabel(visit.status)}${visit.room ? ` · ${visit.room}` : ''}`}
               >
-                <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-slate-950 text-[10px] font-bold">
+                <span className="relative flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[10px] font-bold">
                   {initials || '?'}
                   <span className={cn("absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full border border-slate-900", statusTone(visit.status))} />
                 </span>
-                <span className="hidden min-w-0 flex-col text-left md:flex">
-                  <span className="max-w-[92px] truncate font-semibold">{patientDisplayName(visit)}</span>
-                  <span className="max-w-[92px] truncate text-[9px] opacity-75">{visit.patientId?.patientId || visit.visitNumber}</span>
+                <span className="flex min-w-0 flex-1 flex-col text-left">
+                  <span className="truncate font-semibold">{patientDisplayName(visit)}</span>
+                  <span className="truncate text-[9px] opacity-75">{visit.patientId?.patientId || visit.visitNumber}</span>
                 </span>
                 {hasResults && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-red-400" />}
               </button>
             );
           })}
-          {activeOverflow && (
-            <span className="text-[10px] text-slate-400 px-1">+{activePatients.length - 4}</span>
-          )}
           {activePatients.length === 0 && (
-            <span className="text-xs text-slate-500 hidden sm:block">No active patients</span>
+            <span className="text-xs text-slate-400">No active encounters</span>
           )}
+          </div>
+          <button type="button" className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-600 text-slate-300 hover:bg-slate-700 disabled:opacity-30 sm:flex" onClick={() => activeStripRef.current?.scrollBy({ left: 380, behavior: 'smooth' })} disabled={activePatients.length === 0} aria-label="Next active encounters">
+            <ChevronRight className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
       {/* Right: queue, notifications, search, accept next, profile */}
       <div className="flex items-center gap-2 shrink-0">
         {/* Queue dropdown */}
-        <div className="relative" ref={queueRef}>
+        <div className="relative order-4" ref={queueRef}>
           <button
             onClick={() => setQueueOpen((o) => !o)}
             className={cn(
@@ -424,7 +432,7 @@ export function DoctorTopBar({
           <button
             type="button"
             onClick={onOpenDashboard}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            className="order-1 hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
             title="Doctor dashboard"
           >
             <LayoutDashboard className="w-3.5 h-3.5" />
@@ -439,7 +447,7 @@ export function DoctorTopBar({
             onClick={onOpenResults}
             disabled={resultsReady.length === 0}
             className={cn(
-              "hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors",
+              "order-2 hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs transition-colors",
               resultsReady.length > 0 ? "text-white hover:bg-slate-800" : "text-slate-500 cursor-default"
             )}
             title={`${resultsReady.length} results ready`}
@@ -455,7 +463,7 @@ export function DoctorTopBar({
         )}
 
         {/* Notifications dropdown */}
-        <div className="relative" ref={notifRef}>
+        <div className="relative order-5" ref={notifRef}>
           <button
             onClick={() => setNotifOpen((o) => !o)}
             className={cn(
@@ -518,7 +526,7 @@ export function DoctorTopBar({
         </div>
 
         {/* Global patient search */}
-        <div className="relative hidden md:block" ref={searchRef}>
+        <div className="relative order-3 hidden xl:block" ref={searchRef}>
           <div className="relative">
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
             <Input
@@ -563,7 +571,7 @@ export function DoctorTopBar({
         <button
           type="button"
           onClick={() => navigate('/doctor/treatment-plans')}
-          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+          className="hidden"
           title="Treatment Plans"
         >
           <ClipboardList className="w-3.5 h-3.5" />
@@ -573,7 +581,7 @@ export function DoctorTopBar({
         <button
           type="button"
           onClick={() => navigate('/patient/search')}
-          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+          className="hidden"
           title="Patient History"
         >
           <FileText className="w-3.5 h-3.5" />
@@ -584,7 +592,7 @@ export function DoctorTopBar({
           <button
             type="button"
             onClick={onOpenAllPatients}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+            className="hidden"
             title="All My Patients"
           >
             <UserCheck className="w-3.5 h-3.5" />
@@ -595,17 +603,16 @@ export function DoctorTopBar({
         {/* Accept next */}
         <Button
           size="sm"
-          className="h-8 text-xs gap-1.5 bg-primary hover:bg-primary/90 text-primary-foreground"
+          className="order-6 h-9 gap-1.5 bg-primary px-3 text-xs text-primary-foreground hover:bg-primary/90"
           onClick={onAcceptNext}
           disabled={waitingQueue.length === 0 || acceptPending}
         >
-          <UserCheck className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Accept</span>
-          {waitingQueue.length > 0 && <span className="text-[10px]">({waitingQueue.length})</span>}
+          <span className="hidden sm:inline">Accept Next</span>
+          <ArrowRight className="h-3.5 w-3.5" />
         </Button>
 
         {/* Profile */}
-        <div className="hidden lg:flex items-center gap-2 pl-2 border-l border-slate-700">
+        <div className="hidden">
           <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center">
             <span className="text-[10px] font-bold">{profile?.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
           </div>

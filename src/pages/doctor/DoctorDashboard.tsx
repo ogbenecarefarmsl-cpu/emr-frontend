@@ -50,7 +50,7 @@ import {
   Loader2, CheckCircle, User, FileText, FlaskConical, Pill,
   ChevronRight, AlertTriangle, Search, Plus, Trash2, Save,
   Send, ClipboardList, UserCheck, BedDouble, Activity,
-  AlertCircle, Calendar, Clock, Eye, Printer,
+  AlertCircle, Calendar, Clock, Eye, Printer, Pencil,
   RefreshCw, ShieldCheck, Scissors
 } from 'lucide-react';
 import { type CreateTreatmentPlanItemInput } from '@/types/treatment-plan';
@@ -1372,7 +1372,7 @@ export default function DoctorDashboard() {
       />
 
       {isDirty && canWriteConsultation && (
-        <div className="fixed left-0 right-0 top-16 z-50 flex h-11 items-center justify-between border-y border-amber-300 bg-amber-50 px-5 text-xs text-amber-900 shadow-sm">
+        <div className="fixed left-0 right-0 top-[116px] z-50 flex h-11 items-center justify-between border-y border-amber-300 bg-amber-50 px-5 text-xs text-amber-900 shadow-sm md:top-[132px]">
           <div className="flex items-center gap-2">
             <AlertTriangle className="h-4 w-4 text-amber-600" />
             <span>Unsaved clinical notes — save or discard before switching patients.</span>
@@ -1384,12 +1384,12 @@ export default function DoctorDashboard() {
         </div>
       )}
 
-      <div className={cn("flex flex-1 min-h-0 h-full", isDirty && canWriteConsultation ? "pt-[108px]" : "pt-16")}>
+      <div className={cn("flex h-full min-h-0 flex-1", isDirty && canWriteConsultation ? "pt-[160px] md:pt-[176px]" : "pt-[116px] md:pt-[132px]")}>
         {/* Main Workspace */}
         <main className="flex-1 h-full min-h-0 flex flex-col overflow-hidden">
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col lg:flex-row gap-4 bg-[#f4f7fa] p-3 md:p-4">
             {/* Left Editor Area */}
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,2.15fr)_minmax(340px,1fr)] 2xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,0.85fr)_minmax(300px,0.8fr)] xl:items-start">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,2.15fr)_minmax(360px,0.95fr)] xl:items-start">
               {selectedVisit || searchedPatient ? (
                 <>
                   {/* Calm Patient Header */}
@@ -1556,7 +1556,7 @@ export default function DoctorDashboard() {
                                   <div className="space-y-2 xl:contents">
                                     <Label className="text-sm font-medium text-slate-950">Subjective</Label>
                                     <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({ ...soapForm, subjective: e.target.value })} placeholder="Patient history, symptoms, relevant negatives..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                                    
+                                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setSoapForm((current) => ({ ...current, subjective: `${current.subjective}${current.subjective ? '\n' : ''}` }))} disabled={isReadOnly || !canWriteConsultation}><Plus className="mr-1 h-3.5 w-3.5" /> Add Note</Button>
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t py-3 xl:grid-cols-[42px_108px_minmax(0,1fr)_112px] xl:items-center">
@@ -1564,7 +1564,7 @@ export default function DoctorDashboard() {
                                   <div className="space-y-2 xl:contents">
                                     <Label className="text-sm font-medium text-slate-950">Objective</Label>
                                     <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({ ...soapForm, objective: e.target.value })} placeholder="Exam findings, observations, reviewed results..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                                    
+                                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setSoapForm((current) => ({ ...current, objective: `${current.objective}${current.objective ? '\n' : ''}` }))} disabled={isReadOnly || !canWriteConsultation}><Plus className="mr-1 h-3.5 w-3.5" /> Add Note</Button>
                                   </div>
                                 </div>
                               </div>
@@ -1603,14 +1603,14 @@ export default function DoctorDashboard() {
                                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-950 text-white"><ClipboardList className="h-4 w-4" /></div>
                                   <Label className="text-sm font-medium text-slate-950">Diagnosis</Label>
                                   <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({ ...soapForm, diagnosis: e.target.value })} placeholder="Primary diagnosis" className="h-9 border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                                  
+                                  <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setSoapForm((current) => ({ ...current, diagnosis: current.diagnosis ? `${current.diagnosis}; ` : '' }))} disabled={isReadOnly || !canWriteConsultation}><Plus className="mr-1 h-3.5 w-3.5" /> Diagnosis</Button>
                                 </div>
                                 <div className="order-1 grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t py-3 xl:grid-cols-[42px_108px_minmax(0,1fr)_112px] xl:items-center">
                                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">A</div>
                                   <div className="space-y-2 xl:contents">
                                     <Label className="text-sm font-medium text-slate-950">Assessment</Label>
                                     <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({ ...soapForm, assessment: e.target.value })} placeholder="Clinical impression and differential..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                                    
+                                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setSoapForm((current) => ({ ...current, assessment: `${current.assessment}${current.assessment ? '\n' : ''}` }))} disabled={isReadOnly || !canWriteConsultation}><Plus className="mr-1 h-3.5 w-3.5" /> Add Note</Button>
                                   </div>
                                 </div>
                                 <div className="order-2 grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t py-3 xl:grid-cols-[42px_108px_minmax(0,1fr)_112px] xl:items-center">
@@ -1648,7 +1648,7 @@ export default function DoctorDashboard() {
                                       </div>
                                     </div>
                                     <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({ ...soapForm, plan: e.target.value })} placeholder="Treatment plan, follow-up, counselling..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                                    
+                                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setSoapForm((current) => ({ ...current, plan: `${current.plan}${current.plan ? '\n' : ''}` }))} disabled={isReadOnly || !canWriteConsultation}><Plus className="mr-1 h-3.5 w-3.5" /> Add Note</Button>
                                     {currentVisitPlans.length > 0 && (
                                       <div className="space-y-1.5 xl:col-start-3">
                                         {currentVisitPlans.map((plan: any) => (
@@ -1963,7 +1963,7 @@ export default function DoctorDashboard() {
                       </section>
                     </aside>
 
-                    <aside className="hidden bg-slate-50/80 px-4 py-4 xl:max-h-[calc(100vh-186px)] xl:overflow-y-auto 2xl:block 2xl:col-start-3 2xl:row-start-1 2xl:row-span-5 rounded-md border border-slate-200">
+                    <aside className="hidden" aria-hidden="true">
                       <div className="space-y-5">
                         <div className="rounded-lg border border-teal-100 bg-white p-3 shadow-sm">
                           <div className="mb-2 flex items-center justify-between">
@@ -2188,7 +2188,7 @@ export default function DoctorDashboard() {
                       <div className="space-y-2">
                         {waitingQueue.slice(0, 5).map((visit: Visit) => (
                           <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => acceptVisit(visit)}>
-                            <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                                 <span className="text-xs font-bold text-primary">
                                   {visit.patientId?.firstName?.[0]}{visit.patientId?.lastName?.[0]}
@@ -2262,16 +2262,16 @@ export default function DoctorDashboard() {
                       </div>
                       <div className="space-y-2">
                         {activePatients.map((visit: Visit) => (
-                          <div key={visit._id} className="flex items-center justify-between p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => selectVisit(visit)}>
-                            <div className="flex items-center gap-3 min-w-0">
+                          <div key={visit._id} className="flex min-w-0 items-center justify-between gap-3 rounded-lg border border-border p-3 transition-colors hover:bg-muted/50 cursor-pointer" onClick={() => selectVisit(visit)}>
+                            <div className="flex min-w-0 flex-1 items-center gap-3">
                               <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
                                 <span className="text-xs font-bold text-blue-700">
                                   {visit.patientId?.firstName?.[0]}{visit.patientId?.lastName?.[0]}
                                 </span>
                               </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{patientDisplayName(visit)}</p>
-                                <p className="text-xs text-muted-foreground truncate">{visit.chiefComplaint || 'In consultation'}</p>
+                              <div className="min-w-0 flex-1">
+                                <p className="break-words text-sm font-medium">{patientDisplayName(visit)}</p>
+                                <p className="break-words text-xs text-muted-foreground">{visit.chiefComplaint || 'In consultation'}</p>
                               </div>
                             </div>
                             <Badge className={cn("text-[10px] shrink-0", visitStatusTone(visit.status))}>{statusLabel(visit.status)}</Badge>
