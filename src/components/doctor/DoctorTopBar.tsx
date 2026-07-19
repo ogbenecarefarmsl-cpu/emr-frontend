@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
@@ -8,7 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { LIS_LOGO_ALT, LIS_LOGO_URL } from '@/lib/branding';
 import {
   UserCheck, Search, Bell, Clock, AlertTriangle, FlaskConical,
-  ChevronDown, X, LogOut, LayoutDashboard, ArrowLeftToLine, Menu
+  ChevronDown, X, LogOut, LayoutDashboard, ArrowLeftToLine, Menu,
+  ClipboardList, FileText
 } from 'lucide-react';
 
 interface Patient {
@@ -118,18 +120,22 @@ export function DoctorTopBar({
 }: DoctorTopBarProps) {
   const [queueOpen, setQueueOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const navigate = useNavigate();
   const queueRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useClickOutside(queueRef, () => setQueueOpen(false));
   useClickOutside(notifRef, () => setNotifOpen(false));
   useClickOutside(searchRef, () => setSearchFocused(false));
+  useClickOutside(mobileMenuRef, () => setMobileMenuOpen(false));
 
   // Build notifications from dashboard data
   useEffect(() => {
@@ -236,7 +242,70 @@ export function DoctorTopBar({
       {/* Left: logo + active patients */}
       <div className="flex items-center gap-3 min-w-0">
         <div className="flex items-center gap-3 shrink-0">
-          <Menu className="h-5 w-5 text-slate-200" />
+          <div className="relative" ref={mobileMenuRef}>
+            <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="rounded-md p-1 hover:bg-slate-800 transition-colors">
+              <Menu className="h-5 w-5 text-slate-200" />
+            </button>
+            {mobileMenuOpen && (
+              <div className="absolute left-0 top-full mt-2 w-56 rounded-lg border border-slate-700 bg-slate-900 py-1 shadow-xl z-50">
+                <button
+                  type="button"
+                  onClick={() => { setMobileMenuOpen(false); onOpenDashboard?.(); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5" /> Dashboard
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMobileMenuOpen(false); navigate('/doctor/treatment-plans'); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
+                >
+                  <ClipboardList className="h-3.5 w-3.5" /> Treatment Plans
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMobileMenuOpen(false); navigate('/patient/search'); }}
+                  className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white"
+                >
+                  <FileText className="h-3.5 w-3.5" /> Patient Records
+                </button>
+                {onOpenAllPatients && (
+                  <button
+                    type="button"
+                    onClick={() => { setMobileMenuOpen(false); onOpenAllPatients(); }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-300 hover:bg-slate-800 hover:text-white sm:hidden"
+                  >
+                    <UserCheck className="h-3.5 w-3.5" /> All My Patients
+                  </button>
+                )}
+                <div className="my-1 h-px bg-slate-700" />
+                <div className="flex items-center gap-2 px-3 py-2">
+                  <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center">
+                    <span className="text-[10px] font-bold">{profile?.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
+                  </div>
+                  <span className="text-xs text-slate-300 truncate">{profile?.fullName}</span>
+                </div>
+                {doctorMode && onExitDoctorMode && (
+                  <button
+                    type="button"
+                    onClick={() => { setMobileMenuOpen(false); onExitDoctorMode(); }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-amber-400 hover:bg-amber-900/30"
+                  >
+                    <ArrowLeftToLine className="h-3.5 w-3.5" /> Exit Doctor Mode
+                  </button>
+                )}
+                {onLogout && (
+                  <button
+                    type="button"
+                    onClick={() => { setMobileMenuOpen(false); onLogout(); }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-xs text-slate-400 hover:bg-slate-800 hover:text-white"
+                  >
+                    <LogOut className="h-3.5 w-3.5" /> Logout
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
           <div className="hidden h-9 items-center rounded bg-white px-2 sm:flex">
             <img src={LIS_LOGO_URL} alt={LIS_LOGO_ALT} className="h-7 w-auto object-contain" />
           </div>
@@ -490,6 +559,26 @@ export function DoctorTopBar({
             </div>
           )}
         </div>
+
+        <button
+          type="button"
+          onClick={() => navigate('/doctor/treatment-plans')}
+          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+          title="Treatment Plans"
+        >
+          <ClipboardList className="w-3.5 h-3.5" />
+          Plans
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/patient/search')}
+          className="hidden md:flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+          title="Patient History"
+        >
+          <FileText className="w-3.5 h-3.5" />
+          Records
+        </button>
 
         {onOpenAllPatients && (
           <button

@@ -21,7 +21,6 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,22 +38,19 @@ import {
   buildSmartInstruction,
   buildSmartRegimen,
   computeMedicationQuantity,
-  estimateMedicationDispense,
   getMedicationBaseUnit,
   getMedicationPrice,
-  validateMedicationRegimen,
   parseShorthand,
   applyShorthand,
-  frequencyText,
   type MedicationLike,
 } from '@/lib/medicationIntelligence';
 
 // Icons
 import {
   Loader2, CheckCircle, User, FileText, FlaskConical, Pill,
-  ChevronDown, ChevronRight, AlertTriangle, Search, Plus, Trash2, Save,
-  Send, Heart, ClipboardList, UserCheck, BedDouble, ExternalLink, Activity,
-  Pencil, AlertCircle, TestTube, Stethoscope, Calendar, Clock, Eye, Printer,
+  ChevronRight, AlertTriangle, Search, Plus, Trash2, Save,
+  Send, ClipboardList, UserCheck, BedDouble, Activity,
+  AlertCircle, Calendar, Clock, Eye, Printer,
   RefreshCw, ShieldCheck, Scissors
 } from 'lucide-react';
 import { type CreateTreatmentPlanItemInput } from '@/types/treatment-plan';
@@ -191,15 +187,6 @@ interface Medication {
   packSizes?: Array<{ name: string; unit: string; quantityPerPack: number; sellingPrice: number }>;
 }
 
-// Helper to get flag color
-const getFlagColor = (flag?: string) => {
-  if (!flag || flag === 'normal') return 'text-green-600 bg-green-50';
-  if (flag === 'low') return 'text-blue-600 bg-blue-50';
-  if (flag === 'high') return 'text-amber-600 bg-amber-50';
-  if (flag === 'critical_low' || flag === 'critical_high') return 'text-red-600 bg-red-50';
-  return 'text-gray-600 bg-gray-50';
-};
-
 const getFlagLabel = (flag?: string) => {
   if (!flag || flag === 'normal') return 'Normal';
   if (flag === 'low') return 'Low';
@@ -239,9 +226,6 @@ const visitStatusTone = (status?: string) => cn(
   status === 'awaiting_doctor_review' && 'bg-cyan-600 text-white',
   status === 'admitted' && 'bg-blue-600 text-white',
 );
-
-const CLINICAL_LABEL = 'text-[10px] font-bold uppercase tracking-wider text-muted-foreground';
-const CLINICAL_CARD = 'bg-white border border-border rounded-xl shadow-[0_1px_3px_rgba(0,0,0,0.02)]';
 
 const formatClinicalDateTime = (value?: string) => {
   if (!value) return 'Not recorded';
@@ -547,7 +531,12 @@ export default function DoctorDashboard() {
       sorted.sort((a, b) => {
         let cmp = 0;
         if (labSortField === 'testName') cmp = (a.testName || '').localeCompare(b.testName || '');
-        else if (labSortField === 'value') cmp = (a.value || '').localeCompare(b.value || '');
+        else if (labSortField === 'value') {
+          const numA = parseFloat(String(a.value || '').replace(/[^\d.\-]/g, ''));
+          const numB = parseFloat(String(b.value || '').replace(/[^\d.\-]/g, ''));
+          if (!isNaN(numA) && !isNaN(numB)) cmp = numA - numB;
+          else cmp = (a.value || '').localeCompare(b.value || '');
+        }
         else if (labSortField === 'flag') {
           const aVal = flagOrder[a.flag as keyof typeof flagOrder] ?? 4;
           const bVal = flagOrder[b.flag as keyof typeof flagOrder] ?? 4;
@@ -650,8 +639,8 @@ export default function DoctorDashboard() {
       setActiveTab('soap');
       setIsDirty(false);
       toast.success(`Accepted patient: ${visit.patientId?.firstName} ${visit.patientId?.lastName}`);
-    } catch (error) {
-      toast.error('Failed to accept patient');
+    } catch {
+      // onError in the hook already shows the error toast
     }
   };
 
@@ -679,6 +668,10 @@ export default function DoctorDashboard() {
       toast.error('Consultation fee must be paid before saving clinical notes');
       return;
     }
+    if (!validateVitals(vitalsForm)) {
+      toast.error('Please fix vitals errors before saving');
+      return;
+    }
 
     try {
       await updateVisit.mutateAsync({
@@ -689,8 +682,8 @@ export default function DoctorDashboard() {
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       toast.success('Notes saved');
       setIsDirty(false);
-    } catch (error) {
-      toast.error('Failed to save notes');
+    } catch {
+      // onError in the hook already shows the error toast
     }
   };
 
@@ -710,8 +703,8 @@ export default function DoctorDashboard() {
       setIsDirty(false);
       setSelectedVisit(null);
       return true;
-    } catch (error) {
-      toast.error('Failed to complete visit');
+    } catch {
+      // onError in the hook already shows the error toast
       return false;
     }
   };
@@ -725,11 +718,6 @@ export default function DoctorDashboard() {
       await handleAcceptPatient(nextInQueue);
     }
   };
-
-  const getPrescriptionEstimate = (item: any) => estimateMedicationDispense(item, item as MedicationLike);
-
-  const getPrescriptionEstimateTotal = (items: any[]) =>
-    items.reduce((sum, item) => sum + getPrescriptionEstimate(item).lineTotal, 0);
 
   // Lab order creation
   const createLabOrder = useMutation({
@@ -764,6 +752,7 @@ export default function DoctorDashboard() {
       }
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-chart'] });
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || err?.message || 'Failed to create lab order';
@@ -805,6 +794,7 @@ export default function DoctorDashboard() {
       }
       queryClient.invalidateQueries({ queryKey: ['visits'] });
       queryClient.invalidateQueries({ queryKey: ['prescriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['patient-chart'] });
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || err?.message || 'Failed to create prescription';
@@ -1034,9 +1024,15 @@ export default function DoctorDashboard() {
       computedQuantity: item.quantity,
       quantityTouched: false,
       route: item.route || 'oral',
-      unitPrice: 0,
+      unitPrice: item.unitPrice ?? 0,
       instructions: item.instructions || '',
       pharmacistNote: item.pharmacistNote || '',
+      strengthPerDose: item.strengthPerDose,
+      dosesPerDay: item.dosesPerDay,
+      durationDays: item.durationDays,
+      isControlled: item.isControlled,
+      requiresPrescription: item.requiresPrescription,
+      baseUnit: item.baseUnit,
     }));
     setPrescriptionItems(items);
     setEditingPrescription(rx);
@@ -1067,8 +1063,7 @@ export default function DoctorDashboard() {
   const admittedPatients = dashboardData?.admittedPatients || [];
   const openEncounterCount = activePatients.length;
 
-  // Global search across all visit queues
-  const searchHits: Visit[] = []; // Replaced by DoctorTopBar patient search
+  // Global search across all visit queues — replaced by DoctorTopBar patient search
 
   // Pending lab payment/processing must not freeze clinical documentation.
   // Doctors can keep SOAP and vitals current while the encounter remains open;
@@ -1394,7 +1389,7 @@ export default function DoctorDashboard() {
         <main className="flex-1 h-full min-h-0 flex flex-col overflow-hidden">
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col lg:flex-row gap-4 bg-[#f4f7fa] p-3 md:p-4">
             {/* Left Editor Area */}
-            <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,2.15fr)_minmax(340px,1fr)] xl:items-start">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,2.15fr)_minmax(340px,1fr)] 2xl:grid-cols-[minmax(0,1.9fr)_minmax(320px,0.85fr)_minmax(300px,0.8fr)] xl:items-start">
               {selectedVisit || searchedPatient ? (
                 <>
                   {/* Calm Patient Header */}
@@ -1513,7 +1508,7 @@ export default function DoctorDashboard() {
                                     <Button type="button" size="sm" variant="outline" className="bg-white" onClick={() => setActiveTab('lab-results')}>
                                       <FlaskConical className="mr-1.5 h-3.5 w-3.5" /> Results
                                     </Button>
-                                    <Button type="button" size="sm" className="bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}>
+                                    <Button type="button" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}>
                                       <Plus className="mr-1.5 h-3.5 w-3.5" /> Order Lab
                                     </Button>
                                     <Button type="button" size="sm" className="bg-slate-900 text-white hover:bg-slate-800" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setShorthandInputs({}); setShorthandErrors({}); setPrescriptionModalOpen(true); }}>
@@ -1561,7 +1556,7 @@ export default function DoctorDashboard() {
                                   <div className="space-y-2 xl:contents">
                                     <Label className="text-sm font-medium text-slate-950">Subjective</Label>
                                     <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({ ...soapForm, subjective: e.target.value })} placeholder="Patient history, symptoms, relevant negatives..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setSoapForm((current) => ({ ...current, subjective: `${current.subjective}${current.subjective ? '\n' : ''}` }))} disabled={isReadOnly || !canWriteConsultation}><Plus className="mr-1 h-3.5 w-3.5" /> Add Note</Button>
+                                    
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t py-3 xl:grid-cols-[42px_108px_minmax(0,1fr)_112px] xl:items-center">
@@ -1569,13 +1564,13 @@ export default function DoctorDashboard() {
                                   <div className="space-y-2 xl:contents">
                                     <Label className="text-sm font-medium text-slate-950">Objective</Label>
                                     <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({ ...soapForm, objective: e.target.value })} placeholder="Exam findings, observations, reviewed results..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setSoapForm((current) => ({ ...current, objective: `${current.objective}${current.objective ? '\n' : ''}` }))} disabled={isReadOnly || !canWriteConsultation}><Plus className="mr-1 h-3.5 w-3.5" /> Add Note</Button>
+                                    
                                   </div>
                                 </div>
                               </div>
 
                               <div className="flex flex-col gap-0">
-                                <div className="hidden grid-cols-2 gap-2 rounded-lg border border-border/70 bg-muted/20 p-3">
+                                <div className="hidden grid-cols-2 gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 xl:grid">
                                   {[
                                     { key: 'temperature', label: 'Temp', placeholder: '36.5', type: 'number' },
                                     { key: 'bloodPressure', label: 'BP', placeholder: '120/80', type: 'text' },
@@ -1608,14 +1603,14 @@ export default function DoctorDashboard() {
                                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-950 text-white"><ClipboardList className="h-4 w-4" /></div>
                                   <Label className="text-sm font-medium text-slate-950">Diagnosis</Label>
                                   <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({ ...soapForm, diagnosis: e.target.value })} placeholder="Primary diagnosis" className="h-9 border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                                  <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setSoapForm((current) => ({ ...current, diagnosis: current.diagnosis ? `${current.diagnosis}; ` : '' }))} disabled={isReadOnly || !canWriteConsultation}><Plus className="mr-1 h-3.5 w-3.5" /> Diagnosis</Button>
+                                  
                                 </div>
                                 <div className="order-1 grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t py-3 xl:grid-cols-[42px_108px_minmax(0,1fr)_112px] xl:items-center">
                                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">A</div>
                                   <div className="space-y-2 xl:contents">
                                     <Label className="text-sm font-medium text-slate-950">Assessment</Label>
                                     <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({ ...soapForm, assessment: e.target.value })} placeholder="Clinical impression and differential..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setSoapForm((current) => ({ ...current, assessment: `${current.assessment}${current.assessment ? '\n' : ''}` }))} disabled={isReadOnly || !canWriteConsultation}><Plus className="mr-1 h-3.5 w-3.5" /> Add Note</Button>
+                                    
                                   </div>
                                 </div>
                                 <div className="order-2 grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t py-3 xl:grid-cols-[42px_108px_minmax(0,1fr)_112px] xl:items-center">
@@ -1653,7 +1648,7 @@ export default function DoctorDashboard() {
                                       </div>
                                     </div>
                                     <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({ ...soapForm, plan: e.target.value })} placeholder="Treatment plan, follow-up, counselling..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
-                                    <Button type="button" size="sm" variant="outline" className="h-9" onClick={() => setSoapForm((current) => ({ ...current, plan: `${current.plan}${current.plan ? '\n' : ''}` }))} disabled={isReadOnly || !canWriteConsultation}><Plus className="mr-1 h-3.5 w-3.5" /> Add Note</Button>
+                                    
                                     {currentVisitPlans.length > 0 && (
                                       <div className="space-y-1.5 xl:col-start-3">
                                         {currentVisitPlans.map((plan: any) => (
@@ -1722,7 +1717,16 @@ export default function DoctorDashboard() {
                                     >
                                       <RefreshCw className="mr-1.5 h-3.5 w-3.5" /> Refresh
                                     </Button>
-                                    <Button type="button" size="sm" variant="outline" className="h-8 text-xs" disabled={sortedLabResults.length === 0}>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 text-xs"
+                                      disabled={sortedLabResults.length === 0 || !labOrderId}
+                                      onClick={() => {
+                                        if (labOrderId) window.open(`/lab/reports/${labOrderId}`, '_blank');
+                                      }}
+                                    >
                                       <Printer className="mr-1.5 h-3.5 w-3.5" /> Print
                                     </Button>
                                     <Button
@@ -1814,9 +1818,6 @@ export default function DoctorDashboard() {
                                             <Badge variant="outline" className={cn('border text-[10px]', getResultRiskTone(result.flag))}>{getFlagLabel(result.flag)}</Badge>
                                           </div>
                                           <div className="flex items-center justify-start gap-2 lg:justify-end">
-                                            <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                                              <Eye className="mr-1 h-3.5 w-3.5" /> Compare
-                                            </Button>
                                             <Button
                                               type="button"
                                               size="sm"
@@ -1871,7 +1872,8 @@ export default function DoctorDashboard() {
                               ].map((field) => (
                                 <div key={field.key}>
                                   <Label className="text-[9px] text-muted-foreground">{field.label}</Label>
-                                  <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(event) => setVitalsForm({ ...vitalsForm, [field.key]: event.target.value })} placeholder={field.placeholder} className="mt-1 h-7 bg-white text-[11px]" disabled={isReadOnly || !canWriteConsultation} />
+                                  <Input type={field.type} value={(vitalsForm as any)[field.key]} onChange={(event) => setVitalsForm({ ...vitalsForm, [field.key]: event.target.value })} placeholder={field.placeholder} className={cn('mt-1 h-7 bg-white text-[11px]', (vitalsErrors as any)[field.key] && 'border-red-300')} disabled={isReadOnly || !canWriteConsultation} />
+                                  {(vitalsErrors as any)[field.key] && <p className="mt-0.5 text-[9px] text-red-600">{(vitalsErrors as any)[field.key]}</p>}
                                 </div>
                               ))}
                             </div>
@@ -1961,7 +1963,7 @@ export default function DoctorDashboard() {
                       </section>
                     </aside>
 
-                    <aside className="hidden bg-slate-50/80 px-4 py-4 xl:max-h-[calc(100vh-186px)] xl:overflow-y-auto">
+                    <aside className="hidden bg-slate-50/80 px-4 py-4 xl:max-h-[calc(100vh-186px)] xl:overflow-y-auto 2xl:block 2xl:col-start-3 2xl:row-start-1 2xl:row-span-5 rounded-md border border-slate-200">
                       <div className="space-y-5">
                         <div className="rounded-lg border border-teal-100 bg-white p-3 shadow-sm">
                           <div className="mb-2 flex items-center justify-between">
@@ -1974,7 +1976,7 @@ export default function DoctorDashboard() {
                           </div>
                           {selectedVisit && (
                             <>
-                              <Button className="w-full justify-center bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
+                              <Button className="w-full justify-center bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation} title={!canCloseEncounter ? closureBlockers.join(' ') : undefined}>
                                 {completeVisit.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                                 Complete & Next
                               </Button>
@@ -2024,18 +2026,38 @@ export default function DoctorDashboard() {
                         <div className="border-t border-border pt-4">
                           <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Orders</h4>
                           <div className="space-y-2 text-xs">
-                            {currentVisitOrders.slice(0, 3).map((order: any) => (
-                              <div key={order._id || order.id} className="flex items-center justify-between gap-2">
-                                <span className="truncate">{(order.order_tests || order.tests || []).map((t: any) => t.testName || t.testCode).join(', ') || statusLabel(order.orderType || order.order_type)}</span>
-                                <span className="shrink-0 capitalize text-muted-foreground">{statusLabel(order.status || order.paymentStatus || order.payment_status)}</span>
-                              </div>
-                            ))}
-                            {currentVisitPrescriptions.slice(0, 3).map((rx: any) => (
-                              <div key={rx._id} className="flex items-center justify-between gap-2">
-                                <span className="truncate">{(rx.items || []).map((i: any) => i.medicationName).join(', ') || rx.prescriptionNumber}</span>
-                                <span className="shrink-0 text-muted-foreground">{rx.isPaid ? statusLabel(rx.status) : 'unpaid'}</span>
-                              </div>
-                            ))}
+                            {currentVisitOrders.slice(0, 3).map((order: any) => {
+                              const isEditable = ['pending', 'ordered'].includes((order.status || '').toLowerCase());
+                              return (
+                                <div key={order._id || order.id} className="flex items-center justify-between gap-2">
+                                  <span className="truncate">{(order.order_tests || order.tests || []).map((t: any) => t.testName || t.testCode).join(', ') || statusLabel(order.orderType || order.order_type)}</span>
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <span className="capitalize text-muted-foreground">{statusLabel(order.status || order.paymentStatus || order.payment_status)}</span>
+                                    {isEditable && (
+                                      <Button type="button" size="sm" variant="ghost" className="h-6 w-6 p-0" title="Edit order" onClick={() => startEditOrder(order)}>
+                                        <Pencil className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {currentVisitPrescriptions.slice(0, 3).map((rx: any) => {
+                              const isEditable = !rx.isPaid && ['pending', 'sent_to_pharmacy', 'prescribed'].includes((rx.status || '').toLowerCase());
+                              return (
+                                <div key={rx._id} className="flex items-center justify-between gap-2">
+                                  <span className="truncate">{(rx.items || []).map((i: any) => i.medicationName).join(', ') || rx.prescriptionNumber}</span>
+                                  <div className="flex shrink-0 items-center gap-1">
+                                    <span className="text-muted-foreground">{rx.isPaid ? statusLabel(rx.status) : 'unpaid'}</span>
+                                    {isEditable && (
+                                      <Button type="button" size="sm" variant="ghost" className="h-6 w-6 p-0" title="Edit prescription" onClick={() => startEditPrescription(rx)}>
+                                        <Pencil className="h-3 w-3" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
                             {currentVisitOrders.length === 0 && currentVisitPrescriptions.length === 0 && <div className="text-muted-foreground">No active orders.</div>}
                           </div>
                         </div>
@@ -2092,7 +2114,7 @@ export default function DoctorDashboard() {
                           {updateVisit.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
                           Save Draft
                         </Button>
-                        <Button size="sm" className="bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation}>
+                        <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation}>
                           {completeVisit.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="mr-2 h-3.5 w-3.5" />}
                           Complete & Next
                         </Button>
@@ -2584,7 +2606,7 @@ export default function DoctorDashboard() {
           </div>
           <DialogFooter className="border-t bg-white px-4 py-3 sm:px-5">
             <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
-            <Button className="bg-[#0d9488] text-white hover:bg-[#0f766e]" onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()} disabled={(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) || prescriptionItems.length === 0 || prescriptionItems.some(i => !hasPrescriptionInstruction(i))}>
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()} disabled={(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) || prescriptionItems.length === 0 || prescriptionItems.some(i => !hasPrescriptionInstruction(i))}>
               {(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
               {editingPrescription ? 'Update Prescription' : 'Create Prescription'}
             </Button>
@@ -2619,7 +2641,7 @@ export default function DoctorDashboard() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setReferralOpen(false)}>Cancel</Button>
-            <Button onClick={async () => { if (!selectedVisit) return; try { await referToSpecialist.mutateAsync({ visitId: selectedVisit._id || selectedVisit.id || '', data: referralForm }); toast.success('Patient referred to specialist'); setReferralOpen(false); setReferralForm({ specialistId: '', reason: '', notes: '' }); setSelectedVisit(null); } catch { toast.error('Failed to refer patient'); } }} disabled={referToSpecialist.isPending || !referralForm.specialistId || !referralForm.reason}>
+            <Button onClick={async () => { if (!selectedVisit) return; try { await referToSpecialist.mutateAsync({ visitId: selectedVisit._id || selectedVisit.id || '', data: referralForm }); toast.success('Patient referred to specialist'); setReferralOpen(false); setReferralForm({ specialistId: '', reason: '', notes: '' }); setSelectedVisit(null); } catch { /* hook onError shows toast */ } }} disabled={referToSpecialist.isPending || !referralForm.specialistId || !referralForm.reason}>
               {referToSpecialist.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <UserCheck className="w-4 h-4 mr-2" />}Refer
             </Button>
           </DialogFooter>
@@ -2712,7 +2734,7 @@ export default function DoctorDashboard() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmCompleteOpen(false)}>Cancel</Button>
-            <Button onClick={() => { setConfirmCompleteOpen(false); handleCompleteAndNext(); }} disabled={completeVisit.isPending || !canCloseEncounter} className="bg-[#0d9488] hover:bg-[#0f766e] text-white">
+            <Button onClick={() => { setConfirmCompleteOpen(false); handleCompleteAndNext(); }} disabled={completeVisit.isPending || !canCloseEncounter} className="bg-primary hover:bg-primary/90 text-primary-foreground">
               {completeVisit.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}Complete & Next
             </Button>
           </DialogFooter>
@@ -2772,13 +2794,16 @@ export default function DoctorDashboard() {
                       key={p._id}
                       type="button"
                       onClick={async () => {
-                        setAllPatientsOpen(false);
                         try {
                           const visits: any[] = await visitsAPI.getByPatient(p._id);
                           if (visits && visits.length > 0) {
                             const last = visits.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-                            setSelectedVisit(last);
-                            setActiveTab('timeline');
+                            guardNavigation(() => {
+                              setSearchedPatient(null);
+                              setSelectedVisit(last);
+                              setActiveTab('timeline');
+                              setAllPatientsOpen(false);
+                            }, 'select', { visit: last, tab: 'timeline' });
                           } else {
                             toast.info(`${fullName} has no visits on file`);
                           }

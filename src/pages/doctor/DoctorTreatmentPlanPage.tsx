@@ -8,17 +8,18 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
 import type { TreatmentPlan } from '@/types/treatment-plan';
-import { LayoutDashboard, Loader2, Send, Eye, Plus, Trash2, Pencil, FileText } from 'lucide-react';
+import { LayoutDashboard, Loader2, Send, Eye, Plus, Trash2, FileText } from 'lucide-react';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  draft: { label: 'Draft', color: 'bg-gray-100 text-gray-700' },
-  sent_to_reception: { label: 'Sent', color: 'bg-blue-100 text-blue-700' },
-  paid: { label: 'Paid', color: 'bg-green-100 text-green-700' },
-  completed: { label: 'Completed', color: 'bg-emerald-100 text-emerald-700' },
-  cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-700' },
+  draft: { label: 'Draft', color: 'bg-slate-100 text-slate-700 border-slate-200' },
+  sent_to_reception: { label: 'Sent', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+  paid: { label: 'Paid', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+  completed: { label: 'Completed', color: 'bg-green-50 text-green-700 border-green-200' },
+  cancelled: { label: 'Cancelled', color: 'bg-red-50 text-red-700 border-red-200' },
 };
 
 export default function DoctorTreatmentPlanPage() {
@@ -27,6 +28,7 @@ export default function DoctorTreatmentPlanPage() {
   const { user, exitDoctorMode } = useAuth();
   const [viewPlan, setViewPlan] = useState<TreatmentPlan | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
+  const [cancelConfirmPlan, setCancelConfirmPlan] = useState<TreatmentPlan | null>(null);
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['treatment-plans', 'doctor'],
@@ -150,7 +152,7 @@ export default function DoctorTreatmentPlanPage() {
                               size="sm"
                               className="text-destructive"
                               disabled={cancelMutation.isPending}
-                              onClick={() => cancelMutation.mutate(plan._id)}
+                              onClick={() => setCancelConfirmPlan(plan)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
@@ -239,8 +241,9 @@ export default function DoctorTreatmentPlanPage() {
                       size="sm"
                       disabled={sendMutation.isPending}
                       onClick={() => {
-                        sendMutation.mutate(viewPlan._id);
-                        setViewPlan(null);
+                        sendMutation.mutate(viewPlan._id, {
+                          onSuccess: () => setViewPlan(null),
+                        });
                       }}
                     >
                       <Send className="h-4 w-4 mr-1" /> Send to Reception
@@ -249,7 +252,7 @@ export default function DoctorTreatmentPlanPage() {
                       size="sm"
                       variant="destructive"
                       disabled={cancelMutation.isPending}
-                      onClick={() => cancelMutation.mutate(viewPlan._id)}
+                      onClick={() => setCancelConfirmPlan(viewPlan)}
                     >
                       Cancel Plan
                     </Button>
@@ -259,6 +262,32 @@ export default function DoctorTreatmentPlanPage() {
             </Card>
           </div>
         )}
+        {/* Cancel confirmation dialog */}
+        <AlertDialog open={!!cancelConfirmPlan} onOpenChange={(open) => !open && setCancelConfirmPlan(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Cancel Treatment Plan</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to cancel plan <strong>{cancelConfirmPlan?.planNumber}</strong>? This will delete all linked prescriptions and mark orders as cancelled. This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep Plan</AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => {
+                  if (cancelConfirmPlan) {
+                    cancelMutation.mutate(cancelConfirmPlan._id);
+                    if (viewPlan?._id === cancelConfirmPlan._id) setViewPlan(null);
+                    setCancelConfirmPlan(null);
+                  }
+                }}
+              >
+                Cancel Plan
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </RoleLayout>
   );
