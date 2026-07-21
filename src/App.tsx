@@ -382,7 +382,10 @@ function AppRoutes() {
         <RoleGuard allowedRoles={['admin', 'receptionist']}><AdminInsuranceClaimsPage /></RoleGuard>
       } />
       <Route path="/admin/insurance-blocks" element={
-        <RoleGuard allowedRoles={['admin', 'receptionist']}><InsuranceBlockListPage /></RoleGuard>
+        <RoleGuard allowedRoles={['admin']}><InsuranceBlockListPage /></RoleGuard>
+      } />
+      <Route path="/reception/insurance-blocks" element={
+        <RoleGuard allowedRoles={['receptionist', 'admin']}><InsuranceBlockListPage /></RoleGuard>
       } />
       <Route path="/admin/service-pricing" element={
         <RoleGuard allowedRoles={['admin']}><ServicePricingPage /></RoleGuard>
