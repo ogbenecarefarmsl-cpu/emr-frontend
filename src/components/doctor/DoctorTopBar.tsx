@@ -310,8 +310,6 @@ export function DoctorTopBar({
           <span className="hidden text-sm font-semibold lg:block">Doctor Workbench</span>
         </div>
 
-        <div className="hidden" aria-hidden="true" />
-
         {/* Active patients chips */}
         <div className="absolute left-0 right-0 top-16 flex h-[52px] min-w-0 items-center gap-2 border-t border-slate-700 bg-[#0a2238] px-4 shadow-md md:top-[76px] md:h-14">
           <div className="flex h-full shrink-0 items-center gap-2 border-r border-slate-600 pr-3 text-xs font-semibold text-slate-200">
@@ -568,38 +566,6 @@ export function DoctorTopBar({
           )}
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate('/doctor/treatment-plans')}
-          className="hidden"
-          title="Treatment Plans"
-        >
-          <ClipboardList className="w-3.5 h-3.5" />
-          Plans
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('/patient/search')}
-          className="hidden"
-          title="Patient History"
-        >
-          <FileText className="w-3.5 h-3.5" />
-          Records
-        </button>
-
-        {onOpenAllPatients && (
-          <button
-            type="button"
-            onClick={onOpenAllPatients}
-            className="hidden"
-            title="All My Patients"
-          >
-            <UserCheck className="w-3.5 h-3.5" />
-            Patients
-          </button>
-        )}
-
         {/* Accept next */}
         <Button
           size="sm"
@@ -611,27 +577,27 @@ export function DoctorTopBar({
           <ArrowRight className="h-3.5 w-3.5" />
         </Button>
 
-        {/* Profile */}
-        <div className="hidden">
-          <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center">
-            <span className="text-[10px] font-bold">{profile?.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
-          </div>
-          <span className="text-xs truncate max-w-24">{profile?.fullName}</span>
+        {/* Desktop profile + logout */}
+        <div className="hidden items-center gap-2 lg:flex">
           {doctorMode && onExitDoctorMode && (
             <button
               type="button"
               onClick={onExitDoctorMode}
-              className="ml-1 rounded-md p-1.5 text-amber-400 hover:bg-amber-900/30 hover:text-amber-300 transition-colors"
+              className="rounded-md p-1.5 text-amber-400 hover:bg-amber-900/30 hover:text-amber-300 transition-colors"
               title="Exit Doctor Mode"
             >
               <ArrowLeftToLine className="h-3.5 w-3.5" />
             </button>
           )}
+          <div className="w-7 h-7 rounded-full bg-slate-600 flex items-center justify-center">
+            <span className="text-[10px] font-bold text-slate-200">{profile?.fullName?.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}</span>
+          </div>
+          <span className="text-xs text-slate-300 truncate max-w-24">{profile?.fullName}</span>
           {onLogout && (
             <button
               type="button"
               onClick={onLogout}
-              className="ml-1 rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+              className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
               title="Logout"
             >
               <LogOut className="h-3.5 w-3.5" />

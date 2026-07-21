@@ -494,8 +494,8 @@ function OwingPatientsCard({ patients }: { patients: any[] }) {
 
       {/* Quick Deposit Dialog */}
       {depositPatient && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-          <div className="bg-card rounded-xl shadow-xl w-full max-w-sm p-6 space-y-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-[2px] sm:p-6">
+          <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-sm space-y-5 overflow-y-auto rounded-2xl border border-white/70 bg-white p-5 shadow-[0_28px_90px_-28px_rgba(15,23,42,0.55)] sm:p-6">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-sm">Quick Deposit — {depositPatient.firstName} {depositPatient.lastName}</h3>
               <Button variant="ghost" size="sm" onClick={() => setDepositPatient(null)}>

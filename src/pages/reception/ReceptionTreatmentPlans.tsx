@@ -380,8 +380,8 @@ export default function ReceptionTreatmentPlans() {
 
         {/* View plan dialog */}
         {viewPlan && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-lg max-h-[80vh] overflow-y-auto">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-[2px] sm:p-6">
+            <Card className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border-white/70 shadow-[0_28px_90px_-28px_rgba(15,23,42,0.55)]">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base">{viewPlan.planNumber}</CardTitle>
@@ -478,8 +478,8 @@ export default function ReceptionTreatmentPlans() {
 
         {/* Payment dialog */}
         {payPlan && (
-          <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-md">
+          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-[2px] sm:p-6">
+            <Card className="max-h-[calc(100dvh-1.5rem)] w-full max-w-md overflow-y-auto rounded-2xl border-white/70 shadow-[0_28px_90px_-28px_rgba(15,23,42,0.55)]">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-base flex items-center gap-2">
