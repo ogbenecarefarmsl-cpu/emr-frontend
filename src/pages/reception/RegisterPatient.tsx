@@ -312,7 +312,19 @@ export default function RegisterPatient() {
               <Checkbox
                 id="isInsurancePatient"
                 checked={isInsurancePatient}
-                onCheckedChange={(checked) => setIsInsurancePatient(checked === true)}
+                onCheckedChange={(checked) => {
+                  const isOn = checked === true;
+                  setIsInsurancePatient(isOn);
+                  if (isOn) {
+                    const fullName = `${formData.firstName} ${formData.lastName}`.trim();
+                    setInsuranceForm(prev => ({
+                      ...prev,
+                      memberName: prev.memberName || fullName,
+                      responsiblePerson: prev.responsiblePerson || fullName,
+                      responsiblePhone: prev.responsiblePhone || formData.phone || '',
+                    }));
+                  }
+                }}
               />
               <div>
                 <Label htmlFor="isInsurancePatient" className="cursor-pointer font-medium">This is an insurance patient</Label>
