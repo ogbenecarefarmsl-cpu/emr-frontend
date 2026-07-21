@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle, ArrowRight, User, Shield, ShieldOff } from 'lucide-react';
+import { Loader2, CreditCard, FlaskConical, Pill, CheckCircle, ArrowRight, User, Shield } from 'lucide-react';
 import { prescriptionService } from '@/services/prescriptionService';
 import { insuranceClaimsAPI, insuranceBlocksAPI } from '@/services/api';
 import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
@@ -284,19 +284,14 @@ export function PendingOrders() {
                 <div className="min-w-0">
                   <div className="font-medium truncate flex items-center gap-2">
                     {patientName}
-                    {isInsurancePatient && !isBlocked ? (
+                    {isInsurancePatient && (
                       <InsuranceStatusBadge
                         insurance={item.visitId.insurance}
+                        eligibility={isBlocked ? { status: 'blocked' } as any : undefined}
                         patientBalance={item.paymentStatus === 'partial' ? Number(item.balance || 0) : 0}
                         compact
                         className="text-[10px]"
                       />
-                    ) : null}
-                    {isBlocked && (
-                      <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px]">
-                        <ShieldOff className="h-3 w-3 mr-0.5" />
-                        Blocked
-                      </Badge>
                     )}
                   </div>
                   <div className="text-sm text-muted-foreground">

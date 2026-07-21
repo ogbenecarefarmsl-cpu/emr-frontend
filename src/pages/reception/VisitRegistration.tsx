@@ -328,12 +328,12 @@ export default function VisitRegistration() {
                       {selectedPatient.phone && (
                         <p className="text-sm text-green-600">{selectedPatient.phone}</p>
                       )}
-                      {selectedPatient.insurance?.programCode && (
-                        <p className="text-sm text-blue-700 mt-1">
-                          Insurance: {selectedPatient.insurance.programCode}
-                          {selectedPatient.insurance.subEntityCode && ` / ${selectedPatient.insurance.subEntityCode}`}
-                          {selectedPatient.insurance.memberNumber && ` • #${selectedPatient.insurance.memberNumber}`}
-                          {selectedPatient.insurance.responsiblePerson && ` • Resp: ${selectedPatient.insurance.responsiblePerson}`}
+                      {selectedPatient.insurance?.memberNumber && (
+                        <p className="text-xs text-green-700 mt-1">
+                          Member #{selectedPatient.insurance.memberNumber}
+                          {selectedPatient.insurance.responsiblePerson
+                            ? ` · Resp: ${selectedPatient.insurance.responsiblePerson}`
+                            : ''}
                         </p>
                       )}
                     </div>
@@ -553,7 +553,13 @@ export default function VisitRegistration() {
                   ) : (isBlocked || isWaitingPeriod || selfPayOverride) ? (
                     <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
                       <InsuranceStatusBadge insurance={selectedPatient.insurance} coverageType="paid" compact />
-                      <span className="text-sm text-amber-700">Insurance blocked — patient pays out of pocket</span>
+                      <span className="text-sm text-amber-700">
+                        {isBlocked
+                          ? 'Insurance blocked — patient pays consultation out of pocket'
+                          : isWaitingPeriod
+                            ? 'Waiting period — consultation is self-pay (labs/pharmacy can still use insurance)'
+                            : 'Self-pay selected — consultation out of pocket (labs/pharmacy can still use insurance)'}
+                      </span>
                     </div>
                   ) : (
                     <>

@@ -9,6 +9,8 @@ export interface InsuranceProgram {
   contactPhone?: string;
   contactEmail?: string;
   address?: string;
+  paymentTerms?: string;
+  /** @deprecated use paymentTerms */
   notes?: string;
   isActive: boolean;
   subEntities?: InsuranceSubEntity[];
@@ -22,8 +24,7 @@ export interface InsuranceSubEntity {
   name: string;
   contactPerson?: string;
   contactPhone?: string;
-  contactEmail?: string;
-  notes?: string;
+  address?: string;
   isActive: boolean;
   createdAt?: string;
 }

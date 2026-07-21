@@ -6,6 +6,7 @@ import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
 import { usePatient, usePatientResults, useUpdatePatient, usePatientWallet, useWalletTransactions, useDepositWallet, useWithdrawWallet } from '@/hooks/usePatients';
 import { useOrders } from '@/hooks/useOrders';
+import { useInsuranceLookup } from '@/hooks/useInsurance';
 import { paymentsAPI } from '@/services/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,15 +17,27 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Edit, Eye, Loader2, Save, X, Wallet, ArrowDownToLine, ArrowUpFromLine,
   Clock, User, FileText, FlaskConical, ShoppingCart, Calendar, AlertTriangle, Phone, Mail, MapPin, Hash, CreditCard
 } from 'lucide-react';
 import { PatientNotesPanel } from '@/components/patients/PatientNotesPanel';
+import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
 import { getPatientAgeDisplay, getPatientFullName } from '@/utils/orderHelpers';
 
 type AgeUnit = 'years' | 'months' | 'weeks' | 'days';
+
+interface InsuranceFormState {
+  programCode: string;
+  subEntityCode: string;
+  memberNumber: string;
+  memberName: string;
+  responsiblePerson: string;
+  responsiblePhone: string;
+  responsibleAddress: string;
+}
 
 interface FormState {
   firstName: string;
@@ -35,6 +48,8 @@ interface FormState {
   phone: string;
   email: string;
   address: string;
+  isInsurancePatient: boolean;
+  insurance: InsuranceFormState;
 }
 
 interface NormalizedPatient {
@@ -53,6 +68,7 @@ interface NormalizedPatient {
   createdAt?: string;
   allergies?: string[];
   bloodType?: string;
+  insurance?: InsuranceFormState;
 }
 
 const convertAgeToYears = (ageValue: number, ageUnit: AgeUnit): number => {
@@ -72,10 +88,21 @@ const getField = <T,>(record: any, keys: string[], fallback: T): T => {
   return fallback;
 };
 
+const emptyInsurance = (): InsuranceFormState => ({
+  programCode: '',
+  subEntityCode: '',
+  memberNumber: '',
+  memberName: '',
+  responsiblePerson: '',
+  responsiblePhone: '',
+  responsibleAddress: '',
+});
+
 const normalizePatient = (patient: any): NormalizedPatient => {
   const age = Number(getField<number | string>(patient, ['age'], 0));
   const ageValue = Number(getField<number | string>(patient, ['ageValue', 'age_value'], age));
   const ageUnit = getField<AgeUnit>(patient, ['ageUnit', 'age_unit'], 'years');
+  const insuranceRaw = getField<any>(patient, ['insurance'], undefined);
   return {
     id: getField<string>(patient, ['id', '_id'], ''),
     patientId: getField<string>(patient, ['patientId', 'patient_id'], '-'),
@@ -92,6 +119,15 @@ const normalizePatient = (patient: any): NormalizedPatient => {
     createdAt: getField<string | undefined>(patient, ['createdAt', 'created_at'], undefined),
     allergies: getField<string[] | undefined>(patient, ['allergies'], undefined),
     bloodType: getField<string | undefined>(patient, ['bloodType', 'blood_type'], undefined),
+    insurance: insuranceRaw ? {
+      programCode: insuranceRaw.programCode || '',
+      subEntityCode: insuranceRaw.subEntityCode || '',
+      memberNumber: insuranceRaw.memberNumber || '',
+      memberName: insuranceRaw.memberName || '',
+      responsiblePerson: insuranceRaw.responsiblePerson || '',
+      responsiblePhone: insuranceRaw.responsiblePhone || '',
+      responsibleAddress: insuranceRaw.responsibleAddress || '',
+    } : undefined,
   };
 };
 
@@ -151,6 +187,7 @@ export default function PatientDetails() {
   const { data: orders } = useOrders('all');
   const { data: patientResults, isLoading: isLoadingResults } = usePatientResults(id || '');
   const { data: wallet } = usePatientWallet(id || '');
+  const { data: insuranceLookup = [] } = useInsuranceLookup();
   const updatePatient = useUpdatePatient();
 
   const { data: patientPayments = [], isLoading: isLoadingPayments } = useQuery({
@@ -205,15 +242,19 @@ export default function PatientDetails() {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<FormState>({
     firstName: '', lastName: '', ageValue: '', ageUnit: 'years', gender: 'M', phone: '', email: '', address: '',
+    isInsurancePatient: false, insurance: emptyInsurance(),
   });
 
   const handleEdit = () => {
     if (!normalizedPatient) return;
+    const hasIns = !!normalizedPatient.insurance?.programCode;
     setFormData({
       firstName: normalizedPatient.firstName, lastName: normalizedPatient.lastName,
       ageValue: String(normalizedPatient.ageValue || normalizedPatient.age || ''),
       ageUnit: normalizedPatient.ageUnit, gender: normalizedPatient.gender,
       phone: normalizedPatient.phone || '', email: normalizedPatient.email || '', address: normalizedPatient.address || '',
+      isInsurancePatient: hasIns,
+      insurance: hasIns ? { ...emptyInsurance(), ...normalizedPatient.insurance } : emptyInsurance(),
     });
     setIsEditing(true);
   };
@@ -223,11 +264,25 @@ export default function PatientDetails() {
     if (!formData.firstName.trim() || !formData.lastName.trim() || !formData.ageValue.trim()) {
       toast.error('First name, last name, and age are required'); return;
     }
+    if (formData.isInsurancePatient && !formData.insurance.programCode) {
+      toast.error('Select an insurance program or uncheck insurance patient'); return;
+    }
     const ageValueNumber = Number(formData.ageValue);
     if (Number.isNaN(ageValueNumber) || ageValueNumber < 0) {
       toast.error('Please enter a valid age value'); return;
     }
     try {
+      const insurancePayload = formData.isInsurancePatient && formData.insurance.programCode
+        ? {
+            programCode: formData.insurance.programCode || undefined,
+            subEntityCode: formData.insurance.subEntityCode || undefined,
+            memberNumber: formData.insurance.memberNumber || undefined,
+            memberName: formData.insurance.memberName || undefined,
+            responsiblePerson: formData.insurance.responsiblePerson || undefined,
+            responsiblePhone: formData.insurance.responsiblePhone || undefined,
+            responsibleAddress: formData.insurance.responsibleAddress || undefined,
+          }
+        : null;
       await updatePatient.mutateAsync({
         id, updates: {
           firstName: formData.firstName.trim(), lastName: formData.lastName.trim(),
@@ -235,6 +290,7 @@ export default function PatientDetails() {
           ageUnit: formData.ageUnit, gender: formData.gender,
           phone: formData.phone.trim() || undefined, email: formData.email.trim() || undefined,
           address: formData.address.trim() || undefined,
+          insurance: insurancePayload as any,
         },
       });
       toast.success('Patient details updated');
@@ -337,6 +393,11 @@ export default function PatientDetails() {
                     <MapPin className="w-3 h-3" />{normalizedPatient.address}
                   </Badge>
                 )}
+                <InsuranceStatusBadge
+                  insurance={normalizedPatient.insurance}
+                  compact
+                  className="text-[10px]"
+                />
               </div>
             </div>
             {/* Edit button */}
@@ -432,6 +493,117 @@ export default function PatientDetails() {
               <div className="space-y-1.5 md:col-span-2">
                 <Label className="text-xs">Address</Label>
                 <Input value={formData.address} onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))} />
+              </div>
+
+              <div className="md:col-span-2 border-t pt-4 mt-1 space-y-3">
+                <div className="flex items-start gap-2">
+                  <Checkbox
+                    id="editIsInsurance"
+                    checked={formData.isInsurancePatient}
+                    onCheckedChange={(checked) => setFormData(prev => ({
+                      ...prev,
+                      isInsurancePatient: !!checked,
+                      insurance: checked ? prev.insurance : emptyInsurance(),
+                    }))}
+                  />
+                  <div>
+                    <Label htmlFor="editIsInsurance" className="cursor-pointer font-medium text-sm">Insurance patient</Label>
+                    <p className="text-xs text-muted-foreground">Update program, member number, and responsible party.</p>
+                  </div>
+                </div>
+
+                {formData.isInsurancePatient && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-md border border-blue-200 bg-blue-50/40 p-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Program</Label>
+                      <Select
+                        value={formData.insurance.programCode}
+                        onValueChange={(v) => setFormData(prev => ({
+                          ...prev,
+                          insurance: { ...prev.insurance, programCode: v, subEntityCode: '' },
+                        }))}
+                      >
+                        <SelectTrigger><SelectValue placeholder="Select program" /></SelectTrigger>
+                        <SelectContent>
+                          {insuranceLookup.map((prog: any) => (
+                            <SelectItem key={prog.code} value={prog.code}>{prog.name || prog.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Sub-entity</Label>
+                      <Select
+                        value={formData.insurance.subEntityCode || undefined}
+                        onValueChange={(v) => setFormData(prev => ({
+                          ...prev,
+                          insurance: { ...prev.insurance, subEntityCode: v },
+                        }))}
+                        disabled={!formData.insurance.programCode}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={formData.insurance.programCode ? 'Select sub-entity' : 'Select program first'} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(insuranceLookup.find((p: any) => p.code === formData.insurance.programCode)?.subEntities || []).map((sub: any) => (
+                            <SelectItem key={sub.code} value={sub.code}>{sub.name || sub.code}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Member number</Label>
+                      <Input
+                        value={formData.insurance.memberNumber}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          insurance: { ...prev.insurance, memberNumber: e.target.value },
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Member name</Label>
+                      <Input
+                        value={formData.insurance.memberName}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          insurance: { ...prev.insurance, memberName: e.target.value },
+                        }))}
+                        placeholder="Name on insurance card"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Responsible person</Label>
+                      <Input
+                        value={formData.insurance.responsiblePerson}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          insurance: { ...prev.insurance, responsiblePerson: e.target.value },
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label className="text-xs">Responsible phone</Label>
+                      <Input
+                        value={formData.insurance.responsiblePhone}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          insurance: { ...prev.insurance, responsiblePhone: e.target.value },
+                        }))}
+                      />
+                    </div>
+                    <div className="space-y-1.5 md:col-span-2">
+                      <Label className="text-xs">Responsible address</Label>
+                      <Input
+                        value={formData.insurance.responsibleAddress}
+                        onChange={(e) => setFormData(prev => ({
+                          ...prev,
+                          insurance: { ...prev.insurance, responsibleAddress: e.target.value },
+                        }))}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>

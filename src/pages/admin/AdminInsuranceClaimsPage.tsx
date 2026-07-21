@@ -384,13 +384,14 @@ export default function AdminInsuranceClaimsPage() {
                               </Button>
                             </>
                           )}
-                          {claim.status === 'approved' && (
+                          {(claim.status === 'approved' || claim.status === 'partially_approved') && (
                             <Button
                               variant="ghost"
                               size="sm"
                               className="text-emerald-600 hover:text-emerald-700"
                               onClick={() => handleMarkPaid(claim)}
                               disabled={updateStatusMutation.isPending}
+                              title="Mark claim paid by insurer"
                             >
                               <DollarSign className="h-4 w-4" />
                             </Button>

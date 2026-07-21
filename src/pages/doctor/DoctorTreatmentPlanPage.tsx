@@ -7,7 +7,7 @@ import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
 import { treatmentPlanService } from '@/services/treatmentPlanService';
@@ -102,8 +102,10 @@ export default function DoctorTreatmentPlanPage() {
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
             ) : plans.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                No treatment plans yet. Create one to get started.
+              <div className="flex flex-col items-center justify-center gap-2 py-10 text-center text-muted-foreground">
+                <FileText className="h-10 w-10 text-muted-foreground/40" />
+                <p className="text-sm font-medium">No treatment plans yet</p>
+                <p className="text-xs">Click "New Treatment Plan" to get started.</p>
               </div>
             ) : (
               <div className="space-y-2">
@@ -172,6 +174,7 @@ export default function DoctorTreatmentPlanPage() {
           <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Create Treatment Plan</DialogTitle>
+              <DialogDescription>Build a plan of drugs, IVs, labs, and procedures for the patient.</DialogDescription>
             </DialogHeader>
             <div className="py-4">
               <TreatmentPlanBuilder
@@ -186,25 +189,20 @@ export default function DoctorTreatmentPlanPage() {
         </Dialog>
 
         {/* View plan dialog */}
-        {viewPlan && (
-          <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-[2px] sm:p-6">
-            <Card className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl border-white/70 shadow-[0_28px_90px_-28px_rgba(15,23,42,0.55)]">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base">{viewPlan.planNumber}</CardTitle>
-                  <Button variant="ghost" size="sm" onClick={() => setViewPlan(null)}>
-                    Close
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
+        <Dialog open={!!viewPlan} onOpenChange={(open) => !open && setViewPlan(null)}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>{viewPlan?.planNumber}</DialogTitle>
+              <DialogDescription>
+                {viewPlan ? `Created by ${typeof viewPlan.createdBy === 'object' ? viewPlan.createdBy.fullName : viewPlan.createdByName}` : ''}
+              </DialogDescription>
+            </DialogHeader>
+            {viewPlan && (
+              <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <Badge className={STATUS_CONFIG[viewPlan.status]?.color}>
+                  <Badge variant="outline" className={`text-[10px] ${STATUS_CONFIG[viewPlan.status]?.color || ''}`}>
                     {STATUS_CONFIG[viewPlan.status]?.label}
                   </Badge>
-                  <span className="text-sm text-muted-foreground">
-                    Created by {typeof viewPlan.createdBy === 'object' ? viewPlan.createdBy.fullName : viewPlan.createdByName}
-                  </span>
                 </div>
 
                 {typeof viewPlan.patientId === 'object' && (
@@ -236,7 +234,7 @@ export default function DoctorTreatmentPlanPage() {
                 )}
 
                 {viewPlan.status === 'draft' && (
-                  <div className="flex gap-2 pt-2">
+                  <DialogFooter className="gap-2">
                     <Button
                       size="sm"
                       disabled={sendMutation.isPending}
@@ -256,12 +254,12 @@ export default function DoctorTreatmentPlanPage() {
                     >
                       Cancel Plan
                     </Button>
-                  </div>
+                  </DialogFooter>
                 )}
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
         {/* Cancel confirmation dialog */}
         <AlertDialog open={!!cancelConfirmPlan} onOpenChange={(open) => !open && setCancelConfirmPlan(null)}>
           <AlertDialogContent>

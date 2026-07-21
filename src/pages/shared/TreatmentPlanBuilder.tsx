@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { MedicationPicker } from '@/components/medications/MedicationPicker';
 import {
   buildSmartInstruction,
@@ -65,7 +65,7 @@ const patientIdStr = (visit: any) => {
 };
 
 interface TreatmentPlanBuilderProps {
-  /** Pre-selected visit ID (optional — if not provided, user selects from list) */
+  /** Pre-selected visit ID (optional â€” if not provided, user selects from list) */
   preselectedVisitId?: string;
   /** Pre-selected patient ID for plans not tied to a visit */
   preselectedPatientId?: string;
@@ -153,7 +153,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
     );
   }, [lisCatalog, labSearch]);
 
-  // Helper: extract units per dose from strengthPerDose string (e.g., "2 tablets" → 2)
+  // Helper: extract units per dose from strengthPerDose string (e.g., "2 tablets" â†’ 2)
   // Estimated total
   const estimatedTotal = useMemo(() => {
     return items.reduce((sum, item) => {
@@ -164,12 +164,12 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
       if (item.type === 'lab') {
         return sum + (item.testPrice || 0);
       }
-      // procedure, other — price is in amount
+      // procedure, other â€” price is in amount
       return sum + (item.amount || 0);
     }, 0);
   }, [items, allMedications]);
 
-  // ── Add handlers ───────────────────────────────────────────────────────
+  // â”€â”€ Add handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const addDrugOrIv = () => {
     if (!selectedMed) return toast.error('Select a medication');
@@ -252,7 +252,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
-  // ── Create mutation ────────────────────────────────────────────────────
+  // â”€â”€ Create mutation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const createMutation = useMutation({
     mutationFn: (sendNow: boolean) =>
@@ -283,7 +283,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
     },
   });
 
-  // ── Render ─────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
   const content = (
     <div className="space-y-4">
@@ -298,7 +298,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
             <SelectContent>
               {activeVisits.map((v: any) => (
                 <SelectItem key={v._id} value={v._id}>
-                  {v.visitNumber} — {patientName(v)}
+                  {v.visitNumber} â€” {patientName(v)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -608,41 +608,26 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
           Send to Reception
         </Button>
       </div>
-      <Dialog open={sendConfirmOpen} onOpenChange={setSendConfirmOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Send treatment plan to reception?</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 text-sm">
-            <p className="text-muted-foreground">
-              Reception will see this plan for payment and fulfilment.
-            </p>
-            <div className="rounded-lg border bg-muted/40 p-3">
-              <div className="flex justify-between">
-                <span>Items</span>
-                <span className="font-medium">{items.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Total estimate</span>
-                <span className="font-semibold">Le {estimatedTotal.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSendConfirmOpen(false)}>Cancel</Button>
-            <Button
-              onClick={() => {
-                setSendConfirmOpen(false);
-                createMutation.mutate(true);
-              }}
+      <AlertDialog open={sendConfirmOpen} onOpenChange={setSendConfirmOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send treatment plan to reception?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Reception will see this plan for payment and fulfilment. {items.length} items, total estimate Le {estimatedTotal.toLocaleString()}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={createMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
               disabled={createMutation.isPending}
+              onClick={(e) => { e.preventDefault(); setSendConfirmOpen(false); createMutation.mutate(true); }}
             >
               {createMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Send className="h-4 w-4 mr-1" />}
               Send
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 
@@ -658,7 +643,7 @@ export function TreatmentPlanBuilder({ preselectedVisitId, preselectedPatientId,
   );
 }
 
-// ── Drug/IV sub-form ───────────────────────────────────────────────────────
+// â”€â”€ Drug/IV sub-form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface DrugIvFormProps {
   type: 'drug' | 'iv';
@@ -677,162 +662,6 @@ interface DrugIvFormProps {
   onAdd: () => void;
 }
 
-function DrugIvForm({
-  type,
-  allMedications,
-  medsLoading,
-  selectedMed,
-  setSelectedMed,
-  strengthPerDose,
-  setStrengthPerDose,
-  dosesPerDay,
-  setDosesPerDay,
-  durationDays,
-  setDurationDays,
-  route,
-  setRoute,
-  onAdd,
-}: DrugIvFormProps) {
-  const [medFilter, setMedFilter] = useState('');
-
-  const filteredMeds = useMemo(() => {
-    if (!medFilter.trim()) return allMedications.slice(0, 50);
-    const q = medFilter.toLowerCase();
-    return allMedications.filter(
-      (m: any) => m.name.toLowerCase().includes(q) || (m.genericName || '').toLowerCase().includes(q)
-    );
-  }, [allMedications, medFilter]);
-
-  return (
-    <>
-      {/* Medication dropdown */}
-      <div>
-        <Label className="text-sm">{type === 'iv' ? 'IV Fluid / Medication' : 'Medication'}</Label>
-        <Select
-          value={selectedMed?._id || ''}
-          onValueChange={(val) => {
-            const med = allMedications.find((m: any) => m._id === val);
-            setSelectedMed(med || null);
-          }}
-        >
-          <SelectTrigger className="mt-1">
-            <SelectValue placeholder={medsLoading ? 'Loading medications...' : `Select ${type === 'iv' ? 'IV fluid' : 'medication'}...`} />
-          </SelectTrigger>
-          <SelectContent className="max-h-[300px]">
-            <div className="px-2 py-1.5 sticky top-0 bg-background z-10">
-              <div className="relative">
-                <Search className="absolute left-2 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                <Input
-                  placeholder="Filter medications..."
-                  value={medFilter}
-                  onChange={(e) => setMedFilter(e.target.value)}
-                  className="h-8 pl-7 text-sm"
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-              </div>
-            </div>
-            {filteredMeds.map((med: any) => (
-              <SelectItem key={med._id} value={med._id} className="text-sm">
-                <div className="flex items-center justify-between w-full gap-3">
-                  <span className="truncate">
-                    {med.name}
-                    {med.strength ? ` (${med.strength})` : ''}
-                  </span>
-                  <span className="text-muted-foreground text-xs shrink-0">
-                    {med.stockQuantity} in stock · Le {med.unitPrice?.toLocaleString()}
-                  </span>
-                </div>
-              </SelectItem>
-            ))}
-            {filteredMeds.length === 0 && !medsLoading && (
-              <div className="px-3 py-2 text-sm text-muted-foreground text-center">No medications found</div>
-            )}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {selectedMed && (
-        <div className="p-2 bg-muted rounded text-sm">
-          {selectedMed.name}
-          {selectedMed.strength ? ` (${selectedMed.strength})` : ''}
-          <span className="ml-2 text-muted-foreground">
-            Stock: {selectedMed.stockQuantity} | Le {selectedMed.unitPrice?.toLocaleString()}/unit
-          </span>
-        </div>
-      )}
-
-      {/* Regimen */}
-      <div className="grid grid-cols-3 gap-2">
-        <div>
-          <Label className="text-xs">Strength/Dose</Label>
-          <Input
-            className="mt-1"
-            value={strengthPerDose}
-            onChange={(e) => setStrengthPerDose(e.target.value)}
-            placeholder="e.g. 500mg"
-          />
-        </div>
-        <div>
-          <Label className="text-xs">Doses/Day</Label>
-          <Input
-            type="number"
-            className="mt-1"
-            value={dosesPerDay}
-            onChange={(e) => setDosesPerDay(Math.max(1, Number(e.target.value)))}
-            min={1}
-          />
-        </div>
-        <div>
-          <Label className="text-xs">Duration (days)</Label>
-          <Input
-            type="number"
-            className="mt-1"
-            value={durationDays}
-            onChange={(e) => setDurationDays(Math.max(1, Number(e.target.value)))}
-            min={1}
-          />
-        </div>
-      </div>
-
-      {type === 'drug' && (
-        <div>
-          <Label className="text-xs">Route</Label>
-          <Select value={route} onValueChange={setRoute}>
-            <SelectTrigger className="mt-1">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {ROUTE_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
-
-      {/* Quantity preview */}
-      <div className="text-xs text-muted-foreground">
-        {(() => {
-          const quantity = computeMedicationQuantity({ strengthPerDose, dosesPerDay, durationDays }, selectedMed || undefined);
-          const estimate = estimateMedicationDispense({ strengthPerDose, dosesPerDay, durationDays, quantity }, selectedMed || undefined);
-          return (
-            <>
-              Need: {quantity} {selectedMed ? getMedicationBaseUnit(selectedMed) : 'units'}; estimate:{' '}
-              {estimate.mode === 'pack' ? `${estimate.sellQuantity} ${estimate.sellUnitLabel}` : `${estimate.sellQuantity} ${estimate.sellUnitLabel}`} = Le {estimate.lineTotal.toLocaleString()}
-            </>
-          );
-        })()}
-      </div>
-
-      <Button onClick={onAdd} size="sm">
-        <Plus className="h-4 w-4 mr-1" /> Add {type === 'iv' ? 'IV' : 'Drug'}
-      </Button>
-    </>
-  );
-}
 
 function SmartDrugIvForm({
   type,

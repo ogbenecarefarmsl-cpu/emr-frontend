@@ -315,7 +315,7 @@ export function DoctorTopBar({
           <div className="flex h-full shrink-0 items-center gap-2 border-r border-slate-600 pr-3 text-xs font-semibold text-slate-200">
             <Activity className="h-4 w-4 text-teal-400" />
             <span className="hidden sm:inline">Active encounters</span>
-            <Badge className="h-5 min-w-5 bg-teal-700 px-1.5 text-[10px] text-white hover:bg-teal-700">{activePatients.length}</Badge>
+            <Badge className="h-5 min-w-5 bg-primary px-1.5 text-[10px] text-primary-foreground hover:bg-primary">{activePatients.length}</Badge>
           </div>
           <button type="button" className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-600 text-slate-300 hover:bg-slate-700 disabled:opacity-30 sm:flex" onClick={() => activeStripRef.current?.scrollBy({ left: -380, behavior: 'smooth' })} disabled={activePatients.length === 0} aria-label="Previous active encounters">
             <ChevronLeft className="h-4 w-4" />
@@ -453,7 +453,7 @@ export function DoctorTopBar({
             <FlaskConical className="w-3.5 h-3.5" />
             Results
             {resultsReady.length > 0 && (
-              <Badge className="h-4 min-w-4 text-[10px] bg-slate-700 hover:bg-slate-700 text-white px-1">
+              <Badge className="h-4 min-w-4 text-[10px] bg-primary hover:bg-primary text-primary-foreground px-1">
                 {resultsReady.length}
               </Badge>
             )}

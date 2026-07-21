@@ -12,14 +12,14 @@ import { useDoctorDashboard, useDoctorPatients, useAcceptPatient, useUpdateVisit
 import { useResults } from '@/hooks/useResults';
 import { useRealtimeResults } from '@/hooks/useRealtimeResults';
 import { useMyBranch } from '@/hooks/useBranch';
-import { LIS_LOGO_URL } from '@/lib/branding';
 
 // UI Components
 import { Badge } from '@/components/ui/badge';
 import { InsuranceStatusBadge } from '@/components/insurance/InsuranceStatusBadge';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,7 +31,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { TreatmentPlanBuilder } from '@/pages/shared/TreatmentPlanBuilder';
 import { PatientTimeline } from '@/components/doctor/PatientTimeline';
 import { DoctorTopBar } from '@/components/doctor/DoctorTopBar';
-import { ReportHeader } from '@/components/reports/ReportHeader';
 import { MedicationPicker } from '@/components/medications/MedicationPicker';
 import {
   buildSmartInstruction,
@@ -215,15 +214,17 @@ const patientAgeLabel = (patient: any) => {
 
 const statusLabel = (status?: string) => status?.replace(/_/g, ' ') || 'not set';
 
+// Unified outline + soft-fill styles — matches reception/nurse badges
 const visitStatusTone = (status?: string) => cn(
-  status === 'in_consultation' && 'bg-blue-500 text-white',
-  status === 'results_ready' && 'bg-green-500 text-white',
-  status === 'awaiting_lab' && 'bg-amber-500 text-white',
-  status === 'awaiting_pharmacy' && 'bg-purple-500 text-white',
-  status === 'awaiting_results' && 'bg-orange-500 text-white',
-  status === 'awaiting_dispensing' && 'bg-fuchsia-500 text-white',
-  status === 'awaiting_doctor_review' && 'bg-cyan-600 text-white',
-  status === 'admitted' && 'bg-blue-600 text-white',
+  'inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium capitalize',
+  status === 'in_consultation' && 'border-blue-200 bg-blue-50 text-blue-700',
+  status === 'results_ready' && 'border-emerald-200 bg-emerald-50 text-emerald-700',
+  status === 'awaiting_lab' && 'border-amber-200 bg-amber-50 text-amber-700',
+  status === 'awaiting_pharmacy' && 'border-purple-200 bg-purple-50 text-purple-700',
+  status === 'awaiting_results' && 'border-orange-200 bg-orange-50 text-orange-700',
+  status === 'awaiting_dispensing' && 'border-fuchsia-200 bg-fuchsia-50 text-fuchsia-700',
+  status === 'awaiting_doctor_review' && 'border-cyan-200 bg-cyan-50 text-cyan-700',
+  status === 'admitted' && 'border-rose-200 bg-rose-50 text-rose-700',
 );
 
 const formatClinicalDateTime = (value?: string) => {
@@ -1401,7 +1402,7 @@ export default function DoctorDashboard() {
       <div className={cn("flex h-full min-h-0 flex-1", isDirty && canWriteConsultation ? "pt-[160px] md:pt-[176px]" : "pt-[116px] md:pt-[132px]")}>
         {/* Main Workspace */}
         <main className="flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-          <div className="min-h-0 flex-1 overflow-y-auto bg-[#f4f7fa] p-3 md:p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-muted/40 p-3 md:p-4">
               {selectedVisit || searchedPatient ? (
                 <div className="flex min-h-0 flex-col gap-4 xl:grid xl:grid-cols-[minmax(0,2.4fr)_minmax(300px,0.85fr)] xl:items-start">
                   {/* Calm Patient Header */}
@@ -1423,9 +1424,9 @@ export default function DoctorDashboard() {
                                 {selectedVisit.triagePriority.replace('esi_', 'ESI ').replace(/_/g, ' ')}
                               </Badge>
                             )}
-                            {selectedVisit && isReadOnly && <Badge className="h-5 shrink-0 bg-amber-500 text-[10px] text-white hover:bg-amber-500">View-only</Badge>}
+                            {selectedVisit && isReadOnly && <Badge variant="outline" className="h-5 shrink-0 border-amber-300 bg-amber-50 text-[10px] text-amber-800 hover:bg-amber-50">View-only</Badge>}
                             <InsuranceStatusBadge
-                              insurance={contextPatient?.insurance}
+                              insurance={selectedVisit?.insurance ?? contextPatient?.insurance}
                               coverageType={selectedVisit?.consultationCoverageType}
                               compact
                               className="h-5 shrink-0 text-[10px]"
@@ -1521,7 +1522,7 @@ export default function DoctorDashboard() {
                                     <Button type="button" size="sm" variant="outline" className="bg-white" onClick={() => setActiveTab('lab-results')}>
                                       <FlaskConical className="mr-1.5 h-3.5 w-3.5" /> Results
                                     </Button>
-                                    <Button type="button" size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}>
+                                    <Button type="button" size="sm" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}>
                                       <Plus className="mr-1.5 h-3.5 w-3.5" /> Order Lab
                                     </Button>
                                      <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setShorthandInputs({}); setShorthandErrors({}); setPrescriptionModalOpen(true); }}>
@@ -1585,7 +1586,7 @@ export default function DoctorDashboard() {
                                 </div>
                               </div>
                               <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t py-3 xl:grid-cols-[42px_108px_minmax(0,1fr)] xl:items-center">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-950 text-white"><ClipboardList className="h-4 w-4" /></div>
+                                <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">D</div>
                                 <div className="space-y-2 xl:contents">
                                   <Label className="text-sm font-medium text-slate-950">Diagnosis</Label>
                                   <Input value={soapForm.diagnosis} onChange={(e) => setSoapForm({ ...soapForm, diagnosis: e.target.value })} placeholder="Primary diagnosis" className="h-9 border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
@@ -2135,7 +2136,7 @@ export default function DoctorDashboard() {
                                 <p className="text-xs text-muted-foreground truncate">{visit.chiefComplaint || 'Referred to you'}</p>
                               </div>
                             </div>
-                            <Badge className="bg-purple-500 text-white text-[10px] shrink-0">Referral</Badge>
+                            <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[10px] text-purple-700 shrink-0">Referral</Badge>
                           </div>
                         ))}
                         {incomingReferrals.length > 5 && (
@@ -2199,15 +2200,14 @@ export default function DoctorDashboard() {
             <div className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 md:px-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-xs text-muted-foreground">
-                  {isDirty ? <span className="font-medium text-amber-700">Unsaved changes</span> : <span>All changes saved</span>}
-                  {selectedVisit?.room && <span className="ml-3">Room: {selectedVisit.room}</span>}
+                  {selectedVisit?.room && <span>Room: {selectedVisit.room}</span>}
                 </div>
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="outline" onClick={handleSaveVitalsAndSOAP} disabled={updateVisit.isPending || isReadOnly || !canWriteConsultation}>
                     {updateVisit.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <Save className="mr-2 h-3.5 w-3.5" />}
                     Save Draft
                   </Button>
-                  <Button size="sm" className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation}>
+                  <Button size="sm" onClick={() => setConfirmCompleteOpen(true)} disabled={completeVisit.isPending || !canCloseEncounter || isReadOnly || !canWriteConsultation}>
                     {completeVisit.isPending ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <CheckCircle className="mr-2 h-3.5 w-3.5" />}
                     Complete & Next
                   </Button>
@@ -2222,19 +2222,13 @@ export default function DoctorDashboard() {
 
       {/* Lab Order Modal */}
       <Dialog open={labOrderModalOpen} onOpenChange={(open) => { if (!open) cancelEdit(); setLabOrderModalOpen(open); }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0">
-          <DialogHeader className="border-b bg-white px-6 pb-4 pt-6">
-            <ReportHeader laboratoryInfo={{
-              name: 'Harbour Medical Diagnostic',
-              logo: LIS_LOGO_URL,
-              address: branch?.address || '',
-              phone: branch?.phone || '',
-              email: branch?.email || '',
-              website: branch?.website,
-            }} />
-            <DialogTitle className="pt-2 text-left text-base">{editingOrder ? 'Edit LIS Test Request' : 'Create LIS Test Request'}</DialogTitle>
+<DialogContent className="max-w-3xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0 border-b px-6 pb-4 pt-6">
+            <DialogTitle className="text-left text-base">{editingOrder ? 'Edit LIS Test Request' : 'Create LIS Test Request'}</DialogTitle>
+            <DialogDescription className="text-left">Search the LIS catalog and add tests or panels to a new request.</DialogDescription>
           </DialogHeader>
-          <div className="grid grid-cols-1 gap-4 px-6 md:grid-cols-2">
+          <div className="flex-1 overflow-y-auto px-6">
+          <div className="grid grid-cols-1 gap-4 py-4 md:grid-cols-2">
             <div>
               <Label className="text-sm font-medium">Search Tests</Label>
               <Input value={searchTest} onChange={(e) => setSearchTest(e.target.value)} placeholder="Search by test name or code..." className="mt-1" />
@@ -2304,7 +2298,8 @@ export default function DoctorDashboard() {
               )}
             </div>
           </div>
-          <DialogFooter className="border-t bg-slate-50 px-6 py-4">
+          </div>
+          <DialogFooter className="shrink-0 border-t px-6 py-4">
             <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
             <Button onClick={() => editingOrder ? updateLabOrder.mutate() : createLabOrder.mutate()} disabled={(editingOrder ? updateLabOrder.isPending : createLabOrder.isPending) || selectedTests.length === 0}>
               {(editingOrder ? updateLabOrder.isPending : createLabOrder.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
@@ -2316,90 +2311,111 @@ export default function DoctorDashboard() {
 
       {/* Prescription Modal */}
       <Dialog open={prescriptionModalOpen} onOpenChange={(open) => { if (!open) cancelEdit(); setPrescriptionModalOpen(open); }}>
-        <DialogContent className="grid h-[100dvh] max-h-[100dvh] w-screen max-w-none grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden rounded-none bg-slate-50 p-0 sm:h-[94vh] sm:w-[96vw] sm:max-w-none sm:rounded-lg lg:w-[94vw] xl:w-[92vw]">
-          <DialogHeader className="border-b bg-white px-4 py-3 pr-12 sm:px-5">
-            <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <DialogTitle className="text-base">{editingPrescription ? 'Edit Prescription' : 'Prescribe Medication'}</DialogTitle>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {patientDisplayName(selectedVisit || ({ patientId: contextPatient } as Visit))} {contextPatient?.patientId ? `- ${contextPatient.patientId}` : ''} - doctor estimate only; reception finalizes packs.
+        <DialogContent className="flex h-[100dvh] max-h-[100dvh] w-screen max-w-none flex-col gap-0 overflow-hidden rounded-none border-0 bg-background p-0 shadow-2xl sm:h-[min(900px,92vh)] sm:w-[min(1100px,96vw)] sm:max-w-none sm:rounded-2xl sm:border">
+          <DialogHeader className="shrink-0 space-y-0 border-b border-slate-200 bg-white px-4 py-3 pr-14 sm:px-5">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <DialogTitle className="text-base font-semibold sm:text-lg">
+                  {editingPrescription ? 'Edit Prescription' : 'Prescribe Medication'}
+                </DialogTitle>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {patientDisplayName(selectedVisit || ({ patientId: contextPatient } as Visit))}
+                  {contextPatient?.patientId ? ` · ${contextPatient.patientId}` : ''}
+                  <span className="hidden sm:inline"> · Estimate only — reception finalizes packs</span>
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {contextPatient?.allergies?.length > 0 ? (
-                  <Badge variant="destructive" className="h-7 px-2.5 text-xs">
-                    <AlertTriangle className="mr-1.5 h-3.5 w-3.5" /> Allergy: {contextPatient.allergies.slice(0, 2).join(', ')}
+                  <Badge variant="destructive" className="h-7 max-w-[220px] truncate px-2.5 text-xs">
+                    <AlertTriangle className="mr-1.5 h-3.5 w-3.5 shrink-0" />
+                    <span className="truncate">Allergy: {contextPatient.allergies.slice(0, 2).join(', ')}</span>
                   </Badge>
                 ) : (
                   <Badge variant="outline" className="h-7 border-emerald-200 bg-emerald-50 px-2.5 text-xs text-emerald-700">
-                    <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> No allergies recorded
+                    <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> No allergies
                   </Badge>
                 )}
-                <Badge variant="outline" className="h-7 bg-white px-2.5 text-xs">{prescriptionItems.length} item{prescriptionItems.length !== 1 ? 's' : ''}</Badge>
+                <Badge variant="secondary" className="h-7 px-2.5 text-xs">
+                  {prescriptionItems.length} item{prescriptionItems.length !== 1 ? 's' : ''}
+                </Badge>
               </div>
             </div>
           </DialogHeader>
-          <div className="min-h-0 overflow-hidden p-3 sm:p-4">
+
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3 sm:p-4">
             {contextPatient?.allergies?.length > 0 && (
-              <div className="mb-3 flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
-                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-semibold text-red-800">Allergy alert</p>
-                  <p className="text-[11px] text-red-700">Patient allergies: <span className="font-medium">{contextPatient.allergies.join(', ')}</span>. Verify each medication before prescribing.</p>
-                </div>
+              <div className="flex shrink-0 items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                <p className="text-xs text-red-800">
+                  <span className="font-semibold">Allergy alert: </span>
+                  {contextPatient.allergies.join(', ')}. Verify each medication before prescribing.
+                </p>
               </div>
             )}
-            <div className="grid h-full min-h-0 grid-cols-1 gap-3 lg:grid-cols-[minmax(260px,0.28fr)_minmax(480px,1fr)]">
+
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[minmax(0,0.42fr)_minmax(0,0.58fr)]">
               <MedicationPicker
                 medications={filteredMedications}
                 loading={medicationsLoading}
                 searchTerm={searchMedication}
                 onSearchTermChange={setSearchMedication}
                 onSelect={(med) => addMedicationToPrescription(med as Medication)}
-                title="Search CAF / local drugs"
-                className="min-h-[260px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm lg:min-h-0"
-                listClassName="h-[32vh] lg:h-[calc(94vh-13rem)]"
+                allowOutOfStock
+                title="Search drugs"
+                className="min-h-[240px] rounded-xl border-slate-200 bg-white shadow-sm lg:min-h-0"
+                listClassName="h-full max-h-none"
               />
-              <div className="flex min-h-0 flex-col rounded-xl border border-slate-200 bg-white shadow-sm">
-                <div className="flex items-center justify-between border-b px-4 py-3">
-                  <div>
-                    <Label className="text-sm font-semibold text-slate-950">Prescription instructions</Label>
-                    <p className="text-[11px] text-muted-foreground">Select a drug, then write exactly how the patient should take it.</p>
+
+              <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex shrink-0 items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-slate-950">Prescription items</p>
+                    <p className="text-[11px] text-muted-foreground">Add a drug, set route, write dosing instructions.</p>
                   </div>
-                  <Badge variant="outline" className="bg-slate-50 text-[10px]">Reception prices</Badge>
+                  <Badge variant="outline" className="shrink-0 bg-slate-50 text-[10px]">Reception prices</Badge>
                 </div>
-                <ScrollArea className="min-h-0 flex-1">
+
+                <div className="min-h-0 flex-1 overflow-y-auto">
                   {prescriptionItems.length === 0 ? (
-                    <div className="flex h-full min-h-[280px] items-center justify-center p-6 text-center text-sm text-muted-foreground">
-                      Select a medication from the left to start.
+                    <div className="flex h-full min-h-[200px] flex-col items-center justify-center gap-2 p-8 text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                        <Pill className="h-5 w-5 text-slate-400" />
+                      </div>
+                      <p className="text-sm font-medium text-slate-700">No medications yet</p>
+                      <p className="max-w-[240px] text-xs text-muted-foreground">
+                        Search and select a drug on the left to add it here.
+                      </p>
                     </div>
                   ) : (
-                    <div className="space-y-2 p-3">
+                    <div className="space-y-2.5 p-3">
                       {prescriptionItems.map((item, index) => {
                         const duplicateCount = prescriptionItems.filter((c) => c.medicationId === item.medicationId).length;
                         const isDuplicate = duplicateCount > 1;
                         return (
-                          <div key={index} className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                            {/* Header: drug name + badges + remove */}
+                          <div key={index} className="rounded-xl border border-slate-200 bg-slate-50/40 p-3">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-1.5">
                                   <p className="truncate text-sm font-semibold text-slate-950">{item.medicationName}</p>
                                   {item.isControlled && <Badge variant="destructive" className="text-[10px]">Controlled</Badge>}
                                   {isDuplicate && <Badge variant="outline" className="border-amber-300 bg-amber-50 text-[10px] text-amber-700">Duplicate</Badge>}
-                                  {(item.route === 'intravenous' || item.route === 'intramuscular') && <Badge variant="outline" className="border-blue-200 bg-blue-50 text-[10px] text-blue-700">{item.route === 'intravenous' ? 'IV' : 'IM'}</Badge>}
+                                  {(item.route === 'intravenous' || item.route === 'intramuscular') && (
+                                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-[10px] text-blue-700">
+                                      {item.route === 'intravenous' ? 'IV' : 'IM'}
+                                    </Badge>
+                                  )}
                                   {item.__cafProduct && <Badge variant="outline" className="border-purple-200 bg-purple-50 text-[10px] text-purple-700">CAF</Badge>}
                                   {item.isPrn && <Badge variant="outline" className="border-orange-200 bg-orange-50 text-[10px] text-orange-700">PRN</Badge>}
                                 </div>
                               </div>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 shrink-0" onClick={() => removePrescriptionItem(index)}>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 shrink-0 p-0" onClick={() => removePrescriptionItem(index)}>
                                 <Trash2 className="h-3.5 w-3.5 text-red-500" />
                               </Button>
                             </div>
 
-                            <div className="mt-3 grid gap-2 md:grid-cols-[120px_minmax(0,1fr)]">
+                            <div className="mt-3 grid gap-2 sm:grid-cols-[110px_minmax(0,1fr)]">
                               <Select value={item.route || 'oral'} onValueChange={(v) => updatePrescriptionItem(index, 'route', v)}>
-                                <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectTrigger className="h-9 bg-white text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="oral">Oral</SelectItem>
                                   <SelectItem value="intravenous">IV</SelectItem>
@@ -2413,22 +2429,28 @@ export default function DoctorDashboard() {
                                 </SelectContent>
                               </Select>
                               <Textarea
-                                placeholder="Write instruction, including strength if needed. Example: 500mg BD for 5 days after food"
+                                placeholder="e.g. 500mg BD × 5 days after food"
                                 value={item.instructions || ''}
                                 onChange={(e) => updatePrescriptionItem(index, 'instructions', e.target.value)}
-                                className="min-h-[72px] resize-none text-sm"
+                                className="min-h-[72px] resize-none bg-white text-sm"
                               />
                             </div>
 
-                            {/* Pharmacist note (collapsible) */}
-                            <details className="mt-1.5 group">
-                              <summary className="cursor-pointer text-[10px] text-muted-foreground hover:text-slate-700 select-none">Pharmacist note</summary>
-                              <Input placeholder="Internal note for pharmacist" value={item.pharmacistNote || ''} onChange={(e) => updatePrescriptionItem(index, 'pharmacistNote', e.target.value)} className="mt-1 h-7 text-[11px]" />
+                            <details className="group mt-2">
+                              <summary className="cursor-pointer select-none text-[10px] text-muted-foreground hover:text-slate-700">
+                                Pharmacist note
+                              </summary>
+                              <Input
+                                placeholder="Internal note for pharmacist"
+                                value={item.pharmacistNote || ''}
+                                onChange={(e) => updatePrescriptionItem(index, 'pharmacistNote', e.target.value)}
+                                className="mt-1 h-8 bg-white text-[11px]"
+                              />
                             </details>
 
                             {!hasPrescriptionInstruction(item) && (
-                              <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] text-red-700">
-                                Instruction is required before sending to reception.
+                              <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5 text-[10px] text-red-700">
+                                Instruction required before creating prescription.
                               </div>
                             )}
                           </div>
@@ -2436,29 +2458,33 @@ export default function DoctorDashboard() {
                       })}
                     </div>
                   )}
-                </ScrollArea>
-                {/* Summary footer inside the right panel */}
+                </div>
+
                 {prescriptionItems.length > 0 && (
-                  <div className="border-t bg-slate-50 px-4 py-3">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Reception pricing</p>
-                        <p className="text-sm font-semibold text-slate-950">Priced at dispense</p>
-                      </div>
-                      <div className="text-right text-[11px] text-muted-foreground">
-                        <p>{prescriptionItems.length} medication{prescriptionItems.length !== 1 ? 's' : ''} prescribed</p>
-                        <p>Reception finalizes packs at dispense</p>
-                      </div>
-                    </div>
+                  <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-100 bg-slate-50 px-4 py-2.5">
+                    <p className="text-[11px] text-muted-foreground">
+                      {prescriptionItems.length} med{prescriptionItems.length !== 1 ? 's' : ''} · priced at dispense
+                    </p>
+                    <p className="text-[11px] font-medium text-slate-700">Reception finalizes packs</p>
                   </div>
                 )}
               </div>
             </div>
           </div>
-          <DialogFooter className="border-t bg-white px-4 py-3 sm:px-5">
+
+          <DialogFooter className="mt-0 shrink-0 gap-2 border-t border-slate-200 bg-white px-4 py-3 sm:flex-row sm:justify-end sm:space-x-0 sm:px-5">
             <Button variant="outline" onClick={cancelEdit}>Cancel</Button>
-            <Button className="bg-primary text-primary-foreground hover:bg-primary/90" onClick={() => editingPrescription ? updatePrescription.mutate() : createPrescription.mutate()} disabled={(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) || prescriptionItems.length === 0 || prescriptionItems.some(i => !hasPrescriptionInstruction(i))}>
-              {(editingPrescription ? updatePrescription.isPending : createPrescription.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+            <Button
+              onClick={() => (editingPrescription ? updatePrescription.mutate() : createPrescription.mutate())}
+              disabled={
+                (editingPrescription ? updatePrescription.isPending : createPrescription.isPending)
+                || prescriptionItems.length === 0
+                || prescriptionItems.some((i) => !hasPrescriptionInstruction(i))
+              }
+            >
+              {(editingPrescription ? updatePrescription.isPending : createPrescription.isPending)
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <Send className="mr-2 h-4 w-4" />}
               {editingPrescription ? 'Update Prescription' : 'Create Prescription'}
             </Button>
           </DialogFooter>
@@ -2470,6 +2496,7 @@ export default function DoctorDashboard() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Refer to Specialist</DialogTitle>
+            <DialogDescription>Notify another provider about this patient for follow-up care.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div>
@@ -2504,6 +2531,7 @@ export default function DoctorDashboard() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Admit Patient</DialogTitle>
+            <DialogDescription>Assign the patient to a ward and bed for inpatient care.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
@@ -2538,11 +2566,12 @@ export default function DoctorDashboard() {
 
       {/* Treatment Plan Modal */}
       <Dialog open={treatmentPlanOpen} onOpenChange={setTreatmentPlanOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogHeader className="shrink-0 border-b">
             <DialogTitle>Create Treatment Plan</DialogTitle>
+            <DialogDescription>Build a plan of drugs, IVs, labs, and procedures for this encounter.</DialogDescription>
           </DialogHeader>
-          <div className="py-4">
+          <div className="flex-1 overflow-y-auto py-4">
             <TreatmentPlanBuilder
               preselectedVisitId={selectedVisit?._id || selectedVisit?.id}
               preselectedPatientId={!selectedVisit ? contextPatient?._id : undefined}
@@ -2567,30 +2596,30 @@ export default function DoctorDashboard() {
       </Dialog>
 
       {/* Complete Visit Confirmation */}
-      <Dialog open={confirmCompleteOpen} onOpenChange={setConfirmCompleteOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Complete this visit?</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              This will close the encounter for <span className="font-semibold text-foreground">{patientDisplayName(selectedVisit)}</span> and advance to the next waiting patient.
-            </p>
-            {closureBlockers.length > 0 && (
-              <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
-                {closureBlockers.length === 1 ? closureBlockers[0] : `${closureBlockers.length} blocker(s) remain`}
-              </div>
-            )}
-            <p className="text-xs text-muted-foreground">SOAP notes will be signed and locked.</p>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConfirmCompleteOpen(false)}>Cancel</Button>
-            <Button onClick={() => { setConfirmCompleteOpen(false); handleCompleteAndNext(); }} disabled={completeVisit.isPending || !canCloseEncounter} className="bg-primary hover:bg-primary/90 text-primary-foreground">
+      <AlertDialog open={confirmCompleteOpen} onOpenChange={setConfirmCompleteOpen}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Complete this visit?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will close the encounter for <span className="font-semibold text-foreground">{patientDisplayName(selectedVisit)}</span> and advance to the next waiting patient. SOAP notes will be signed and locked.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {closureBlockers.length > 0 && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
+              {closureBlockers.length === 1 ? closureBlockers[0] : `${closureBlockers.length} blocker(s) remain`}
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={completeVisit.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={completeVisit.isPending || !canCloseEncounter}
+              onClick={(e) => { e.preventDefault(); setConfirmCompleteOpen(false); handleCompleteAndNext(); }}
+            >
               {completeVisit.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}Complete & Next
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* All My Patients Modal */}
       <Dialog open={allPatientsOpen} onOpenChange={setAllPatientsOpen}>
@@ -2601,6 +2630,7 @@ export default function DoctorDashboard() {
               All My Patients
               <Badge variant="secondary" className="ml-1">{doctorPatientsTotal}</Badge>
             </DialogTitle>
+            <DialogDescription>Jump to any patient you have seen, with their latest visit attached.</DialogDescription>
           </DialogHeader>
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
@@ -2739,7 +2769,7 @@ export default function DoctorDashboard() {
           <DialogFooter className="flex-row gap-2 sm:gap-2">
             <Button variant="outline" onClick={() => { setDiscardConfirmOpen(false); setPendingNavigation(null); }}>Stay</Button>
             <Button variant="outline" className="text-red-600 hover:text-red-700" onClick={confirmDiscardAndProceed}>Discard & Switch</Button>
-            <Button className="bg-amber-500 hover:bg-amber-600 text-white" onClick={saveAndProceed} disabled={updateVisit.isPending}>
+            <Button onClick={saveAndProceed} disabled={updateVisit.isPending}>
               {updateVisit.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} Save & Switch
             </Button>
           </DialogFooter>

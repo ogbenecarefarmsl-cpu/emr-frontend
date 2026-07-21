@@ -27,8 +27,17 @@ interface Patient {
   currentMedications?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
-  insuranceProvider?: string;
-  insurancePolicyNumber?: string;
+  insurance?: {
+    programCode?: string;
+    subEntityCode?: string;
+    memberNumber?: string;
+    memberName?: string;
+    responsiblePerson?: string;
+    responsiblePhone?: string;
+    responsibleAddress?: string;
+    authorizerName?: string;
+    authorizerPhone?: string;
+  };
   corporateEmployer?: string;
   corporateStaffId?: string;
   createdAt: string;
@@ -60,8 +69,17 @@ interface PatientCreate {
   currentMedications?: string;
   emergencyContactName?: string;
   emergencyContactPhone?: string;
-  insuranceProvider?: string;
-  insurancePolicyNumber?: string;
+  insurance?: {
+    programCode?: string;
+    subEntityCode?: string;
+    memberNumber?: string;
+    memberName?: string;
+    responsiblePerson?: string;
+    responsiblePhone?: string;
+    responsibleAddress?: string;
+    authorizerName?: string;
+    authorizerPhone?: string;
+  };
   corporateEmployer?: string;
   corporateStaffId?: string;
 }

@@ -34,18 +34,18 @@ export default function InsuranceManagementPage() {
   const [expandedProgram, setExpandedProgram] = useState<string | null>(null);
   const [showProgramDialog, setShowProgramDialog] = useState(false);
   const [editingProgram, setEditingProgram] = useState<InsuranceProgram | null>(null);
-  const [programForm, setProgramForm] = useState({ code: '', name: '', contactPerson: '', contactPhone: '', contactEmail: '', address: '', notes: '' });
+  const [programForm, setProgramForm] = useState({ code: '', name: '', contactPerson: '', contactPhone: '', contactEmail: '', address: '', paymentTerms: '' });
 
   const [showSubDialog, setShowSubDialog] = useState(false);
   const [editingSub, setEditingSub] = useState<InsuranceSubEntity | null>(null);
   const [subForProgram, setSubForProgram] = useState<string>('');
-  const [subForm, setSubForm] = useState({ code: '', name: '', contactPerson: '', contactPhone: '', contactEmail: '', notes: '' });
+  const [subForm, setSubForm] = useState({ code: '', name: '', contactPerson: '', contactPhone: '', address: '' });
 
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'program' | 'sub'; id: string; name: string } | null>(null);
 
   const openCreateProgram = () => {
     setEditingProgram(null);
-    setProgramForm({ code: '', name: '', contactPerson: '', contactPhone: '', contactEmail: '', address: '', notes: '' });
+    setProgramForm({ code: '', name: '', contactPerson: '', contactPhone: '', contactEmail: '', address: '', paymentTerms: '' });
     setShowProgramDialog(true);
   };
 
@@ -58,7 +58,7 @@ export default function InsuranceManagementPage() {
       contactPhone: prog.contactPhone || '',
       contactEmail: prog.contactEmail || '',
       address: prog.address || '',
-      notes: prog.notes || '',
+      paymentTerms: prog.paymentTerms || prog.notes || '',
     });
     setShowProgramDialog(true);
   };
@@ -68,12 +68,21 @@ export default function InsuranceManagementPage() {
       toast.error('Code and Name are required');
       return;
     }
+    const payload = {
+      code: programForm.code.trim(),
+      name: programForm.name.trim(),
+      contactPerson: programForm.contactPerson || undefined,
+      contactPhone: programForm.contactPhone || undefined,
+      contactEmail: programForm.contactEmail || undefined,
+      address: programForm.address || undefined,
+      paymentTerms: programForm.paymentTerms || undefined,
+    };
     try {
       if (editingProgram) {
-        await updateProgram.mutateAsync({ id: editingProgram._id, data: programForm });
+        await updateProgram.mutateAsync({ id: editingProgram._id, data: payload });
         toast.success('Program updated');
       } else {
-        await createProgram.mutateAsync(programForm);
+        await createProgram.mutateAsync(payload);
         toast.success('Program created');
       }
       setShowProgramDialog(false);
@@ -85,7 +94,7 @@ export default function InsuranceManagementPage() {
   const openCreateSub = (programId: string) => {
     setEditingSub(null);
     setSubForProgram(programId);
-    setSubForm({ code: '', name: '', contactPerson: '', contactPhone: '', contactEmail: '', notes: '' });
+    setSubForm({ code: '', name: '', contactPerson: '', contactPhone: '', address: '' });
     setShowSubDialog(true);
   };
 
@@ -97,8 +106,7 @@ export default function InsuranceManagementPage() {
       name: sub.name,
       contactPerson: sub.contactPerson || '',
       contactPhone: sub.contactPhone || '',
-      contactEmail: sub.contactEmail || '',
-      notes: sub.notes || '',
+      address: sub.address || '',
     });
     setShowSubDialog(true);
   };
@@ -108,12 +116,19 @@ export default function InsuranceManagementPage() {
       toast.error('Code and Name are required');
       return;
     }
+    const payload = {
+      code: subForm.code.trim(),
+      name: subForm.name.trim(),
+      contactPerson: subForm.contactPerson || undefined,
+      contactPhone: subForm.contactPhone || undefined,
+      address: subForm.address || undefined,
+    };
     try {
       if (editingSub) {
-        await updateSub.mutateAsync({ id: editingSub._id, data: subForm });
+        await updateSub.mutateAsync({ id: editingSub._id, data: payload });
         toast.success('Sub-entity updated');
       } else {
-        await createSub.mutateAsync({ programId: subForProgram, data: subForm });
+        await createSub.mutateAsync({ programId: subForProgram, data: payload });
         toast.success('Sub-entity created');
       }
       setShowSubDialog(false);
@@ -337,11 +352,11 @@ export default function InsuranceManagementPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label>Notes</Label>
+                <Label>Payment terms</Label>
                 <Input
-                  value={programForm.notes}
-                  onChange={(e) => setProgramForm({ ...programForm, notes: e.target.value })}
-                  placeholder="Any additional notes"
+                  value={programForm.paymentTerms}
+                  onChange={(e) => setProgramForm({ ...programForm, paymentTerms: e.target.value })}
+                  placeholder="e.g. Net 30, monthly batch"
                 />
               </div>
             </div>
@@ -392,30 +407,20 @@ export default function InsuranceManagementPage() {
                   placeholder="Primary contact at this organization"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>Contact Phone</Label>
-                  <Input
-                    value={subForm.contactPhone}
-                    onChange={(e) => setSubForm({ ...subForm, contactPhone: e.target.value })}
-                    placeholder="+232..."
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Contact Email</Label>
-                  <Input
-                    value={subForm.contactEmail}
-                    onChange={(e) => setSubForm({ ...subForm, contactEmail: e.target.value })}
-                    placeholder="email@example.com"
-                  />
-                </div>
+              <div className="space-y-1">
+                <Label>Contact Phone</Label>
+                <Input
+                  value={subForm.contactPhone}
+                  onChange={(e) => setSubForm({ ...subForm, contactPhone: e.target.value })}
+                  placeholder="+232..."
+                />
               </div>
               <div className="space-y-1">
-                <Label>Notes</Label>
+                <Label>Address</Label>
                 <Input
-                  value={subForm.notes}
-                  onChange={(e) => setSubForm({ ...subForm, notes: e.target.value })}
-                  placeholder="Any additional notes"
+                  value={subForm.address}
+                  onChange={(e) => setSubForm({ ...subForm, address: e.target.value })}
+                  placeholder="Organization address"
                 />
               </div>
             </div>
