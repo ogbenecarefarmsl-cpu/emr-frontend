@@ -320,7 +320,6 @@ export default function RegisterPatient() {
                     setInsuranceForm(prev => ({
                       ...prev,
                       memberName: prev.memberName || fullName,
-                      responsiblePerson: prev.responsiblePerson || fullName,
                       responsiblePhone: prev.responsiblePhone || formData.phone || '',
                     }));
                   }
