@@ -35,7 +35,7 @@ const EMPTY_VITALS = {
 export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageDialogProps) {
   const qc = useQueryClient();
   const completeTriage = useCompleteTriage();
-  const { data: doctors = [], isLoading: doctorsLoading } = useDoctors();
+  const { data: doctors = [], isLoading: doctorsLoading, error: doctorsError } = useDoctors();
   const [vitals, setVitals] = useState(EMPTY_VITALS);
   const [triageEsiLevel, setTriageEsiLevel] = useState('3');
   const [triageNotes, setTriageNotes] = useState('');
@@ -239,22 +239,31 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
 
           <div>
             <Label className="text-sm">Send to Doctor</Label>
-            <Select value={doctorId} onValueChange={setDoctorId}>
-              <SelectTrigger className="mt-1">
-                <SelectValue placeholder="Select receiving doctor" />
-              </SelectTrigger>
-              <SelectContent>
-                {availableDoctors.map((doctor: any) => (
-                  <SelectItem key={doctor._id} value={doctor._id}>
-                    {doctor.fullName}
-                    {doctor.specialty ? ` - ${String(doctor.specialty).replace(/_/g, ' ')}` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground mt-1">
-              {doctorsLoading ? 'Loading doctors...' : `${availableDoctors.length} active doctor${availableDoctors.length === 1 ? '' : 's'} available`}
-            </p>
+            {doctorsError ? (
+              <div className="mt-1 p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-700 font-medium">Unable to load doctors</p>
+                <p className="text-xs text-red-600 mt-1">Check that your account is assigned to a branch. Contact an administrator.</p>
+              </div>
+            ) : (
+              <>
+                <Select value={doctorId} onValueChange={setDoctorId}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue placeholder="Select receiving doctor" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableDoctors.map((doctor: any) => (
+                      <SelectItem key={doctor._id} value={doctor._id}>
+                        {doctor.fullName}
+                        {doctor.specialty ? ` - ${String(doctor.specialty).replace(/_/g, ' ')}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {doctorsLoading ? 'Loading doctors...' : `${availableDoctors.length} active doctor${availableDoctors.length === 1 ? '' : 's'} available`}
+                </p>
+              </>
+            )}
           </div>
 
           <div>
@@ -275,7 +284,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
           </Button>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button onClick={submitTriage} disabled={completeTriage.isPending || doctorsLoading || !doctorId || availableDoctors.length === 0}>
+            <Button onClick={submitTriage} disabled={completeTriage.isPending || doctorsLoading || doctorsError || !doctorId || availableDoctors.length === 0}>
               {completeTriage.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
               Send to Selected Doctor
             </Button>
