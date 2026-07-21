@@ -7,12 +7,13 @@ import { useCompleteTriage } from '@/hooks/useVisits';
 import { admissionsAPI } from '@/services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Activity, AlertCircle, BedDouble, Heart, Loader2, Send } from 'lucide-react';
+import { Activity, AlertCircle, BedDouble, Heart, Loader2, Send, FlaskConical } from 'lucide-react';
 import { ESI_LEVELS, checkAbnormalVitals, patientName, triagePriorityFromEsi } from './nurseUtils';
 
 interface TriageDialogProps {
@@ -50,6 +51,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
     diagnosis: '',
     notes: '',
   });
+  const [rapidTests, setRapidTests] = useState<{ malaria: boolean; typhoid: boolean }>({ malaria: false, typhoid: false });
 
   useEffect(() => {
     if (!visit || !open) return;
@@ -60,6 +62,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
     setVitals(EMPTY_VITALS);
     setAdmitOpen(false);
     setIsAdmitting(false);
+    setRapidTests({ malaria: false, typhoid: false });
     setAdmitForm({
       wardType: 'general',
       bedNumber: '',
@@ -95,6 +98,9 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
           doctorId,
           triageAlert: alerts.length > 0,
           triageAlerts: alerts,
+          rapidTestsRequested: (rapidTests.malaria || rapidTests.typhoid)
+            ? (['malaria', 'typhoid'] as const).filter(t => rapidTests[t])
+            : undefined,
         },
       });
       toast.success('Triage complete - patient sent to selected doctor');
@@ -267,7 +273,36 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
           </div>
 
           <div>
-            <Label className="text-sm">Triage Notes</Label>
+            <Label className="text-sm flex items-center gap-1.5">
+              <FlaskConical className="w-3.5 h-3.5" />
+              Rapid Tests (bedside)
+            </Label>
+            <p className="text-xs text-muted-foreground mt-0.5 mb-2">Select tests to run now. Results recorded immediately.</p>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rdtMalaria"
+                  checked={rapidTests.malaria}
+                  onCheckedChange={(c) => setRapidTests(prev => ({ ...prev, malaria: !!c }))}
+                />
+                <label htmlFor="rdtMalaria" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Malaria RDT
+                </label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="rdtTyphoid"
+                  checked={rapidTests.typhoid}
+                  onCheckedChange={(c) => setRapidTests(prev => ({ ...prev, typhoid: !!c }))}
+                />
+                <label htmlFor="rdtTyphoid" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Typhoid RDT
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div>
             <Textarea
               value={triageNotes}
               onChange={(e) => setTriageNotes(e.target.value)}

@@ -65,8 +65,7 @@ export default function VisitRegistration() {
   const [temperature, setTemperature] = useState('');
   const [specialistId, setSpecialistId] = useState('');
   const [procedureType, setProcedureType] = useState('');
-  const [wantsMalariaTest, setWantsMalariaTest] = useState(false);
-  const [wantsTyphoidTest, setWantsTyphoidTest] = useState(false);
+
   const [paymentMethod, setPaymentMethod] = useState('cash');
 
   const { data: doctors = [] } = useDoctors();
@@ -147,11 +146,8 @@ export default function VisitRegistration() {
 
   useEffect(() => {
     const serviceFee = selectedService.fee;
-    let extraFee = 0;
-    if (wantsMalariaTest) extraFee += servicePriceMap.rapid_malaria ?? 50;
-    if (wantsTyphoidTest) extraFee += servicePriceMap.rapid_typhoid ?? 50;
-    setConsultationFee(String(serviceFee + extraFee));
-  }, [selectedService.fee, servicePriceMap, wantsMalariaTest, wantsTyphoidTest]);
+    setConsultationFee(String(serviceFee));
+  }, [selectedService.fee, servicePriceMap]);
 
   const handleSubmit = async () => {
     if (!selectedPatient) {
@@ -179,10 +175,6 @@ export default function VisitRegistration() {
         return;
       }
 
-      const rapidTestsRequested: ('malaria' | 'typhoid')[] = [];
-      if (wantsMalariaTest) rapidTestsRequested.push('malaria');
-      if (wantsTyphoidTest) rapidTestsRequested.push('typhoid');
-
       const visit = await createVisit.mutateAsync({
         patientId: selectedPatient._id || selectedPatient.id,
         visitType: visitType as any,
@@ -192,14 +184,12 @@ export default function VisitRegistration() {
         notes: [
           `Service: ${selectedService.label}`,
           procedureType ? `Procedure: ${procedureType}` : undefined,
-          rapidTestsRequested.length > 0 ? `Rapid tests requested: ${rapidTestsRequested.join(', ')}` : undefined,
           notes.trim() || undefined,
         ].filter(Boolean).join('\n'),
         temperature: temperature ? parseFloat(temperature) : undefined,
         serviceType: selectedService.id,
         specialistId: selectedService.flag === 'specialist' ? specialistId : undefined,
         procedureType: selectedService.flag === 'procedure' ? procedureType : undefined,
-        rapidTestsRequested: rapidTestsRequested.length > 0 ? rapidTestsRequested : undefined,
       });
 
       if ((visit as any).consultationFeeWaived) {
@@ -502,32 +492,6 @@ export default function VisitRegistration() {
                     />
                   </div>
                 )}
-
-                {(wantsMalariaTest || wantsTyphoidTest) && (
-                  <div className="col-span-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                    <strong>Rapid test workflow:</strong> After vitals, the nurse will run the bedside
-                    rapid test and record the result on the visit. You will not need to route a lab order.
-                  </div>
-                )}
-
-                {/* Rapid Tests check */}
-                <div className="col-span-2 space-y-2 mt-2">
-                  <Label>Rapid Tests (done by Nurse at Triage)</Label>
-                  <div className="flex items-center gap-6">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="rapidMalaria" checked={wantsMalariaTest} onCheckedChange={(c) => setWantsMalariaTest(!!c)} />
-                      <label htmlFor="rapidMalaria" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Rapid Malaria (+{servicePriceMap.rapid_malaria ?? 50})
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox id="rapidTyphoid" checked={wantsTyphoidTest} onCheckedChange={(c) => setWantsTyphoidTest(!!c)} />
-                      <label htmlFor="rapidTyphoid" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Rapid Typhoid (+{servicePriceMap.rapid_typhoid ?? 50})
-                      </label>
-                    </div>
-                  </div>
-                </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="visitType">Visit Type</Label>
