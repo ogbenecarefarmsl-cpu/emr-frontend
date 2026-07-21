@@ -285,6 +285,12 @@ export default function DoctorDashboard() {
   const queryClient = useQueryClient();
   useRealtimeResults();
 
+  const autoResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const el = e.target;
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+  };
+
   const { data: dashboardData, isLoading, isError: dashboardError, refetch: refetchDashboard } = useDoctorDashboard();
   const acceptPatient = useAcceptPatient();
   const updateVisit = useUpdateVisit();
@@ -616,6 +622,15 @@ export default function DoctorDashboard() {
       setActiveTab(selectedVisit.status === 'results_ready' ? 'lab-results' : 'soap');
     }
   }, [selectedVisit?._id]);
+
+  // Auto-resize SOAP textareas when data loads or form resets
+  useEffect(() => {
+    const textareas = document.querySelectorAll<HTMLTextAreaElement>('.soap-autosize');
+    textareas.forEach((el) => {
+      el.style.height = 'auto';
+      el.style.height = el.scrollHeight + 'px';
+    });
+  }, [soapForm.subjective, soapForm.objective, soapForm.assessment, soapForm.plan]);
 
   // Handlers
   const handleSelectSearchPatient = (patient: any) => {
@@ -1554,14 +1569,14 @@ export default function DoctorDashboard() {
                                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">S</div>
                                   <div className="space-y-2 xl:contents">
                                     <Label className="text-sm font-medium text-slate-950">Subjective</Label>
-                                    <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({ ...soapForm, subjective: e.target.value })} placeholder="Patient history, symptoms, relevant negatives..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                    <Textarea value={soapForm.subjective} onChange={(e) => setSoapForm({ ...soapForm, subjective: e.target.value })} onInput={autoResize} placeholder="Patient history, symptoms, relevant negatives..." rows={3} className="soap-autosize min-h-[76px] border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
                                   </div>
                                 </div>
                                 <div className="grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t py-3 xl:grid-cols-[42px_108px_minmax(0,1fr)_112px] xl:items-center">
                                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">O</div>
                                   <div className="space-y-2 xl:contents">
                                     <Label className="text-sm font-medium text-slate-950">Objective</Label>
-                                    <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({ ...soapForm, objective: e.target.value })} placeholder="Exam findings, observations, reviewed results..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                    <Textarea value={soapForm.objective} onChange={(e) => setSoapForm({ ...soapForm, objective: e.target.value })} onInput={autoResize} placeholder="Exam findings, observations, reviewed results..." rows={3} className="soap-autosize min-h-[76px] border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
                                   </div>
                                 </div>
                               </div>
@@ -1606,7 +1621,7 @@ export default function DoctorDashboard() {
                                   <div className="flex h-9 w-9 items-center justify-center rounded-full bg-teal-700 text-sm font-bold text-white">A</div>
                                   <div className="space-y-2 xl:contents">
                                     <Label className="text-sm font-medium text-slate-950">Assessment</Label>
-                                    <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({ ...soapForm, assessment: e.target.value })} placeholder="Clinical impression and differential..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                    <Textarea value={soapForm.assessment} onChange={(e) => setSoapForm({ ...soapForm, assessment: e.target.value })} onInput={autoResize} placeholder="Clinical impression and differential..." rows={3} className="soap-autosize min-h-[76px] border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
                                   </div>
                                 </div>
                                 <div className="order-2 grid grid-cols-[36px_minmax(0,1fr)] gap-3 border-t py-3 xl:grid-cols-[42px_108px_minmax(0,1fr)_112px] xl:items-center">
@@ -1643,7 +1658,7 @@ export default function DoctorDashboard() {
                                         )}
                                       </div>
                                     </div>
-                                    <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({ ...soapForm, plan: e.target.value })} placeholder="Treatment plan, follow-up, counselling..." rows={3} className="min-h-[76px] resize-y border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
+                                    <Textarea value={soapForm.plan} onChange={(e) => setSoapForm({ ...soapForm, plan: e.target.value })} onInput={autoResize} placeholder="Treatment plan, follow-up, counselling..." rows={3} className="soap-autosize min-h-[76px] border-muted-foreground/20 bg-white text-sm" disabled={isReadOnly || !canWriteConsultation} />
                                     {currentVisitPlans.length > 0 && (
                                       <div className="space-y-1.5 xl:col-start-3">
                                         {currentVisitPlans.map((plan: any) => (
