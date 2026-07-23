@@ -4,7 +4,7 @@ import { useAuth } from '@/context/AuthContext';
 import {
   useInsurancePrograms, useInsuranceLookup,
   useCreateInsuranceProgram, useUpdateInsuranceProgram, useDeleteInsuranceProgram,
-  useSubEntities, useCreateSubEntity, useUpdateSubEntity, useDeleteSubEntity,
+  useCreateSubEntity, useUpdateSubEntity, useDeleteSubEntity,
   InsuranceProgram, InsuranceSubEntity,
 } from '@/hooks/useInsurance';
 import { Button } from '@/components/ui/button';

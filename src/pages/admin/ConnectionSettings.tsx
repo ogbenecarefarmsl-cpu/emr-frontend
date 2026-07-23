@@ -216,21 +216,15 @@ export default function ConnectionSettings() {
 
   return (
     <RoleLayout title="Connection Settings" subtitle="Configure backend servers and connection behavior" role="admin" userName={profile?.fullName || profile?.email}>
-    <div className="container mx-auto p-6 max-w-4xl">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Connection Settings</h1>
-        <p className="text-gray-600 mt-2">
-          Configure backend servers and connection behavior
-        </p>
-      </div>
+    <div className="max-w-4xl space-y-6">
 
       {/* Current Status */}
-      <div className="mb-6">
+      <div>
         <ConnectionStatusDetailed />
       </div>
 
       {/* Sync Status */}
-      <Alert className="mb-6 bg-blue-50 border-blue-200">
+      <Alert className="bg-blue-50 border-blue-200">
         <Users className="h-4 w-4 text-blue-600" />
         <AlertDescription className="text-blue-800">
           <strong>Centralized Configuration:</strong> Changes made here will automatically sync to
@@ -244,7 +238,7 @@ export default function ConnectionSettings() {
       </Alert>
 
       {/* Local Network Server */}
-      <Card className="mb-6">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Server className="w-5 h-5" />
@@ -326,7 +320,7 @@ export default function ConnectionSettings() {
       </Card>
 
       {/* Cloud Server */}
-      <Card className="mb-6">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Cloud className="w-5 h-5" />
@@ -400,7 +394,7 @@ export default function ConnectionSettings() {
       </Card>
 
       {/* Advanced Settings */}
-      <Card className="mb-6">
+      <Card>
         <CardHeader>
           <CardTitle>Advanced Settings</CardTitle>
           <CardDescription>Fine-tune connection monitoring behavior</CardDescription>

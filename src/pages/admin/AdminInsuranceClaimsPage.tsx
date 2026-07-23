@@ -4,9 +4,9 @@ import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,7 +16,7 @@ import { insuranceClaimsAPI } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import {
   Shield, Loader2, DollarSign, FileText, CheckCircle, XCircle,
-  Clock, Filter, Search, Eye, ChevronDown, ChevronUp, ArrowLeft
+  Clock, Filter, Search, Eye
 } from 'lucide-react';
 
 const STATUS_COLORS: Record<string, string> = {
@@ -38,7 +38,6 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function AdminInsuranceClaimsPage() {
-  const [activeTab, setActiveTab] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
   const [programFilter, setProgramFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -415,6 +414,7 @@ export default function AdminInsuranceClaimsPage() {
               <Shield className="h-5 w-5" />
               Claim Details
             </DialogTitle>
+            <DialogDescription>View claim details and line items.</DialogDescription>
           </DialogHeader>
           {selectedClaim && (
             <div className="space-y-4">
@@ -522,6 +522,7 @@ export default function AdminInsuranceClaimsPage() {
               <CheckCircle className="h-5 w-5" />
               Approve Claim
             </DialogTitle>
+            <DialogDescription>Approve this insurance claim for payment.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -581,6 +582,7 @@ export default function AdminInsuranceClaimsPage() {
               <XCircle className="h-5 w-5" />
               Reject Claim
             </DialogTitle>
+            <DialogDescription>Reject this insurance claim.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>

@@ -150,7 +150,6 @@ export default function UserManagementPage() {
       setShowCreateDialog(false);
 
     } catch (error: unknown) {
-      console.error('Error creating user:', error);
       const axiosError = error as { response?: { data?: { message?: string } }; message?: string };
       if (axiosError.response?.data?.message?.includes('duplicate') || axiosError.response?.data?.message?.includes('already exists')) {
         toast.error('A user with this email already exists');
@@ -193,6 +192,7 @@ export default function UserManagementPage() {
           email: editEmail.trim(),
           department: editDepartment.trim() || undefined,
           branchId: editBranchId === 'unassigned' ? null : editBranchId,
+          isActive: editIsActive,
         },
       });
       toast.success(`User ${editFullName} updated`);
@@ -251,7 +251,7 @@ export default function UserManagementPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-card border rounded-lg p-4">
           <p className="text-sm text-muted-foreground">Total Users</p>
           <p className="text-2xl font-bold">{visibleUsers.length}</p>
@@ -301,7 +301,8 @@ export default function UserManagementPage() {
             <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
-          <table className="data-table">
+          <div className="overflow-x-auto">
+            <table className="data-table">
             <thead>
               <tr>
                 <th>User</th>
@@ -429,6 +430,7 @@ export default function UserManagementPage() {
               )}
             </tbody>
           </table>
+          </div>
         )}
       </div>
 
@@ -492,11 +494,7 @@ export default function UserManagementPage() {
                 <Switch checked={editIsActive} onCheckedChange={setEditIsActive} />
               </div>
             </div>
-            {editIsActive !== true && (
-              <p className="text-xs text-amber-600">
-                Note: Account status changes are not yet wired through the edit dialog — use the deactivation button in the table to mark inactive.
-              </p>
-            )}
+
           </div>
 
           <DialogFooter>
@@ -561,6 +559,7 @@ export default function UserManagementPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Assign Role to {selectedUser?.full_name}</DialogTitle>
+            <DialogDescription>Assign a new role to this user.</DialogDescription>
           </DialogHeader>
 
           <div className="py-4">
@@ -664,6 +663,7 @@ export default function UserManagementPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create New User</DialogTitle>
+            <DialogDescription>Create a new user account.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">

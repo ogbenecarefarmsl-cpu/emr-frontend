@@ -7,14 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { insuranceBlocksAPI, insuranceAPI, patientsAPI } from '@/services/api';
 import { useAuth } from '@/context/AuthContext';
 import {
   ShieldOff, Loader2, Plus, Search, Filter, Ban, CheckCircle, Trash2, Eye,
-  AlertTriangle, UserCheck, X
+  AlertTriangle, UserCheck
 } from 'lucide-react';
 
 const REASON_OPTIONS = [
@@ -40,7 +40,6 @@ export default function InsuranceBlockListPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [programFilter, setProgramFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('active');
-  const [showInactive, setShowInactive] = useState(false);
   const queryClient = useQueryClient();
   const { profile, hasRole } = useAuth();
 
@@ -173,14 +172,7 @@ export default function InsuranceBlockListPage() {
   return (
     <RoleLayout title="Insurance Block List" subtitle="Manage patients blocked from insurance billing" role={profile?.role || 'admin'} userName={profile?.fullName || profile?.email}>
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ShieldOff className="h-6 w-6 text-red-600" />
-            Insurance Block List
-          </h1>
-          <p className="text-muted-foreground">Manage patients blocked from insurance billing</p>
-        </div>
+      <div className="flex items-center justify-end">
         <Button className="bg-red-600 hover:bg-red-700" onClick={() => setShowAddDialog(true)}>
           <Plus className="h-4 w-4 mr-2" />
           Add Block
@@ -388,6 +380,7 @@ export default function InsuranceBlockListPage() {
               <ShieldOff className="h-5 w-5" />
               Block Insurance Billing
             </DialogTitle>
+            <DialogDescription>Add a patient or member to the insurance block list.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
@@ -502,6 +495,7 @@ export default function InsuranceBlockListPage() {
               <ShieldOff className="h-5 w-5 text-red-600" />
               Block Details
             </DialogTitle>
+            <DialogDescription>View block details.</DialogDescription>
           </DialogHeader>
           {selectedBlock && (
             <div className="space-y-4">
