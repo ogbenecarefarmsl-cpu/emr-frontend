@@ -313,6 +313,10 @@ export default function DoctorDashboard() {
   const [selectedTests, setSelectedTests] = useState<Test[]>([]);
   const [searchTest, setSearchTest] = useState('');
 
+  // RDT order modal state
+  const [rdtModalOpen, setRdtModalOpen] = useState(false);
+  const [selectedRdts, setSelectedRdts] = useState<{ malaria: boolean; typhoid: boolean }>({ malaria: false, typhoid: false });
+
   // Prescription modal state
   const [prescriptionModalOpen, setPrescriptionModalOpen] = useState(false);
   const [prescriptionItems, setPrescriptionItems] = useState<any[]>([]);
@@ -511,7 +515,25 @@ export default function DoctorDashboard() {
     selectedVisit?.consultationOrderId;
   const { data: labResults = [] } = useResults(labOrderId);
   const chartReviewLabResults = useMemo(() => chartOrderResults(patientChart), [patientChart]);
-  const displayedLabResults = selectedVisit ? labResults : chartReviewLabResults;
+  // Merge LIS lab results with RDT bedside results from the visit
+  const rdtResults: LabResult[] = useMemo(() => {
+    const rapidTests = (selectedVisit as any)?.rapidTestResults || [];
+    return rapidTests.map((rt: any, idx: number) => ({
+      _id: `rdt-${rt.testType}-${idx}`,
+      testCode: rt.testType === 'malaria' ? 'RAPID_MALARIA' : 'RAPID_TYPHOID',
+      testName: rt.testType === 'malaria' ? 'Rapid Malaria Test' : 'Rapid Typhoid Test',
+      value: rt.result === 'positive'
+        ? `Positive${rt.parasiteCount ? ` (${rt.parasiteCount}/µL)` : ''}`
+        : 'Negative',
+      unit: rt.testType === 'malaria' && rt.result === 'positive' ? '/µL' : undefined,
+      referenceRange: rt.antigen || undefined,
+      flag: rt.result === 'positive' ? 'high' as const : 'normal' as const,
+      status: 'completed',
+      resulted_at: rt.performedAt || new Date().toISOString(),
+      createdAt: rt.performedAt || new Date().toISOString(),
+    }));
+  }, [(selectedVisit as any)?.rapidTestResults]);
+  const displayedLabResults = selectedVisit ? [...rdtResults, ...labResults] : chartReviewLabResults;
   const abnormalLabResults = displayedLabResults.filter((result: LabResult) => result.flag && result.flag !== 'normal');
   const criticalLabResults = displayedLabResults.filter((result: LabResult) => result.flag === 'critical_high' || result.flag === 'critical_low');
   const latestResultAt = displayedLabResults.reduce<string | undefined>((latest, result: LabResult) => {
@@ -771,6 +793,40 @@ export default function DoctorDashboard() {
     },
     onError: (err: any) => {
       const msg = err?.response?.data?.message || err?.message || 'Failed to create lab order';
+      toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
+    },
+  });
+
+  // RDT order creation
+  const createRdtOrder = useMutation({
+    mutationFn: async () => {
+      const patientId = contextPatient?._id;
+      if (!patientId) return;
+      const rdtTests: { testCode: string; testName: string; price: number }[] = [];
+      if (selectedRdts.malaria) rdtTests.push({ testCode: 'RAPID_MALARIA', testName: 'Rapid Malaria Test', price: branch?.servicePrices?.rapid_malaria ?? 50 });
+      if (selectedRdts.typhoid) rdtTests.push({ testCode: 'RAPID_TYPHOID', testName: 'Rapid Typhoid Test', price: branch?.servicePrices?.rapid_typhoid ?? 50 });
+      if (rdtTests.length === 0) return;
+
+      const orderData: any = {
+        patientId,
+        orderType: 'lab',
+        tests: rdtTests,
+        priority: 'routine',
+      };
+      if (selectedVisit) {
+        orderData.visitId = selectedVisit._id || selectedVisit.id;
+      }
+      return await ordersAPI.create(orderData);
+    },
+    onSuccess: () => {
+      toast.success('RDT order created. Patient should pay at reception.');
+      setRdtModalOpen(false);
+      setSelectedRdts({ malaria: false, typhoid: false });
+      queryClient.invalidateQueries({ queryKey: ['visits'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (err: any) => {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to create RDT order';
       toast.error(Array.isArray(msg) ? msg.join(', ') : msg);
     },
   });
@@ -1525,6 +1581,9 @@ export default function DoctorDashboard() {
                                     <Button type="button" size="sm" onClick={() => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); }}>
                                       <Plus className="mr-1.5 h-3.5 w-3.5" /> Order Lab
                                     </Button>
+                                    <Button type="button" size="sm" variant="outline" className="bg-white" onClick={() => { setSelectedRdts({ malaria: false, typhoid: false }); setRdtModalOpen(true); }}>
+                                      <FlaskConical className="mr-1.5 h-3.5 w-3.5" /> Order RDT
+                                    </Button>
                                      <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingPrescription(null); setPrescriptionItems([]); setShorthandInputs({}); setShorthandErrors({}); setPrescriptionModalOpen(true); }}>
                                       <Pill className="mr-1.5 h-3.5 w-3.5" /> Prescribe
                                     </Button>
@@ -1912,6 +1971,7 @@ export default function DoctorDashboard() {
                         <div className="divide-y overflow-hidden rounded-md border border-slate-200">
                           {[
                             { label: 'Order Labs', detail: 'Order laboratory investigations', icon: FlaskConical, tone: 'bg-teal-700', disabled: !contextPatient, onClick: () => { setEditingOrder(null); setSelectedTests([]); setLabOrderModalOpen(true); } },
+                            { label: 'Order RDT', detail: 'Rapid malaria / typhoid test', icon: FlaskConical, tone: 'bg-emerald-700', disabled: !contextPatient, onClick: () => { setSelectedRdts({ malaria: false, typhoid: false }); setRdtModalOpen(true); } },
                             { label: 'Prescribe', detail: 'Create prescription', icon: Pill, tone: 'bg-blue-700', disabled: !contextPatient, onClick: () => { setEditingPrescription(null); setPrescriptionItems([]); setShorthandInputs({}); setShorthandErrors({}); setPrescriptionModalOpen(true); } },
                             { label: 'Treatment Plan', detail: 'Create or update treatment plan', icon: ClipboardList, tone: 'bg-purple-700', disabled: !contextPatient, onClick: () => setTreatmentPlanOpen(true) },
                             { label: 'Refer', detail: 'Refer to specialist or service', icon: Send, tone: 'bg-orange-600', disabled: !selectedVisit, onClick: () => { setReferralOpen(true); setReferralForm({ specialistId: '', reason: '', notes: '' }); } },
@@ -2304,6 +2364,38 @@ export default function DoctorDashboard() {
             <Button onClick={() => editingOrder ? updateLabOrder.mutate() : createLabOrder.mutate()} disabled={(editingOrder ? updateLabOrder.isPending : createLabOrder.isPending) || selectedTests.length === 0}>
               {(editingOrder ? updateLabOrder.isPending : createLabOrder.isPending) ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
               {editingOrder ? 'Update Order' : 'Create Order'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* RDT Order Modal */}
+      <Dialog open={rdtModalOpen} onOpenChange={setRdtModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Order Rapid Diagnostic Tests</DialogTitle>
+            <DialogDescription>Select bedside rapid tests. Patient pays at reception, then nurse performs the test.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {[
+              { key: 'malaria' as const, label: 'Rapid Malaria Test', detail: 'HRP-2 / pLDH antigen detection', price: branch?.servicePrices?.rapid_malaria ?? 50 },
+              { key: 'typhoid' as const, label: 'Rapid Typhoid Test', detail: 'Typhi O/H antigen detection', price: branch?.servicePrices?.rapid_typhoid ?? 50 },
+            ].map((rdt) => (
+              <label key={rdt.key} className={cn('flex items-center gap-3 rounded-lg border p-3 cursor-pointer transition-colors', selectedRdts[rdt.key] ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 hover:bg-slate-50')}>
+                <input type="checkbox" className="h-4 w-4 rounded border-slate-300" checked={selectedRdts[rdt.key]} onChange={(e) => setSelectedRdts(prev => ({ ...prev, [rdt.key]: e.target.checked }))} />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{rdt.label}</p>
+                  <p className="text-xs text-muted-foreground">{rdt.detail}</p>
+                </div>
+                <span className="text-sm font-semibold text-muted-foreground">Le {rdt.price}</span>
+              </label>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRdtModalOpen(false)}>Cancel</Button>
+            <Button onClick={() => createRdtOrder.mutate()} disabled={createRdtOrder.isPending || (!selectedRdts.malaria && !selectedRdts.typhoid)}>
+              {createRdtOrder.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Send className="w-4 h-4 mr-2" />}
+              Order RDT
             </Button>
           </DialogFooter>
         </DialogContent>
