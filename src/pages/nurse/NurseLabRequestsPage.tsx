@@ -6,14 +6,23 @@ import { RoleLayout } from '@/components/layout/RoleLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ordersAPI, visitsAPI } from '@/services/api';
 import { cn } from '@/lib/utils';
-import { Check, FlaskConical, Loader2, RefreshCw, Search, Send, X } from 'lucide-react';
+import { Check, ChevronsUpDown, FlaskConical, Loader2, RefreshCw, Search, Send, X } from 'lucide-react';
 
 interface LisOrderable {
   _id?: string;
@@ -24,8 +33,6 @@ interface LisOrderable {
   category?: string;
   panelComponents?: Array<{ testCode: string; testName: string }>;
 }
-
-const CLOSED_VISIT_STATUSES = new Set(['completed', 'cancelled']);
 
 const patientName = (visit: any) => {
   const patient = visit?.patientId || visit?.patient;
@@ -42,6 +49,7 @@ export default function NurseLabRequestsPage() {
   const { profile } = useAuth();
   const queryClient = useQueryClient();
   const [visitId, setVisitId] = useState('');
+  const [visitPickerOpen, setVisitPickerOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [priority, setPriority] = useState<'routine' | 'urgent' | 'stat'>('routine');
   const [notes, setNotes] = useState('');
@@ -49,8 +57,9 @@ export default function NurseLabRequestsPage() {
 
   const { data: visits = [], isLoading: visitsLoading } = useQuery({
     queryKey: ['visits', 'nurse-lab-request-candidates'],
-    queryFn: () => visitsAPI.getAll({ limit: 200 }),
-    staleTime: 15 * 1000,
+    queryFn: () => visitsAPI.getNurseOrderCandidates(),
+    staleTime: 10 * 1000,
+    refetchInterval: 30 * 1000,
   });
 
   const {
@@ -66,9 +75,9 @@ export default function NurseLabRequestsPage() {
 
   const activeVisits = useMemo(() => {
     const list = Array.isArray(visits) ? visits : visits?.data || [];
-    return list
-      .filter((visit: any) => !CLOSED_VISIT_STATUSES.has((visit.status || '').toLowerCase()))
-      .sort((a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    return [...list].sort(
+      (a: any, b: any) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime(),
+    );
   }, [visits]);
 
   const selectedVisit = activeVisits.find((visit: any) => (visit._id || visit.id) === visitId);
@@ -174,18 +183,78 @@ export default function NurseLabRequestsPage() {
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_180px] gap-4">
                 <div className="space-y-2">
                   <Label>Active visit</Label>
-                  <Select value={visitId} onValueChange={setVisitId}>
-                    <SelectTrigger>
-                      <SelectValue placeholder={visitsLoading ? 'Loading active visits' : 'Select patient visit'} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {activeVisits.map((visit: any) => (
-                        <SelectItem key={visit._id || visit.id} value={visit._id || visit.id}>
-                          {patientName(visit)} - {visit.visitNumber || 'No visit number'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={visitPickerOpen} onOpenChange={setVisitPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={visitPickerOpen}
+                        className="w-full justify-between font-normal"
+                        disabled={visitsLoading}
+                      >
+                        <span className="truncate">
+                          {visitsLoading
+                            ? 'Loading eligible visits'
+                            : selectedVisit
+                              ? `${patientName(selectedVisit)} - ${selectedVisit.visitNumber || 'No visit number'}`
+                              : 'Search patient name, ID, or visit number'}
+                        </span>
+                        {visitsLoading
+                          ? <Loader2 className="ml-2 h-4 w-4 shrink-0 animate-spin" />
+                          : <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[var(--radix-popover-trigger-width)] p-0">
+                      <Command>
+                        <CommandInput placeholder="Search patient or visit..." />
+                        <CommandList>
+                          <CommandEmpty>
+                            {activeVisits.length === 0
+                              ? 'No paid or insurance-covered active visits in this branch.'
+                              : 'No matching patient visit.'}
+                          </CommandEmpty>
+                          <CommandGroup heading={`${activeVisits.length} eligible visits`}>
+                            {activeVisits.map((visit: any) => {
+                              const id = visit._id || visit.id;
+                              const patient = visit.patientId || visit.patient;
+                              const searchableValue = [
+                                patientName(visit),
+                                patient?.patientId,
+                                patient?.phone,
+                                visit.visitNumber,
+                              ].filter(Boolean).join(' ');
+
+                              return (
+                                <CommandItem
+                                  key={id}
+                                  value={searchableValue}
+                                  onSelect={() => {
+                                    setVisitId(id);
+                                    setVisitPickerOpen(false);
+                                  }}
+                                  className="items-start gap-2 py-2.5"
+                                >
+                                  <Check className={cn('mt-0.5 h-4 w-4 shrink-0', visitId === id ? 'opacity-100' : 'opacity-0')} />
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium">{patientName(visit)}</p>
+                                    <p className="truncate text-xs text-muted-foreground">
+                                      {[patient?.patientId, visit.visitNumber, (visit.status || '').replace(/_/g, ' ')]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                    </p>
+                                  </div>
+                                  {visit.consultationCoverageType === 'insurance' && (
+                                    <Badge variant="secondary" className="ml-auto shrink-0">Insurance</Badge>
+                                  )}
+                                </CommandItem>
+                              );
+                            })}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-2">
                   <Label>Priority</Label>

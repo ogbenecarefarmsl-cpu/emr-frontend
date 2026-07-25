@@ -1081,6 +1081,11 @@ export const visitsAPI = {
     return response.data;
   },
 
+  getNurseOrderCandidates: async () => {
+    const response = await api.get('/visits/nurse-order-candidates');
+    return response.data;
+  },
+
   completeTriage: async (id: string, data: any) => {
     const response = await api.patch(`/visits/${id}/triage`, data);
     return response.data;
