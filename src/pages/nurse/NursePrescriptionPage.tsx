@@ -60,8 +60,9 @@ export default function NursePrescriptionPage() {
 
   const { data: visits = [], isLoading: visitsLoading } = useQuery({
     queryKey: ['visits', 'nurse-prescription-candidates'],
-    queryFn: () => visitsAPI.getAll({ limit: 200 }),
-    staleTime: 15 * 1000,
+    queryFn: () => visitsAPI.getNurseOrderCandidates(),
+    staleTime: 10 * 1000,
+    refetchInterval: 30 * 1000,
   });
 
   const { data: searchResults = [], isLoading: searchLoading } = useQuery({
