@@ -55,11 +55,20 @@ export default function NurseLabRequestsPage() {
   const [notes, setNotes] = useState('');
   const [selectedTests, setSelectedTests] = useState<LisOrderable[]>([]);
 
-  const { data: visits = [], isLoading: visitsLoading } = useQuery({
+  const {
+    data: visits = [],
+    isLoading: visitsLoading,
+    isFetching: visitsFetching,
+    isError: visitsError,
+    error: visitsLoadError,
+    refetch: refetchVisits,
+  } = useQuery({
     queryKey: ['visits', 'nurse-lab-request-candidates'],
     queryFn: () => visitsAPI.getNurseOrderCandidates(),
     staleTime: 10 * 1000,
     refetchInterval: 30 * 1000,
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
   });
 
   const {
@@ -182,7 +191,27 @@ export default function NurseLabRequestsPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_180px] gap-4">
                 <div className="space-y-2">
-                  <Label>Active visit</Label>
+                  <div className="flex items-center justify-between gap-3">
+                    <Label>Triage and active patient visit</Label>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => refetchVisits()}
+                      disabled={visitsFetching}
+                    >
+                      <RefreshCw className={cn('mr-1 h-3.5 w-3.5', visitsFetching && 'animate-spin')} />
+                      Refresh
+                    </Button>
+                  </div>
+                  {visitsError && (
+                    <div className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                      {(visitsLoadError as any)?.response?.data?.message
+                        || (visitsLoadError as any)?.message
+                        || 'Could not load triage and active patient visits.'}
+                    </div>
+                  )}
                   <Popover open={visitPickerOpen} onOpenChange={setVisitPickerOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -211,10 +240,10 @@ export default function NurseLabRequestsPage() {
                         <CommandList>
                           <CommandEmpty>
                             {activeVisits.length === 0
-                              ? 'No paid or insurance-covered active visits in this branch.'
+                              ? 'No triage or active patient visits are available in this branch.'
                               : 'No matching patient visit.'}
                           </CommandEmpty>
-                          <CommandGroup heading={`${activeVisits.length} eligible visits`}>
+                          <CommandGroup heading={`${activeVisits.length} available visits`}>
                             {activeVisits.map((visit: any) => {
                               const id = visit._id || visit.id;
                               const patient = visit.patientId || visit.patient;
