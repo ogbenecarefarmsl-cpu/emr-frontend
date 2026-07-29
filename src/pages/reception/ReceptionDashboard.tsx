@@ -29,7 +29,11 @@ import {
   AlertTriangle,
   Shield,
   ShieldOff,
+  ClipboardCheck,
+  FlaskConical,
+  CheckCircle2,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { prescriptionService } from '@/services/prescriptionService';
 import { ordersAPI } from '@/services/api';
@@ -103,10 +107,27 @@ export default function ReceptionDashboard() {
     staleTime: 15 * 1000,
   });
 
+  const pendingConsultationVisits = Array.isArray(receptionSnapshot?.pendingConsultationPayments)
+    ? receptionSnapshot.pendingConsultationPayments
+    : [];
+  const awaitingTriageVisits = Array.isArray(receptionSnapshot?.awaitingTriage)
+    ? receptionSnapshot.awaitingTriage
+    : [];
+  const pendingLabVisits = Array.isArray(receptionSnapshot?.pendingLabPayments)
+    ? receptionSnapshot.pendingLabPayments
+    : [];
+  const pendingPharmacyVisits = Array.isArray(receptionSnapshot?.pendingPharmacyPayments)
+    ? receptionSnapshot.pendingPharmacyPayments
+    : [];
+  const awaitingTriageCount = visitStats?.awaitingTriage ?? awaitingTriageVisits.length;
   const todayRevenue = paymentStats?.paidRevenue ?? 0;
-  const pendingLabPayments = paymentStats?.pendingOrders ?? 0;
+  const pendingClinicalOrderCount = paymentStats?.pendingOrders ?? 0;
   const pendingPrescriptionPayments = Array.isArray(pendingPrescriptions) ? pendingPrescriptions : [];
-  const pendingPayments = pendingLabPayments + pendingPrescriptionPayments.length;
+  const pendingClinicalPayments = Math.max(
+    pendingClinicalOrderCount + pendingPrescriptionPayments.length,
+    pendingLabVisits.length + pendingPharmacyVisits.length + pendingPrescriptionPayments.length,
+  );
+  const pendingPayments = pendingConsultationVisits.length + pendingClinicalPayments;
   const totalOutstanding = Number(
     outstandingBalances?.summary?.totalOutstanding
       ?? (Array.isArray(outstandingBalances)
@@ -134,6 +155,10 @@ export default function ReceptionDashboard() {
   }, [dailyIncome, paymentStats?.treatmentPlanCollected, paymentStats?.walletDeposits]);
   const totalExpenditures = expenditureSummary?.totalExpenditures || 0;
   const netCashPosition = (paymentStats?.paidRevenue ?? 0) - totalExpenditures;
+  const scrollToClinicalPayments = () => {
+    if (typeof document === 'undefined') return;
+    document.getElementById('pending-clinical-payments')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
 
   return (
     <RoleLayout
@@ -142,62 +167,135 @@ export default function ReceptionDashboard() {
       role="receptionist"
       userName={profile?.fullName}
     >
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <button
-          onClick={() => navigate('/reception/register')}
-          className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border-2 border-dashed border-primary/30 bg-primary/5 hover:bg-primary hover:border-primary transition-all duration-200"
-        >
-          <div className="w-12 h-12 rounded-xl bg-primary/10 group-hover:bg-white/20 flex items-center justify-center transition-colors">
-            <UserPlus className="w-6 h-6 text-primary group-hover:text-white transition-colors" />
+      {/* Start Here */}
+      <div className="mb-6 rounded-xl border bg-card shadow-sm">
+        <div className="flex flex-col gap-3 border-b px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Reception workbench</h2>
+            <p className="text-sm text-muted-foreground">Start a patient, collect what is due, and see where everyone is right now.</p>
           </div>
-          <span className="text-sm font-semibold text-primary group-hover:text-white transition-colors">Register Patient</span>
-        </button>
-        <button
-          onClick={() => navigate('/reception/visit-registration')}
-          className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border-2 border-dashed border-blue-500/30 bg-blue-500/5 hover:bg-blue-500 hover:border-blue-500 transition-all duration-200"
-        >
-          <div className="w-12 h-12 rounded-xl bg-blue-500/10 group-hover:bg-white/20 flex items-center justify-center transition-colors">
-            <Stethoscope className="w-6 h-6 text-blue-500 group-hover:text-white transition-colors" />
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/admin/insurance')}>
+              <Shield className="h-4 w-4" />
+              Insurance
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/reception/insurance-blocks')}>
+              <ShieldOff className="h-4 w-4" />
+              Block list
+            </Button>
           </div>
-          <span className="text-sm font-semibold text-blue-500 group-hover:text-white transition-colors">New Visit</span>
-        </button>
-        <button
-          onClick={() => navigate('/reception/payments')}
-          className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border bg-card hover:bg-secondary hover:shadow-md transition-all duration-200"
-        >
-          <div className="w-12 h-12 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-            <CreditCard className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
+        </div>
+        <div className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+          <ReceptionActionCard
+            icon={UserPlus}
+            title="Register a new patient"
+            description="Create the patient record first."
+            actionLabel="Register"
+            tone="primary"
+            onClick={() => navigate('/reception/register')}
+          />
+          <ReceptionActionCard
+            icon={ClipboardCheck}
+            title="Start or renew a visit"
+            description="Choose doctor, coverage, and visit type."
+            actionLabel="Create visit"
+            tone="blue"
+            onClick={() => navigate('/reception/visit-registration')}
+          />
+          <ReceptionActionCard
+            icon={CreditCard}
+            title="Take a payment"
+            description="Consultation, labs, drugs, plans, or balances."
+            actionLabel="Open billing"
+            tone="green"
+            onClick={() => navigate('/reception/payments')}
+          />
+          <ReceptionActionCard
+            icon={Users}
+            title="Find a patient"
+            description="Search history, receipts, reports, and visits."
+            actionLabel="Search"
+            tone="slate"
+            onClick={() => navigate('/reception/patients')}
+          />
+        </div>
+      </div>
+
+      {/* Patient Flow */}
+      <div className="mb-6 rounded-xl border bg-card shadow-sm">
+        <div className="flex flex-col gap-3 border-b px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-base font-semibold">Today&apos;s patient flow</h2>
+            <p className="text-sm text-muted-foreground">Plain-language queues so Reception can quickly guide each patient to the next desk.</p>
           </div>
-          <span className="text-sm font-semibold text-foreground">Billing & Payments</span>
-        </button>
-        <button 
-          onClick={() => navigate('/reception/patients')}
-          className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border bg-card hover:bg-secondary hover:shadow-md transition-all duration-200"
-        >
-          <div className="w-12 h-12 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-            <Users className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
-          </div>
-          <span className="text-sm font-semibold text-foreground">Search Patients</span>
-        </button>
-        <button
-          onClick={() => navigate('/admin/insurance')}
-          className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border bg-card hover:bg-secondary hover:shadow-md transition-all duration-200"
-        >
-          <div className="w-12 h-12 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-            <Shield className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
-          </div>
-          <span className="text-sm font-semibold text-foreground">Insurance</span>
-        </button>
-        <button
-          onClick={() => navigate('/reception/insurance-blocks')}
-          className="group flex flex-col items-center justify-center gap-2.5 p-5 rounded-xl border bg-card hover:bg-secondary hover:shadow-md transition-all duration-200"
-        >
-          <div className="w-12 h-12 rounded-xl bg-muted group-hover:bg-primary/10 flex items-center justify-center transition-colors">
-            <ShieldOff className="w-6 h-6 text-muted-foreground group-hover:text-primary transition-colors" />
-          </div>
-          <span className="text-sm font-semibold text-foreground">Block List</span>
-        </button>
+          <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={() => navigate('/reception/visit-registration')}>
+            Add visit <ArrowRight className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+          <PatientFlowStep
+            icon={CreditCard}
+            label="Needs consultation payment"
+            count={pendingConsultationVisits.length}
+            helper="Collect or confirm coverage before vitals."
+            action="Open billing"
+            onClick={() => navigate('/reception/payments')}
+            tone={pendingConsultationVisits.length > 0 ? 'amber' : 'muted'}
+          />
+          <PatientFlowStep
+            icon={Stethoscope}
+            label="Ready for nurse vitals"
+            count={awaitingTriageCount}
+            helper="Paid or covered visits waiting for triage."
+            action="View visits"
+            onClick={() => navigate('/reception')}
+            tone={awaitingTriageCount > 0 ? 'blue' : 'muted'}
+          />
+          <PatientFlowStep
+            icon={Users}
+            label="Waiting for doctor"
+            count={doctorQueue.length}
+            helper="Vitals done, doctor should call next."
+            action="View queue"
+            onClick={() => navigate('/reception')}
+            tone={doctorQueue.length > 0 ? 'primary' : 'muted'}
+          />
+          <PatientFlowStep
+            icon={FlaskConical}
+            label="Lab or pharmacy payment"
+            count={pendingClinicalPayments}
+            helper="Orders, prescriptions, and uncovered balances."
+            action="Review now"
+            onClick={scrollToClinicalPayments}
+            tone={pendingClinicalPayments > 0 ? 'green' : 'muted'}
+          />
+        </div>
+        <div className="grid gap-3 border-t p-4 lg:grid-cols-3">
+          <MiniVisitList
+            title="Collect before vitals"
+            emptyText="No consultation payments waiting"
+            visits={pendingConsultationVisits}
+            actionLabel="Open billing"
+            onAction={() => navigate('/reception/payments')}
+            loading={snapshotLoading}
+          />
+          <MiniVisitList
+            title="Send to nurse"
+            emptyText="No patients waiting for vitals"
+            visits={awaitingTriageVisits}
+            actionLabel="Create visit"
+            onAction={() => navigate('/reception/visit-registration')}
+            loading={snapshotLoading}
+          />
+          <MiniVisitList
+            title="Waiting for doctor"
+            emptyText="No one is waiting for a doctor"
+            visits={doctorQueue}
+            actionLabel="View queue"
+            onAction={() => navigate('/reception')}
+            loading={snapshotLoading}
+          />
+        </div>
       </div>
 
       {/* Metrics */}
@@ -209,9 +307,9 @@ export default function ReceptionDashboard() {
         />
         <MetricCard
           title="Awaiting Vitals"
-          value={visitStats?.awaitingTriage || 0}
+          value={awaitingTriageCount}
           icon={Stethoscope}
-          variant={(visitStats?.awaitingTriage || 0) > 0 ? 'warning' : 'default'}
+          variant={awaitingTriageCount > 0 ? 'warning' : 'default'}
         />
         <MetricCard
           title="Revenue Today"
@@ -311,7 +409,7 @@ export default function ReceptionDashboard() {
       )}
 
       {/* Pending Clinical Orders (created by doctors, paid at reception) */}
-      <div className="mb-6">
+      <div id="pending-clinical-payments" className="mb-6 scroll-mt-20">
         <PendingOrders />
       </div>
 
@@ -401,6 +499,204 @@ export default function ReceptionDashboard() {
         </div>
       </div>
     </RoleLayout>
+  );
+}
+
+type ReceptionTone = 'primary' | 'blue' | 'green' | 'amber' | 'slate' | 'muted';
+
+const toneStyles: Record<ReceptionTone, { card: string; icon: string; count: string }> = {
+  primary: {
+    card: 'border-primary/25 bg-primary/5 hover:border-primary/45',
+    icon: 'bg-primary/10 text-primary',
+    count: 'text-primary',
+  },
+  blue: {
+    card: 'border-blue-200 bg-blue-50/70 hover:border-blue-300 dark:border-blue-900 dark:bg-blue-950/20',
+    icon: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
+    count: 'text-blue-700 dark:text-blue-300',
+  },
+  green: {
+    card: 'border-emerald-200 bg-emerald-50/70 hover:border-emerald-300 dark:border-emerald-900 dark:bg-emerald-950/20',
+    icon: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
+    count: 'text-emerald-700 dark:text-emerald-300',
+  },
+  amber: {
+    card: 'border-amber-200 bg-amber-50/80 hover:border-amber-300 dark:border-amber-900 dark:bg-amber-950/20',
+    icon: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+    count: 'text-amber-700 dark:text-amber-300',
+  },
+  slate: {
+    card: 'border-slate-200 bg-slate-50/80 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/20',
+    icon: 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300',
+    count: 'text-slate-700 dark:text-slate-300',
+  },
+  muted: {
+    card: 'border-border bg-muted/20 hover:bg-muted/30',
+    icon: 'bg-muted text-muted-foreground',
+    count: 'text-muted-foreground',
+  },
+};
+
+function ReceptionActionCard({
+  icon: Icon,
+  title,
+  description,
+  actionLabel,
+  tone,
+  onClick,
+}: {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  actionLabel: string;
+  tone: ReceptionTone;
+  onClick: () => void;
+}) {
+  const styles = toneStyles[tone];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group flex min-h-[132px] flex-col items-start justify-between rounded-lg border p-4 text-left transition-all hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        styles.card,
+      )}
+    >
+      <span className={cn('flex h-10 w-10 items-center justify-center rounded-lg', styles.icon)}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <span className="mt-3 block">
+        <span className="block text-sm font-semibold text-foreground">{title}</span>
+        <span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span>
+      </span>
+      <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary">
+        {actionLabel}
+        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </button>
+  );
+}
+
+function PatientFlowStep({
+  icon: Icon,
+  label,
+  count,
+  helper,
+  action,
+  tone,
+  onClick,
+}: {
+  icon: LucideIcon;
+  label: string;
+  count: number;
+  helper: string;
+  action: string;
+  tone: ReceptionTone;
+  onClick: () => void;
+}) {
+  const styles = toneStyles[tone];
+  const hasWork = count > 0;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        'group flex min-h-[150px] flex-col rounded-lg border p-4 text-left transition-all hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+        styles.card,
+      )}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <span className={cn('flex h-10 w-10 items-center justify-center rounded-lg', styles.icon)}>
+          <Icon className="h-5 w-5" />
+        </span>
+        {hasWork ? (
+          <Badge className="bg-white text-foreground shadow-sm dark:bg-slate-900">{count} waiting</Badge>
+        ) : (
+          <Badge variant="outline" className="gap-1 bg-background/70 text-muted-foreground">
+            <CheckCircle2 className="h-3 w-3" />
+            Clear
+          </Badge>
+        )}
+      </div>
+      <div className="mt-4">
+        <div className={cn('text-3xl font-bold leading-none', styles.count)}>{count}</div>
+        <div className="mt-2 text-sm font-semibold text-foreground">{label}</div>
+        <p className="mt-1 text-xs leading-5 text-muted-foreground">{helper}</p>
+      </div>
+      <span className="mt-auto inline-flex items-center gap-1 pt-4 text-xs font-semibold text-primary">
+        {action}
+        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+      </span>
+    </button>
+  );
+}
+
+function MiniVisitList({
+  title,
+  emptyText,
+  visits,
+  actionLabel,
+  onAction,
+  loading,
+}: {
+  title: string;
+  emptyText: string;
+  visits: any[];
+  actionLabel: string;
+  onAction: () => void;
+  loading?: boolean;
+}) {
+  const visibleVisits = Array.isArray(visits) ? visits.slice(0, 4) : [];
+  return (
+    <div className="rounded-lg border bg-background/60">
+      <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+        <div>
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <p className="text-xs text-muted-foreground">{visits?.length || 0} patient{(visits?.length || 0) === 1 ? '' : 's'}</p>
+        </div>
+        <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs" onClick={onAction}>
+          {actionLabel}
+          <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <div className="divide-y">
+        {loading ? (
+          <div className="flex items-center justify-center py-8 text-muted-foreground">
+            <Loader2 className="h-5 w-5 animate-spin" />
+          </div>
+        ) : visibleVisits.length > 0 ? (
+          visibleVisits.map((visit: any) => {
+            const patient = visit.patientId || visit.patient || {};
+            return (
+              <div key={visit._id || visit.id} className="px-4 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">
+                      {patient.firstName || 'Patient'} {patient.lastName || ''}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {visit.visitNumber || visit.visit_number || 'Visit'} - {patient.patientId || 'No MRN'}
+                    </p>
+                  </div>
+                  {visit.insurance?.programCode || patient.insurance?.programCode ? (
+                    <Badge variant="outline" className="shrink-0 bg-blue-50 text-[10px] text-blue-700">
+                      Insurance
+                    </Badge>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })
+        ) : (
+          <div className="px-4 py-8 text-center text-sm text-muted-foreground">{emptyText}</div>
+        )}
+      </div>
+      {!loading && visits.length > visibleVisits.length ? (
+        <div className="border-t px-4 py-2 text-xs text-muted-foreground">
+          +{visits.length - visibleVisits.length} more waiting
+        </div>
+      ) : null}
+    </div>
   );
 }
 
