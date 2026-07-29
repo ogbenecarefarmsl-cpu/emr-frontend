@@ -163,7 +163,7 @@ export default function ReceptionDashboard() {
   return (
     <RoleLayout
       title="Reception Dashboard"
-      subtitle="Patient registration and EMR management"
+      subtitle="Register patients, start visits, collect payments, and guide patients"
       role="receptionist"
       userName={profile?.fullName}
     >
@@ -177,11 +177,11 @@ export default function ReceptionDashboard() {
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/admin/insurance')}>
               <Shield className="h-4 w-4" />
-              Insurance
+              Insurance programs
             </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate('/reception/insurance-blocks')}>
               <ShieldOff className="h-4 w-4" />
-              Block list
+              Blocked insurance
             </Button>
           </div>
         </div>
@@ -198,7 +198,7 @@ export default function ReceptionDashboard() {
             icon={ClipboardCheck}
             title="Start or renew a visit"
             description="Choose doctor, coverage, and visit type."
-            actionLabel="Create visit"
+            actionLabel="Start visit"
             tone="blue"
             onClick={() => navigate('/reception/visit-registration')}
           />
@@ -229,7 +229,7 @@ export default function ReceptionDashboard() {
             <p className="text-sm text-muted-foreground">Plain-language queues so Reception can quickly guide each patient to the next desk.</p>
           </div>
           <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={() => navigate('/reception/visit-registration')}>
-            Add visit <ArrowRight className="h-3.5 w-3.5" />
+            Start visit <ArrowRight className="h-3.5 w-3.5" />
           </Button>
         </div>
         <div className="grid gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
@@ -283,7 +283,7 @@ export default function ReceptionDashboard() {
             title="Send to nurse"
             emptyText="No patients waiting for vitals"
             visits={awaitingTriageVisits}
-            actionLabel="Create visit"
+            actionLabel="Start visit"
             onAction={() => navigate('/reception/visit-registration')}
             loading={snapshotLoading}
           />
@@ -408,13 +408,13 @@ export default function ReceptionDashboard() {
         <OwingPatientsCard patients={patientOutstandingData.patients} />
       )}
 
-      {/* Pending Clinical Orders (created by doctors, paid at reception) */}
+      {/* Order and medicine payments */}
       <div id="pending-clinical-payments" className="mb-6 scroll-mt-20">
         <PendingOrders />
       </div>
 
       {/* Recent Activity */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Recent Patients */}
         <div className="bg-card border rounded-xl shadow-sm">
           <div className="px-5 py-4 border-b flex items-center justify-between">
@@ -450,47 +450,6 @@ export default function ReceptionDashboard() {
             {(!Array.isArray(patients) || patients.length === 0) && (
               <div className="px-5 py-10 text-center text-muted-foreground text-sm">
                 No patients registered yet
-              </div>
-            )}
-            </>
-            )}
-          </div>
-        </div>
-
-        {/* Doctor Queue Monitor */}
-        <div className="bg-card border rounded-xl shadow-sm">
-          <div className="px-5 py-4 border-b flex items-center justify-between">
-            <h3 className="font-semibold text-sm">Doctor Queue Monitor</h3>
-            <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reception')}>
-              View Queue <ArrowRight className="w-3.5 h-3.5" />
-            </Button>
-          </div>
-          <div className="divide-y">
-            {snapshotLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-            <>
-            {Array.isArray(doctorQueue) && doctorQueue.slice(0, 5).map((visit: any) => (
-              <div key={visit.id || visit._id} className="px-5 py-3.5 hover:bg-muted/30 transition-colors">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">
-                      {visit.patientId?.firstName || visit.patient?.firstName}{' '}
-                      {visit.patientId?.lastName || visit.patient?.lastName}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {visit.visitNumber || visit.visit_number || 'Visit'} - paid, waiting for doctor
-                    </p>
-                  </div>
-                  <Badge variant="outline" className="flex-shrink-0">Doctor Queue</Badge>
-                </div>
-              </div>
-            ))}
-            {(!Array.isArray(doctorQueue) || doctorQueue.length === 0) && (
-              <div className="px-5 py-10 text-center text-muted-foreground text-sm">
-                No patients waiting for doctor after vitals
               </div>
             )}
             </>
@@ -763,7 +722,7 @@ function OwingPatientsCard({ patients }: { patients: any[] }) {
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {patient.billCount || patient.orderCount} unpaid bill{(patient.billCount || patient.orderCount) !== 1 ? 's' : ''}
                   {patient.treatmentPlanCount > 0 ? ` (${patient.treatmentPlanCount} treatment plan${patient.treatmentPlanCount !== 1 ? 's' : ''})` : ''}
-                  {' '}· Owes Le {patient.totalOwed.toLocaleString()}
+                  {' '}- Owes Le {patient.totalOwed.toLocaleString()}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">
@@ -793,7 +752,7 @@ function OwingPatientsCard({ patients }: { patients: any[] }) {
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-[2px] sm:p-6">
           <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-sm space-y-5 overflow-y-auto rounded-2xl border border-white/70 bg-white p-5 shadow-[0_28px_90px_-28px_rgba(15,23,42,0.55)] sm:p-6">
             <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-sm">Quick Deposit — {depositPatient.firstName} {depositPatient.lastName}</h3>
+              <h3 className="font-semibold text-sm">Quick Deposit - {depositPatient.firstName} {depositPatient.lastName}</h3>
               <Button variant="ghost" size="sm" onClick={() => setDepositPatient(null)}>
                 <span className="sr-only">Close</span> ×
               </Button>

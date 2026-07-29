@@ -153,14 +153,14 @@ export function PendingOrders() {
         return (
           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
             <FlaskConical className="h-3 w-3 mr-1" />
-            Test
+            Lab test
           </Badge>
         );
       case 'pharmacy':
         return (
           <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
             <Pill className="h-3 w-3 mr-1" />
-            Pharmacy Order
+            Pharmacy order
           </Badge>
         );
       default:
@@ -173,8 +173,8 @@ export function PendingOrders() {
       return (
         <div className="text-center py-8 text-muted-foreground">
           <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No pending prescriptions</p>
-          <p className="text-sm">Doctor-prescribed medications will appear here</p>
+          <p>No medicine payments waiting</p>
+          <p className="text-sm">Prescribed medicines that need payment will appear here</p>
         </div>
       );
     }
@@ -212,7 +212,7 @@ export function PendingOrders() {
                     ))}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1.5">
-                    <span className="font-medium text-foreground">Drugs:</span>{' '}
+                    <span className="font-medium text-foreground">Medicines:</span>{' '}
                     {group.drugNames.slice(0, 4).join(', ')}
                     {group.drugNames.length > 4 && <span className="text-muted-foreground"> +{group.drugNames.length - 4} more</span>}
                   </div>
@@ -236,7 +236,7 @@ export function PendingOrders() {
                     navigateToDispense(group);
                   }}
                 >
-                  View & Dispense
+                  Open medicine bill
                   <ArrowRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
@@ -252,8 +252,8 @@ export function PendingOrders() {
       return (
         <div className="text-center py-8 text-muted-foreground">
           <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-          <p>No pending clinical payments</p>
-          <p className="text-sm">Test and pharmacy orders will appear here</p>
+          <p>No order payments waiting</p>
+          <p className="text-sm">Lab tests and pharmacy orders that need payment will appear here</p>
         </div>
       );
     }
@@ -340,7 +340,7 @@ export function PendingOrders() {
                         ) : (
                           <>
                             <Shield className="h-4 w-4 mr-1" />
-                            Insurance
+                            Cover by insurance
                           </>
                         )}
                       </Button>
@@ -364,7 +364,7 @@ export function PendingOrders() {
                         ) : (
                           <>
                             <CreditCard className="h-4 w-4 mr-1" />
-                            Pay
+                            Collect payment
                           </>
                         )}
                       </Button>
@@ -391,7 +391,7 @@ export function PendingOrders() {
                         ) : (
                           <>
                             <CreditCard className="h-4 w-4 mr-1" />
-                            Pay
+                            Collect payment
                           </>
                         )}
                       </Button>
@@ -420,7 +420,7 @@ export function PendingOrders() {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CreditCard className="h-5 w-5" />
-          Pending Clinical Payments
+          Payments to collect
           <Badge variant="secondary" className="ml-auto">
             {patientGroups.length} patient{patientGroups.length !== 1 ? 's' : ''}, {pendingPrescriptions.length + allOrders.length} items
           </Badge>
@@ -430,35 +430,35 @@ export function PendingOrders() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="all">
-              All ({pendingPrescriptions.length + allOrders.length})
+              All payments ({pendingPrescriptions.length + allOrders.length})
             </TabsTrigger>
             <TabsTrigger value="lab">
-              Tests ({labOrders.length})
+              Lab tests ({labOrders.length})
             </TabsTrigger>
             <TabsTrigger value="prescription">
-              Prescriptions ({pendingPrescriptions.length})
+              Medicines ({pendingPrescriptions.length})
             </TabsTrigger>
             <TabsTrigger value="pharmacy">
-              Pharmacy Orders ({pharmacyOrders.length})
+              Pharmacy orders ({pharmacyOrders.length})
             </TabsTrigger>
           </TabsList>
           <TabsContent value="all" className="mt-4">
             {patientGroups.length > 0 && (
               <div className="mb-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Prescriptions (grouped by patient)</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Medicine bills grouped by patient</p>
                 {renderPatientGroups(patientGroups)}
               </div>
             )}
             {allOrders.length > 0 && (
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Clinical Orders</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Lab and pharmacy order payments</p>
                 {renderOrderList(allOrders)}
               </div>
             )}
             {patientGroups.length === 0 && allOrders.length === 0 && (
               <div className="text-center py-8 text-muted-foreground">
                 <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p>No pending clinical payments</p>
+                <p>No payments waiting</p>
               </div>
             )}
           </TabsContent>
@@ -477,9 +477,9 @@ export function PendingOrders() {
     <Dialog open={!!insuranceOrder} onOpenChange={(open) => !open && setInsuranceOrder(null)}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Record insurance coverage</DialogTitle>
+          <DialogTitle>Apply insurance cover</DialogTitle>
           <DialogDescription>
-            Enter only the authorized amount. Any uncovered balance remains payable by the patient.
+            Enter the amount insurance will cover. The patient pays any remaining balance.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -488,7 +488,7 @@ export function PendingOrders() {
             <div className="mt-1 flex justify-between"><span>Current balance</span><strong>Le {Number(insuranceOrder?.balance ?? insuranceOrder?.total ?? 0).toLocaleString()}</strong></div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="insurance-amount">Amount covered by insurance (Le)</Label>
+            <Label htmlFor="insurance-amount">Insurance will pay (Le)</Label>
             <Input
               id="insurance-amount"
               type="number"
@@ -500,17 +500,17 @@ export function PendingOrders() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="insurance-reference">Verification reference (optional)</Label>
+            <Label htmlFor="insurance-reference">How did you verify it? (optional)</Label>
             <Input
               id="insurance-reference"
               value={insuranceReference}
               onChange={(event) => setInsuranceReference(event.target.value)}
               placeholder="Card checked, phone authorization, letter or reference number"
             />
-            <p className="text-xs text-muted-foreground">Reception may continue after reasonable verification; a formal code is not required.</p>
+            <p className="text-xs text-muted-foreground">Use the card, phone confirmation, letter, or any reasonable check available today.</p>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="insurance-notes">Verification notes (optional)</Label>
+            <Label htmlFor="insurance-notes">Notes for Admin (optional)</Label>
             <Input
               id="insurance-notes"
               value={insuranceNotes}
@@ -529,7 +529,7 @@ export function PendingOrders() {
           <Button variant="outline" onClick={() => setInsuranceOrder(null)}>Cancel</Button>
           <Button onClick={handleMarkInsurance} disabled={markOrderInsuranceMutation.isPending} className="bg-blue-600 hover:bg-blue-700">
             {markOrderInsuranceMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Shield className="mr-2 h-4 w-4" />}
-            Apply coverage
+            Apply insurance cover
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -208,8 +208,8 @@ export default function VisitRegistration() {
 
   return (
     <RoleLayout
-      title="Register Visit"
-      subtitle="Create a new patient visit"
+      title="Start Visit"
+      subtitle="Choose the patient, doctor or service, and how this visit will be paid"
       role="receptionist"
       userName={user?.fullName}
     >
@@ -229,7 +229,7 @@ export default function VisitRegistration() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Search className="h-5 w-5" />
-              Select Patient
+              Choose Patient
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -275,7 +275,7 @@ export default function VisitRegistration() {
                   <div className="flex items-center justify-between mb-2">
                     <p className="text-sm font-medium">Recent Patients</p>
                     <Button variant="ghost" size="sm" onClick={() => navigate('/reception/register')}>
-                      Register New
+                      Register patient
                     </Button>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -322,7 +322,7 @@ export default function VisitRegistration() {
                         <p className="text-xs text-green-700 mt-1">
                           Member #{selectedPatient.insurance.memberNumber}
                           {selectedPatient.insurance.responsiblePerson
-                            ? ` · Resp: ${selectedPatient.insurance.responsiblePerson}`
+                            ? ` - Responsible: ${selectedPatient.insurance.responsiblePerson}`
                             : ''}
                         </p>
                       )}
@@ -348,12 +348,12 @@ export default function VisitRegistration() {
                 <Checkbox id="selfPayOverride" checked={selfPayOverride} onCheckedChange={(checked) => setSelfPayOverride(checked === true)} />
                 <div>
                   <Label htmlFor="selfPayOverride" className="cursor-pointer font-medium text-blue-900">
-                    {isWaitingPeriod ? 'Insurance is not eligible yet — register as self-pay' : 'Register this visit as self-pay'}
+                    {isWaitingPeriod ? 'Insurance will not cover this consultation today - patient pays' : 'Patient will pay for this consultation'}
                   </Label>
                   <p className="mt-1 text-sm text-blue-800">
                     {isWaitingPeriod && insuranceEligibility?.nextEligibleAt
                       ? `The next covered consultation is ${new Date(insuranceEligibility.nextEligibleAt).toLocaleDateString()}. Select self-pay to continue today.`
-                      : 'Insurance covers one consultation every 14 days. Self-pay can be used for an additional visit.'}
+                      : 'Insurance covers one consultation every 14 days. Use this when the patient still wants to see a doctor today.'}
                   </p>
                 </div>
               </div>
@@ -382,11 +382,11 @@ export default function VisitRegistration() {
                 <div className="flex-1">
                   <h3 className="font-bold text-red-800 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4" />
-                    Insurance Coverage Blocked
+                    Insurance cover is blocked
                   </h3>
                   <p className="text-sm text-red-700 mt-1">
                     <strong>{insuranceBlock.reason}</strong>
-                    {insuranceBlock.block?.programCode && ` — ${insuranceBlock.block.programCode}`}
+                    {insuranceBlock.block?.programCode && ` - ${insuranceBlock.block.programCode}`}
                     {insuranceBlock.block?.effectiveDate && ` (effective ${new Date(insuranceBlock.block.effectiveDate).toLocaleDateString()})`}
                   </p>
                   {insuranceBlock.block?.reasonDetail && (
@@ -399,7 +399,7 @@ export default function VisitRegistration() {
                       onCheckedChange={(c) => setAcknowledgedBlock(!!c)}
                     />
                     <label htmlFor="ackBlock" className="text-sm font-medium text-red-800">
-                      I understand — register this patient as <strong>self-pay</strong> (patient pays out of pocket)
+                      I have told the patient insurance will not cover this consultation today
                     </label>
                   </div>
                 </div>
@@ -413,7 +413,7 @@ export default function VisitRegistration() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Stethoscope className="h-5 w-5" />
-              Visit Details
+              Visit and payment details
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -475,7 +475,7 @@ export default function VisitRegistration() {
                     </Select>
                     {specialistOptions.length === 0 && (
                       <p className="text-xs text-amber-600">
-                        Register a specialist in the Doctors page first.
+                        Add the specialist on the Doctors page first.
                       </p>
                     )}
                   </div>
@@ -494,7 +494,7 @@ export default function VisitRegistration() {
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="visitType">Visit Type</Label>
+                  <Label htmlFor="visitType">Reason for visit type</Label>
                   <Select value={visitType} onValueChange={setVisitType}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select visit type" />
@@ -512,17 +512,17 @@ export default function VisitRegistration() {
                   {hasInsurance && insuranceEligible && !selfPayOverride ? (
                     <div className="flex items-center gap-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
                       <InsuranceStatusBadge insurance={selectedPatient.insurance} eligibility={insuranceEligibility} compact />
-                      <span className="text-sm text-blue-700">Consultation covered — no payment required</span>
+                      <span className="text-sm text-blue-700">Consultation covered - no payment required</span>
                     </div>
                   ) : (isBlocked || isWaitingPeriod || selfPayOverride) ? (
                     <div className="flex items-center gap-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
                       <InsuranceStatusBadge insurance={selectedPatient.insurance} coverageType="paid" compact />
                       <span className="text-sm text-amber-700">
                         {isBlocked
-                          ? 'Insurance blocked — patient pays consultation out of pocket'
+                          ? 'Insurance blocked - patient pays for this consultation'
                           : isWaitingPeriod
-                            ? 'Waiting period — consultation is self-pay (labs/pharmacy can still use insurance)'
-                            : 'Self-pay selected — consultation out of pocket (labs/pharmacy can still use insurance)'}
+                            ? 'Waiting period - patient pays for this consultation. Labs and pharmacy can still use insurance when covered.'
+                            : 'Patient pays for this consultation. Labs and pharmacy can still use insurance when covered.'}
                       </span>
                     </div>
                   ) : (
@@ -562,12 +562,12 @@ export default function VisitRegistration() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="chiefComplaint">Chief Complaint</Label>
+                <Label htmlFor="chiefComplaint">Reason for today's visit</Label>
                 <Textarea
                   id="chiefComplaint"
                   value={chiefComplaint}
                   onChange={(e) => setChiefComplaint(e.target.value)}
-                  placeholder="Enter patient's chief complaint..."
+                  placeholder="What is the patient here for today?"
                   rows={3}
                 />
               </div>
@@ -576,7 +576,7 @@ export default function VisitRegistration() {
               <div className="space-y-2">
                 <Label htmlFor="temperature" className="flex items-center gap-2">
                   <Thermometer className="w-4 h-4 text-red-500" />
-                  Temperature (°C) — Quick Check
+                  Temperature (C) - Quick Check
                 </Label>
                 <Input
                   id="temperature"
@@ -592,18 +592,18 @@ export default function VisitRegistration() {
                     'text-xs font-medium',
                     parseFloat(temperature) >= 38 ? 'text-red-600' : parseFloat(temperature) >= 37.5 ? 'text-amber-600' : 'text-green-600',
                   )}>
-                    {parseFloat(temperature) >= 38 ? '⚠ Fever detected' : parseFloat(temperature) >= 37.5 ? 'Elevated temperature' : 'Normal temperature'}
+                    {parseFloat(temperature) >= 38 ? 'Fever detected' : parseFloat(temperature) >= 37.5 ? 'Elevated temperature' : 'Normal temperature'}
                   </p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Additional Notes</Label>
+                <Label htmlFor="notes">Notes for nurse or doctor</Label>
                 <Textarea
                   id="notes"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Any additional notes..."
+                  placeholder="Anything the nurse or doctor should know..."
                   rows={2}
                 />
               </div>
@@ -628,17 +628,17 @@ export default function VisitRegistration() {
             ) : isBlocked ? (
               <>
                 <UserPlus className="h-4 w-4 mr-2" />
-                Create Visit (Self-Pay Override)
+                Start self-pay visit
               </>
             ) : hasInsurance && insuranceEligible && !selfPayOverride ? (
               <>
                 <UserPlus className="h-4 w-4 mr-2" />
-                Create Visit (Insurance)
+                Start covered visit
               </>
             ) : (
               <>
                 <UserPlus className="h-4 w-4 mr-2" />
-                Create Visit & Confirm Payment
+                Start visit and collect payment
               </>
             )}
           </Button>
