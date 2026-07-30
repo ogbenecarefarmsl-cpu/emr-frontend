@@ -74,7 +74,7 @@ const QUALITATIVE_OPTIONS: Record<string, string[]> = {
 };
 
 // Tests that need a free-text area (complex/descriptive results)
-const TEXTAREA_TESTS = new Set(['STOOLMICRO']);
+const TEXTAREA_TESTS = new Set(['STOOLMICRO', 'SFA']);
 
 // Structured fields for Stool Microscopy (replaces plain textarea)
 const STOOL_MICRO_FIELDS = {
@@ -1189,7 +1189,7 @@ export default function EnterResultsPage() {
                     const testInfo = getTestInfo(testCode, patientAge, patientGender, entry?.menstrualPhase);
 
                     const qualitativeOptions = QUALITATIVE_OPTIONS[testCode];
-                    const isTextarea = TEXTAREA_TESTS.has(testCode);
+                    const isTextarea = TEXTAREA_TESTS.has(normalizeTestCode(testCode));
                     const isStoolMicro = STOOL_MICRO_TEST_CODES.has(normalizeTestCode(testCode));
                     const isHormoneTest = testInfo.isHormoneTest && patientGender === 'F';
                     const showAllRanges = isHormoneTest && entry?.allReferenceRanges && entry.allReferenceRanges.length > 1;
@@ -1246,7 +1246,9 @@ export default function EnterResultsPage() {
                               <p className="text-xs text-muted-foreground">{testName}</p>
                             </div>
                             <textarea
-                              placeholder="Enter findings..."
+                              placeholder={normalizeTestCode(testCode) === 'SFA'
+                                ? 'Enter laboratory observations for the fluid analysis...'
+                                : 'Enter findings...'}
                               value={entry?.value || ''}
                               onChange={e => handleValueChange(test, e.target.value)}
                               className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-ring"
