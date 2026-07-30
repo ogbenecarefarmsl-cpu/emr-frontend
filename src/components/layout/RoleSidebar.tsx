@@ -47,6 +47,11 @@ interface NavItem {
   label: string;
 }
 
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
 const roleNavItems: Record<UserRole, NavItem[]> = {
   admin: [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
@@ -129,6 +134,51 @@ const roleNavItems: Record<UserRole, NavItem[]> = {
   ],
 };
 
+// Grouped navigation for receptionist role
+const receptionistGroupedNav: NavGroup[] = [
+  {
+    label: 'Overview',
+    items: [
+      { to: '/reception', icon: LayoutDashboard, label: 'Reception Home' },
+    ],
+  },
+  {
+    label: 'Patient Care',
+    items: [
+      { to: '/reception/register', icon: UserPlus, label: 'Register Patient' },
+      { to: '/reception/visit-registration', icon: ClipboardCheck, label: 'Start Visit' },
+      { to: '/reception/patients', icon: Users, label: 'Find Patient' },
+      { to: '/reception/doctors', icon: UserRoundCog, label: 'Doctors' },
+    ],
+  },
+  {
+    label: 'Payments',
+    items: [
+      { to: '/reception/payments', icon: CreditCard, label: 'Collect Payments' },
+      { to: '/reception/walk-in-receipt', icon: Receipt, label: 'Walk-in Sale' },
+      { to: '/reception/treatment-plans', icon: ClipboardList, label: 'Treatment Plans' },
+      { to: '/reception/orders', icon: ClipboardList, label: 'Clinical Orders' },
+    ],
+  },
+  {
+    label: 'Documents',
+    items: [
+      { to: '/reception/dispensing', icon: Pill, label: 'Give Medicines' },
+      { to: '/reception/lab-reports', icon: FileText, label: 'Lab Reports' },
+      { to: '/reception/referral-letters', icon: FileCheck, label: 'Referral Letters' },
+      { to: '/reception/price-list', icon: Tag, label: 'Price List' },
+    ],
+  },
+  {
+    label: 'End of Day',
+    items: [
+      { to: '/reception/daily-report', icon: FileBarChart, label: 'Daily Report' },
+      { to: '/reception/reconciliation', icon: Calculator, label: 'Cash Reconciliation' },
+      { to: '/reception/printer', icon: Printer, label: 'Printer Setup' },
+    ],
+  },
+];
+
 interface RoleSidebarProps {
   role: UserRole;
   userName?: string;
@@ -143,6 +193,7 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false, doctor
   const navigate = useNavigate();
   const { signOut } = useAuth();
   const navItems = roleNavItems[role];
+  const isReceptionist = role === 'receptionist';
 
   const handleLogout = async () => {
     await signOut();
@@ -193,27 +244,64 @@ export function RoleSidebar({ role, userName, onClose, collapsed = false, doctor
 
       {/* Navigation */}
       <nav className={cn("flex-1 py-4 space-y-0.5 overflow-y-auto", collapsed ? "lg:px-3 px-3" : "px-3")}>
-        {navItems.map(({ to, icon: Icon, label }) => {
-          const isActive = location.pathname === to;
-          return (
-            <NavLink
-              key={to}
-              to={to}
-              onClick={onClose}
-              title={collapsed ? label : undefined}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 border-l-2 border-transparent',
-                collapsed && 'lg:justify-center lg:px-2',
-                isActive 
-                  ? 'border-sidebar-primary bg-sidebar-primary/15 text-sidebar-foreground font-semibold'
-                  : 'hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium'
-              )}
-            >
-              <Icon className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
-              <span className={cn("clinical-label text-current", collapsed && "lg:hidden")}>{label}</span>
-            </NavLink>
-          );
-        })}
+        {isReceptionist && !collapsed ? (
+          // Grouped navigation for receptionist
+          <>
+            {receptionistGroupedNav.map((group, groupIdx) => (
+              <div key={group.label} className={cn(groupIdx > 0 && "pt-4 mt-4 border-t border-sidebar-border/50")}>
+                <p className="px-3 pb-2 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+                  {group.label}
+                </p>
+                <div className="space-y-0.5">
+                  {group.items.map(({ to, icon: Icon, label }) => {
+                    const isActive = location.pathname === to;
+                    return (
+                      <NavLink
+                        key={to}
+                        to={to}
+                        onClick={onClose}
+                        className={cn(
+                          'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 border-l-2 border-transparent',
+                          isActive 
+                            ? 'border-sidebar-primary bg-sidebar-primary/15 text-sidebar-foreground font-semibold'
+                            : 'hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium'
+                        )}
+                      >
+                        <Icon className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
+                        <span className="clinical-label text-current">{label}</span>
+                      </NavLink>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </>
+        ) : (
+          // Flat navigation for other roles or collapsed receptionist
+          <>
+            {navItems.map(({ to, icon: Icon, label }) => {
+              const isActive = location.pathname === to;
+              return (
+                <NavLink
+                  key={to}
+                  to={to}
+                  onClick={onClose}
+                  title={collapsed ? label : undefined}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-150 border-l-2 border-transparent',
+                    collapsed && 'lg:justify-center lg:px-2',
+                    isActive 
+                      ? 'border-sidebar-primary bg-sidebar-primary/15 text-sidebar-foreground font-semibold'
+                      : 'hover:bg-sidebar-accent text-sidebar-foreground/80 hover:text-sidebar-foreground font-medium'
+                  )}
+                >
+                  <Icon className="w-4.5 h-4.5 flex-shrink-0" style={{ width: '18px', height: '18px' }} />
+                  <span className={cn("clinical-label text-current", collapsed && "lg:hidden")}>{label}</span>
+                </NavLink>
+              );
+            })}
+          </>
+        )}
         {(role === 'doctor' || role === 'specialist') && (
           <div className={cn("pt-3 mt-3 border-t border-sidebar-border/70 space-y-0.5", collapsed && "lg:pt-2 lg:mt-2")}>
             {!collapsed && (
