@@ -2,7 +2,6 @@ import { useState, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { RoleLayout } from '@/components/layout/RoleLayout';
-import { MetricCard } from '@/components/dashboard/MetricCard';
 import { useAuth } from '@/context/AuthContext';
 import { prescriptionService } from '@/services/prescriptionService';
 import { inventoryAPI } from '@/services/api';
@@ -22,13 +21,32 @@ import { toast } from 'sonner';
 
 // Icons
 import {
-  AlertTriangle, CheckCircle, Clock, Loader2, Package, Pill, Search, User,
-  ClipboardList, CreditCard, Send, XCircle, ChevronRight, ArrowRight, Stethoscope,
-  ShieldAlert, Calendar,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Loader2,
+  Package,
+  Pill,
+  Search,
+  User,
+  ClipboardList,
+  CreditCard,
+  Send,
+  XCircle,
+  ChevronRight,
+  ArrowRight,
+  Stethoscope,
+  ShieldAlert,
+  Calendar,
+  Printer,
+  RefreshCw,
+  Sparkles,
+  ShoppingBag,
 } from 'lucide-react';
 
 const getId = (v: any) => v?._id || v?.id || v;
-const patientName = (p: any) => p ? `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'Unknown Patient' : 'Unknown Patient';
+const patientName = (p: any) =>
+  p ? `${p.firstName || ''} ${p.lastName || ''}`.trim() || 'Unknown Patient' : 'Unknown Patient';
 
 export default function PharmacyDashboard() {
   const { profile, user } = useAuth();
@@ -39,7 +57,12 @@ export default function PharmacyDashboard() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [dispensingNotes, setDispensingNotes] = useState('');
 
-  const { data: prescriptions = [], isLoading } = useQuery({
+  const {
+    data: prescriptions = [],
+    isLoading,
+    refetch: refetchPrescriptions,
+    isFetching,
+  } = useQuery({
     queryKey: ['prescriptions', 'pharmacy'],
     queryFn: () => prescriptionService.findAll(),
     refetchInterval: 15000,
@@ -61,7 +84,7 @@ export default function PharmacyDashboard() {
   const dispense = useMutation({
     mutationFn: (id: string) => prescriptionService.dispense(id, dispensingNotes.trim() || undefined),
     onSuccess: () => {
-      toast.success('Prescription dispensed, stock deducted');
+      toast.success('Prescription dispensed successfully. Pharmacy stock updated.');
       setSelected(null);
       setConfirmOpen(false);
       setDispensingNotes('');
@@ -70,29 +93,36 @@ export default function PharmacyDashboard() {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
     },
     onError: (err: any) => {
-      toast.error(err?.response?.data?.message || 'Failed to dispense');
+      toast.error(err?.response?.data?.message || 'Failed to dispense prescription');
     },
   });
 
   // Filter prescriptions into buckets
-  const paidWaiting = prescriptions.filter(
-    (rx: any) => rx.status === PrescriptionStatusEnum.PENDING && rx.isPaid,
+  const paidWaiting = useMemo(
+    () => prescriptions.filter((rx: any) => rx.status === PrescriptionStatusEnum.PENDING && rx.isPaid),
+    [prescriptions],
   );
-  const unpaid = prescriptions.filter(
-    (rx: any) => rx.status === PrescriptionStatusEnum.PENDING && !rx.isPaid,
+  const unpaid = useMemo(
+    () => prescriptions.filter((rx: any) => rx.status === PrescriptionStatusEnum.PENDING && !rx.isPaid),
+    [prescriptions],
   );
-  const dispensedToday = prescriptions.filter((rx: any) => {
-    if (rx.status !== PrescriptionStatusEnum.DISPENSED || !rx.dispensedAt) return false;
-    return new Date(rx.dispensedAt).toDateString() === new Date().toDateString();
-  });
+  const dispensedToday = useMemo(
+    () =>
+      prescriptions.filter((rx: any) => {
+        if (rx.status !== PrescriptionStatusEnum.DISPENSED || !rx.dispensedAt) return false;
+        return new Date(rx.dispensedAt).toDateString() === new Date().toDateString();
+      }),
+    [prescriptions],
+  );
 
   // Filter by search
   const filter = (list: any[]) => {
     if (!searchTerm) return list;
     const q = searchTerm.toLowerCase();
-    return list.filter((rx: any) =>
-      patientName(rx.patientId).toLowerCase().includes(q) ||
-      rx.prescriptionNumber?.toLowerCase().includes(q),
+    return list.filter(
+      (rx: any) =>
+        patientName(rx.patientId).toLowerCase().includes(q) ||
+        rx.prescriptionNumber?.toLowerCase().includes(q),
     );
   };
 
@@ -135,89 +165,175 @@ export default function PharmacyDashboard() {
 
   return (
     <RoleLayout
-      title="Pharmacy"
-      subtitle="Dispense prescriptions and monitor stock"
+      title="Pharmacy Dispensary"
+      subtitle="Prescription fulfillment, inventory stock reconciliation, and patient counseling"
       role="pharmacist"
       userName={profile?.fullName}
     >
-      {/* Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-6">
-        <MetricCard
-          title="Ready to Dispense"
-          value={paidWaiting.length}
-          icon={ClipboardList}
-          variant={paidWaiting.length > 0 ? 'primary' : 'default'}
-        />
-        <MetricCard
-          title="Awaiting Payment"
-          value={unpaid.length}
-          icon={CreditCard}
-          variant={unpaid.length > 0 ? 'warning' : 'default'}
-        />
-        <MetricCard
-          title="Dispensed Today"
-          value={dispensedToday.length}
-          icon={CheckCircle}
-        />
-        <MetricCard
-          title="Low Stock"
-          value={lowStock.length}
-          icon={AlertTriangle}
-          variant={lowStock.length > 0 ? 'critical' : 'default'}
-        />
-        <MetricCard
-          title="Expiring (90d)"
-          value={expiringSoon.length}
-          icon={Calendar}
-          variant={expiringSoon.length > 0 ? 'warning' : 'default'}
-        />
+      {/* ───────── TOP HIGH-DENSITY STATUS STRIP ───────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 mb-5">
+        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3 flex items-center justify-between shadow-xs">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Ready to Dispense</p>
+            <p className="text-2xl font-bold text-primary mt-0.5">{paidWaiting.length}</p>
+          </div>
+          <div className="p-2.5 rounded-lg bg-primary/10 text-primary">
+            <ClipboardList className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="rounded-xl border bg-card p-3 flex items-center justify-between shadow-xs">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Awaiting Payment</p>
+            <p className="text-2xl font-bold text-amber-600 mt-0.5">{unpaid.length}</p>
+          </div>
+          <div className="p-2.5 rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/30">
+            <CreditCard className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className="rounded-xl border bg-card p-3 flex items-center justify-between shadow-xs">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Dispensed Today</p>
+            <p className="text-2xl font-bold text-emerald-600 mt-0.5">{dispensedToday.length}</p>
+          </div>
+          <div className="p-2.5 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/30">
+            <CheckCircle className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div
+          onClick={() => navigate('/pharmacy/inventory')}
+          className="cursor-pointer rounded-xl border bg-card p-3 flex items-center justify-between shadow-xs hover:border-red-300 transition-colors"
+        >
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Low Stock Alert</p>
+            <p className={cn('text-2xl font-bold mt-0.5', lowStock.length > 0 ? 'text-red-600' : 'text-foreground')}>
+              {lowStock.length}
+            </p>
+          </div>
+          <div className="p-2.5 rounded-lg bg-red-50 text-red-600 dark:bg-red-950/30">
+            <AlertTriangle className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div
+          onClick={() => navigate('/pharmacy/inventory')}
+          className="cursor-pointer rounded-xl border bg-card p-3 flex items-center justify-between shadow-xs hover:border-orange-300 transition-colors"
+        >
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Expiring (90d)</p>
+            <p className={cn('text-2xl font-bold mt-0.5', expiringSoon.length > 0 ? 'text-orange-600' : 'text-foreground')}>
+              {expiringSoon.length}
+            </p>
+          </div>
+          <div className="p-2.5 rounded-lg bg-orange-50 text-orange-600 dark:bg-orange-950/30">
+            <Calendar className="w-5 h-5" />
+          </div>
+        </div>
       </div>
 
-      {/* Search */}
-      <div className="mb-4 relative max-w-md">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Search by patient name or prescription number..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
-        />
+      {/* ───────── SEARCH & ACTION TOOLBAR ───────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 bg-card border rounded-xl p-3 shadow-xs">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search patient name, code, or prescription #..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-8 h-9 text-sm"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 text-xs gap-1"
+            onClick={() => refetchPrescriptions()}
+          >
+            <RefreshCw className={cn('w-3.5 h-3.5', isFetching && 'animate-spin')} />
+            Refresh
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 text-xs gap-1.5"
+            onClick={() => navigate('/pharmacy/inventory')}
+          >
+            <Package className="w-3.5 h-3.5" />
+            Inventory & Stock
+          </Button>
+
+          <Button
+            size="sm"
+            className="h-9 text-xs gap-1.5"
+            onClick={() => navigate('/reception/orders')}
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            Walk-in OTC
+          </Button>
+        </div>
       </div>
 
-      {/* Main two-pane layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* LEFT: Prescription queues */}
-        <div className="lg:col-span-1">
-          <div className="bg-card border rounded-xl shadow-sm">
+      {/* ───────── MAIN TWO-PANE DISPENSING CONSOLE ───────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* LEFT: Prescription queues (5 cols) */}
+        <div className="lg:col-span-5 space-y-4">
+          <div className="bg-card border rounded-xl shadow-xs overflow-hidden">
             <Tabs defaultValue="paid">
-              <div className="border-b px-3 pt-2">
+              <div className="border-b px-3 pt-2 bg-muted/20">
                 <TabsList className="bg-transparent h-auto p-0 gap-1">
-                  <TabsTrigger value="paid" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
-                    Ready
+                  <TabsTrigger
+                    value="paid"
+                    className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none pb-2 text-xs"
+                  >
+                    Ready to Dispense
                     {paidWaiting.length > 0 && (
-                      <Badge className="ml-1.5 h-4 min-w-4 text-[10px]">{paidWaiting.length}</Badge>
+                      <Badge className="ml-1.5 h-4.5 min-w-4.5 text-[10px] bg-emerald-600">
+                        {paidWaiting.length}
+                      </Badge>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="unpaid" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
+                  <TabsTrigger
+                    value="unpaid"
+                    className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none pb-2 text-xs"
+                  >
                     Unpaid
                     {unpaid.length > 0 && (
-                      <Badge variant="secondary" className="ml-1.5 h-4 min-w-4 text-[10px]">{unpaid.length}</Badge>
+                      <Badge variant="secondary" className="ml-1.5 h-4.5 min-w-4.5 text-[10px]">
+                        {unpaid.length}
+                      </Badge>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="done" className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none">
-                    Done
+                  <TabsTrigger
+                    value="done"
+                    className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none pb-2 text-xs"
+                  >
+                    Dispensed Today
+                    {dispensedToday.length > 0 && (
+                      <span className="text-[10px] text-muted-foreground ml-1">({dispensedToday.length})</span>
+                    )}
                   </TabsTrigger>
                 </TabsList>
               </div>
 
               {/* Paid waiting list */}
               <TabsContent value="paid" className="mt-0">
-                <ScrollArea className="max-h-[calc(100vh-340px)]">
+                <ScrollArea className="max-h-[calc(100vh-320px)] min-h-[380px]">
                   {isLoading ? (
-                    <div className="py-10 flex justify-center"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                    <div className="py-12 flex flex-col items-center justify-center gap-2">
+                      <Loader2 className="h-6 w-6 animate-spin text-primary" />
+                      <p className="text-xs text-muted-foreground">Loading queue...</p>
+                    </div>
                   ) : filteredPaid.length === 0 ? (
-                    <div className="py-10 text-center text-muted-foreground text-sm">
-                      {searchTerm ? 'No matches' : 'No prescriptions ready to dispense'}
+                    <div className="py-12 text-center text-muted-foreground text-sm space-y-2">
+                      <ClipboardList className="w-8 h-8 mx-auto text-muted-foreground/40" />
+                      <p className="font-medium">No prescriptions waiting for dispensing</p>
+                      <p className="text-xs text-muted-foreground">
+                        {searchTerm ? 'No matches found' : 'Orders paid at reception will appear here immediately'}
+                      </p>
                     </div>
                   ) : (
                     <div className="divide-y">
@@ -227,7 +343,7 @@ export default function PharmacyDashboard() {
                           rx={rx}
                           selected={selected && getId(selected) === getId(rx)}
                           onClick={() => setSelected(rx)}
-                          badge={<Badge className="bg-green-500 text-[10px]">Paid</Badge>}
+                          badge={<Badge className="bg-emerald-600 text-[10px] font-semibold">Paid • Ready</Badge>}
                         />
                       ))}
                     </div>
@@ -237,10 +353,12 @@ export default function PharmacyDashboard() {
 
               {/* Unpaid list */}
               <TabsContent value="unpaid" className="mt-0">
-                <ScrollArea className="max-h-[calc(100vh-340px)]">
+                <ScrollArea className="max-h-[calc(100vh-320px)] min-h-[380px]">
                   {filteredUnpaid.length === 0 ? (
-                    <div className="py-10 text-center text-muted-foreground text-sm">
-                      {searchTerm ? 'No matches' : 'No unpaid prescriptions'}
+                    <div className="py-12 text-center text-muted-foreground text-sm space-y-2">
+                      <CreditCard className="w-8 h-8 mx-auto text-muted-foreground/40" />
+                      <p className="font-medium">No unpaid prescriptions</p>
+                      <p className="text-xs text-muted-foreground">All doctor orders have been paid or completed</p>
                     </div>
                   ) : (
                     <div className="divide-y">
@@ -265,10 +383,12 @@ export default function PharmacyDashboard() {
 
               {/* Done today */}
               <TabsContent value="done" className="mt-0">
-                <ScrollArea className="max-h-[calc(100vh-340px)]">
+                <ScrollArea className="max-h-[calc(100vh-320px)] min-h-[380px]">
                   {filteredDispensed.length === 0 ? (
-                    <div className="py-10 text-center text-muted-foreground text-sm">
-                      Nothing dispensed yet today
+                    <div className="py-12 text-center text-muted-foreground text-sm space-y-2">
+                      <CheckCircle className="w-8 h-8 mx-auto text-muted-foreground/40" />
+                      <p className="font-medium">Nothing dispensed yet today</p>
+                      <p className="text-xs text-muted-foreground">Fulfilled prescriptions will be logged here</p>
                     </div>
                   ) : (
                     <div className="divide-y">
@@ -279,8 +399,8 @@ export default function PharmacyDashboard() {
                           selected={selected && getId(selected) === getId(rx)}
                           onClick={() => setSelected(rx)}
                           badge={
-                            <Badge variant="outline" className="bg-slate-50 text-[10px]">
-                              <CheckCircle className="w-3 h-3 mr-0.5" />
+                            <Badge variant="outline" className="bg-slate-100 text-slate-700 text-[10px]">
+                              <CheckCircle className="w-3 h-3 mr-0.5 text-emerald-600" />
                               Dispensed
                             </Badge>
                           }
@@ -293,62 +413,34 @@ export default function PharmacyDashboard() {
             </Tabs>
           </div>
 
-          {/* Low stock + expiring warnings */}
+          {/* Quick stock warning cards */}
           {lowStock.length > 0 && (
-            <div className="bg-card border rounded-xl shadow-sm mt-4 border-l-4 border-l-amber-500">
-              <div className="px-4 py-3 border-b flex items-center justify-between">
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-500" />
-                  Low Stock
+            <div className="bg-card border rounded-xl shadow-xs border-l-4 border-l-red-500 overflow-hidden">
+              <div className="px-4 py-2.5 border-b bg-muted/20 flex items-center justify-between">
+                <h3 className="font-semibold text-xs flex items-center gap-1.5 text-red-700 dark:text-red-400">
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Urgent Stock Reorder Needed
                 </h3>
-                <Button variant="ghost" size="sm" className="text-xs" onClick={() => navigate('/pharmacy/inventory')}>
-                  View all <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
+                <Button variant="ghost" size="sm" className="text-xs h-6 px-1.5" onClick={() => navigate('/pharmacy/inventory')}>
+                  View all <ArrowRight className="w-3 h-3 ml-0.5" />
                 </Button>
               </div>
               <div className="divide-y">
                 {lowStock.slice(0, 3).map((m: any) => (
-                  <div key={m._id} className="px-4 py-2 flex items-center justify-between">
-                    <p className="text-sm truncate">{m.name}</p>
-                    <Badge variant="destructive" className="text-[10px]">
-                      {m.stockQuantity} left
+                  <div key={m._id} className="px-4 py-2 flex items-center justify-between text-xs">
+                    <p className="font-medium truncate max-w-[200px]">{m.name}</p>
+                    <Badge variant="destructive" className="text-[10px] h-4.5">
+                      {m.stockQuantity} remaining
                     </Badge>
                   </div>
                 ))}
               </div>
             </div>
           )}
-          {expiringSoon.length > 0 && (
-            <div className="bg-card border rounded-xl shadow-sm mt-4 border-l-4 border-l-orange-500">
-              <div className="px-4 py-3 border-b flex items-center justify-between">
-                <h3 className="font-semibold text-sm flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-orange-500" />
-                  Expiring Soon
-                </h3>
-                <Button variant="ghost" size="sm" className="text-xs" onClick={() => navigate('/pharmacy/inventory')}>
-                  View all <ArrowRight className="w-3.5 h-3.5 ml-0.5" />
-                </Button>
-              </div>
-              <div className="divide-y">
-                {expiringSoon.slice(0, 3).map((m: any) => {
-                  const daysLeft = m.expiryDate
-                    ? Math.ceil((new Date(m.expiryDate).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-                    : null;
-                  return (
-                    <div key={m._id} className="px-4 py-2 flex items-center justify-between">
-                      <p className="text-sm truncate">{m.name} <span className="text-xs text-muted-foreground">({m.batchNumber})</span></p>
-                      <Badge variant={daysLeft && daysLeft < 30 ? 'destructive' : 'outline'} className="text-[10px]">
-                        {daysLeft ? `${daysLeft}d` : 'N/A'}
-                      </Badge>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* RIGHT: Prescription detail */}
-        <div className="lg:col-span-2">
+        {/* RIGHT: Prescription detail & dispensing console (7 cols) */}
+        <div className="lg:col-span-7">
           {selected ? (
             <PrescriptionDetail
               rx={selected}
@@ -357,78 +449,89 @@ export default function PharmacyDashboard() {
               interactions={checkInteractions(selected.items || [])}
             />
           ) : (
-            <div className="bg-card border rounded-xl shadow-sm flex flex-col items-center justify-center h-96 text-muted-foreground p-6 text-center">
-              <Pill className="w-16 h-16 mb-4 opacity-30" />
-              <p className="text-lg font-medium">No Prescription Selected</p>
-              <p className="text-sm mt-1 max-w-sm">
-                Select a prescription from the left to review medications and dispense.
+            <div className="bg-card border rounded-xl shadow-xs flex flex-col items-center justify-center min-h-[460px] text-muted-foreground p-8 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center text-primary mb-4">
+                <Pill className="w-8 h-8" />
+              </div>
+              <p className="text-lg font-semibold text-foreground">Select Prescription to Dispense</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                Choose a patient order from the queue to verify inventory stock availability, check drug-drug interactions, and fulfill medication.
               </p>
               {paidWaiting.length > 0 && (
-                <p className="text-xs mt-3 text-primary">
-                  {paidWaiting.length} ready to dispense
-                </p>
+                <div className="mt-4 px-3 py-1.5 rounded-full bg-emerald-50 text-emerald-800 text-xs font-medium border border-emerald-200">
+                  {paidWaiting.length} prescription(s) paid and ready for immediate dispensing
+                </div>
               )}
             </div>
           )}
         </div>
       </div>
 
-      {/* Dispense confirmation dialog */}
+      {/* ───────── DISPENSE CONFIRMATION MODAL ───────── */}
       <Dialog open={confirmOpen} onOpenChange={(open) => { setConfirmOpen(open); if (!open) setDispensingNotes(''); }}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Confirm Dispense</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Pill className="w-5 h-5 text-primary" />
+              Confirm Medication Dispensation
+            </DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <p className="text-sm">
-              Dispensing will deduct the following quantities from stock:
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              Confirming will mark this prescription as fulfilled and automatically deduct the items from pharmacy stock.
             </p>
-            <div className="border rounded-lg divide-y">
+
+            <div className="border rounded-lg divide-y max-h-56 overflow-y-auto">
               {selected?.items?.map((item: any, i: number) => (
-                <div key={i} className="px-3 py-2 text-sm">
+                <div key={i} className="p-3 text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">{item.medicationName}</span>
-                    <Badge variant="outline">Qty {item.quantity}</Badge>
+                    <span className="font-semibold text-foreground">{item.medicationName}</span>
+                    <Badge variant="outline" className="font-mono">Qty {item.quantity}</Badge>
                   </div>
                   {item.instructions && (
                     <p className="text-xs text-muted-foreground mt-0.5 italic">
                       Label: {item.instructions}
                     </p>
                   )}
-                  {item.pharmacistNote && (
-                    <p className="text-xs text-amber-700 mt-0.5">
-                      ⚠ {item.pharmacistNote}
+                  {item.dosage && (
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                      {item.dosage} • {item.frequency} • {item.duration}
                     </p>
                   )}
                 </div>
               ))}
             </div>
+
             <div>
-              <label className="text-sm font-medium">
-                Dispensing Notes <span className="text-muted-foreground font-normal">(optional)</span>
+              <label className="text-xs font-semibold text-foreground block mb-1">
+                Pharmacist Dispensing Notes & Counseling Log (Optional)
               </label>
               <textarea
-                className="mt-1 w-full border rounded-md px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                className="w-full border rounded-lg p-2.5 text-xs resize-none focus:outline-none focus:ring-2 focus:ring-primary"
                 rows={2}
-                placeholder="e.g. Counselled patient on storage. Brand substituted — same generic."
+                placeholder="e.g. Counselled on taking with food. Patient informed of potential drowsiness."
                 value={dispensingNotes}
                 onChange={(e) => setDispensingNotes(e.target.value)}
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              This action cannot be undone.
-            </p>
           </div>
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setConfirmOpen(false); setDispensingNotes(''); }}>Cancel</Button>
+            <Button variant="outline" size="sm" onClick={() => { setConfirmOpen(false); setDispensingNotes(''); }}>
+              Cancel
+            </Button>
             <Button
+              size="sm"
+              className="gap-1.5 font-medium"
               onClick={() => dispense.mutate(getId(selected))}
               disabled={dispense.isPending}
             >
-              {dispense.isPending
-                ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                : <Send className="w-4 h-4 mr-2" />}
-              Confirm Dispense
+              {dispense.isPending ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              Confirm Dispense & Deduct Stock
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -437,28 +540,34 @@ export default function PharmacyDashboard() {
   );
 }
 
-// ──────────── Helpers ────────────
+// ──────────── Helper Components ────────────
 
 function PrescriptionRow({
   rx, selected, onClick, badge,
 }: { rx: any; selected: boolean; onClick: () => void; badge: React.ReactNode }) {
+  const p = rx.patientId;
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        'w-full text-left p-3 hover:bg-muted/50 transition-colors flex items-start justify-between gap-2',
-        selected && 'bg-primary/5 border-l-2 border-primary',
+        'w-full text-left p-3.5 hover:bg-muted/50 transition-colors flex items-start justify-between gap-3',
+        selected && 'bg-primary/5 border-l-4 border-l-primary',
       )}
     >
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-sm truncate">{patientName(rx.patientId)}</p>
-        <p className="text-xs text-muted-foreground truncate">{rx.prescriptionNumber}</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          {rx.items?.length || 0} medication{rx.items?.length === 1 ? '' : 's'}
+        <div className="flex items-center gap-2">
+          <p className="font-semibold text-sm truncate text-foreground">{patientName(p)}</p>
+          {p?.gender && (
+            <span className="text-[10px] text-muted-foreground uppercase">({p.gender.charAt(0)})</span>
+          )}
+        </div>
+        <p className="text-xs font-mono text-muted-foreground truncate mt-0.5">{rx.prescriptionNumber}</p>
+        <p className="text-xs text-muted-foreground mt-1">
+          {rx.items?.length || 0} prescribed medication{rx.items?.length === 1 ? '' : 's'}
         </p>
       </div>
-      <div className="flex-shrink-0 flex flex-col items-end gap-1">
+      <div className="shrink-0 flex flex-col items-end gap-1.5">
         {badge}
         <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
       </div>
@@ -475,59 +584,69 @@ function PrescriptionDetail({
   const patient = rx.patientId;
   const total = rx.totalAmount || rx.items?.reduce((s: number, i: any) => s + (i.quantity * (i.unitPrice || 0)), 0) || 0;
   const patientAllergies = patient?.allergies || patient?.allergyDetails || [];
-  const hasAllergyConflict = interactions.length > 0 || patientAllergies.length > 0;
+  const hasAlerts = interactions.length > 0 || patientAllergies.length > 0;
 
   return (
-    <div className="bg-card border rounded-xl shadow-sm">
-      {/* Header */}
-      <div className={cn(
-        'px-5 py-4 border-b',
-        hasAllergyConflict
-          ? 'bg-gradient-to-r from-red-50 to-amber-50 dark:from-red-950/30 dark:to-amber-950/30 border-red-200'
-          : 'bg-gradient-to-r from-primary/5 to-transparent',
-      )}>
-        <div className="flex items-start justify-between gap-3">
+    <div className="bg-card border rounded-xl shadow-xs overflow-hidden">
+      {/* Header Banner */}
+      <div
+        className={cn(
+          'p-5 border-b',
+          hasAlerts
+            ? 'bg-gradient-to-r from-red-50/70 to-amber-50/70 dark:from-red-950/30 dark:to-amber-950/30 border-red-200'
+            : 'bg-gradient-to-r from-primary/5 to-transparent',
+        )}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <User className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-semibold">{patientName(patient)}</h2>
-              <Badge variant="outline">{rx.prescriptionNumber}</Badge>
+              <h2 className="text-lg font-bold text-foreground">{patientName(patient)}</h2>
+              <Badge variant="outline" className="font-mono text-xs">
+                {rx.prescriptionNumber}
+              </Badge>
             </div>
-            <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground">
-              {patient?.patientId && <span>{patient.patientId}</span>}
-              {patient?.gender && <><span>·</span><span>{patient.gender}</span></>}
-              {patient?.age && <><span>·</span><span>{patient.age} yrs</span></>}
+            <div className="flex items-center gap-2.5 mt-1.5 text-xs text-muted-foreground flex-wrap">
+              {patient?.patientId && <span className="font-mono">{patient.patientId}</span>}
+              {patient?.gender && <span>• {patient.gender}</span>}
+              {patient?.age && <span>• {patient.age} yrs</span>}
               {rx.createdAt && (
-                <>
-                  <span>·</span>
-                  <span>Prescribed {new Date(rx.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
-                </>
+                <span>
+                  • Prescribed {new Date(rx.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
               )}
             </div>
+
             {(rx.prescribedBy || rx.doctorId) && (
-              <div className="flex items-center gap-1.5 mt-1.5 text-sm">
+              <div className="flex items-center gap-1.5 mt-2 text-xs">
                 <Stethoscope className="w-3.5 h-3.5 text-primary" />
-                <span className="font-medium">
-                  {rx.prescribedBy?.fullName || rx.doctorId?.fullName}
+                <span className="font-semibold text-foreground">
+                  Prescriber: {rx.prescribedBy?.fullName || rx.doctorId?.fullName}
                 </span>
                 {rx.prescribedBy?.department && (
-                  <span className="text-muted-foreground">· {rx.prescribedBy.department}</span>
+                  <span className="text-muted-foreground">({rx.prescribedBy.department})</span>
                 )}
               </div>
             )}
+
+            {/* Allergy Alerts */}
             {patientAllergies.length > 0 && (
               <Alert variant="destructive" className="mt-3 py-2 px-3">
                 <ShieldAlert className="w-4 h-4" />
-                <AlertTitle className="text-sm font-semibold">Patient Allergies</AlertTitle>
+                <AlertTitle className="text-xs font-bold uppercase tracking-wider">Patient Allergies</AlertTitle>
                 <AlertDescription className="text-xs mt-0.5">
                   {Array.isArray(patientAllergies) ? patientAllergies.join(', ') : patientAllergies}
                 </AlertDescription>
               </Alert>
             )}
+
+            {/* Drug Interaction Alerts */}
             {interactions.length > 0 && (
               <Alert className="mt-3 py-2 px-3 border-amber-300 bg-amber-50 dark:bg-amber-950/30">
                 <AlertTriangle className="w-4 h-4 text-amber-600" />
-                <AlertTitle className="text-sm font-semibold text-amber-800 dark:text-amber-300">Drug Interaction Alerts</AlertTitle>
+                <AlertTitle className="text-xs font-bold uppercase tracking-wider text-amber-800 dark:text-amber-300">
+                  Drug Interaction Conflict Warning
+                </AlertTitle>
                 <AlertDescription className="text-xs mt-0.5 text-amber-700 dark:text-amber-400">
                   <ul className="list-disc list-inside space-y-0.5">
                     {interactions.map((warning, i) => (
@@ -538,21 +657,38 @@ function PrescriptionDetail({
               </Alert>
             )}
           </div>
-          <div>
-            {isDispensed && <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" />Dispensed</Badge>}
-            {canDispense && <Badge className="bg-primary">Ready to dispense</Badge>}
-            {isUnpaid && <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">Awaiting payment</Badge>}
+
+          <div className="shrink-0 self-start">
+            {isDispensed && (
+              <Badge className="bg-emerald-600 gap-1 text-xs py-1">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Fulfilled
+              </Badge>
+            )}
+            {canDispense && (
+              <Badge className="bg-primary text-xs py-1 font-semibold">
+                Ready to Dispense
+              </Badge>
+            )}
+            {isUnpaid && (
+              <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 text-xs py-1">
+                Awaiting Payment
+              </Badge>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Medications list */}
-      <div className="p-5">
-        <h3 className="text-sm font-semibold mb-3">Medications</h3>
+      {/* Medications List */}
+      <div className="p-5 space-y-4">
+        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Prescribed Medications & Stock Check
+        </h3>
+
         {rx.items?.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No items</p>
+          <p className="text-sm text-muted-foreground">No prescription items found.</p>
         ) : (
-          <div className="border rounded-lg overflow-hidden divide-y">
+          <div className="border rounded-xl overflow-hidden divide-y">
             {rx.items?.map((item: any, i: number) => {
               const medication = typeof item.medicationId === 'object' ? item.medicationId : null;
               const stock = medication?.stockQuantity;
@@ -560,102 +696,125 @@ function PrescriptionDetail({
               const enoughStock = hasStockInfo ? stock >= item.quantity : true;
 
               return (
-              <div key={i} className="p-4 hover:bg-muted/30">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-sm">{item.medicationName}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {item.dosage} · {item.frequency} · {item.duration}
-                      {item.route && item.route !== 'oral' && ` · ${item.route}`}
-                    </p>
-                    {hasStockInfo && (
-                      <p className={cn('text-xs mt-1 font-medium', enoughStock ? 'text-emerald-600' : 'text-red-600')}>
-                        Stock: {stock} available{enoughStock ? '' : `, needs ${item.quantity}`}
-                      </p>
-                    )}
-                    {item.instructions && (
-                      <p className="text-xs italic text-muted-foreground mt-1 bg-muted/50 rounded px-2 py-1">
-                        Label: {item.instructions}
-                      </p>
-                    )}
-                    {item.pharmacistNote && (
-                      <p className="text-xs text-amber-700 mt-1 bg-amber-50 rounded px-2 py-1">
-                        ⚠ {item.pharmacistNote}
-                      </p>
-                    )}
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <Badge variant={enoughStock ? 'outline' : 'destructive'}>Qty {item.quantity}</Badge>
-                    {item.unitPrice > 0 && (
+                <div key={i} className="p-4 hover:bg-muted/20 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-bold text-sm text-foreground">{item.medicationName}</p>
+                        {hasStockInfo && (
+                          <Badge
+                            variant="outline"
+                            className={cn(
+                              'text-[10px] h-5',
+                              enoughStock
+                                ? 'border-emerald-300 text-emerald-700 bg-emerald-50'
+                                : 'border-red-300 text-red-700 bg-red-50',
+                            )}
+                          >
+                            {enoughStock ? `In Stock (${stock} avail)` : `Low Stock (only ${stock} left)`}
+                          </Badge>
+                        )}
+                      </div>
+
                       <p className="text-xs text-muted-foreground mt-1">
-                        @ Le {Number(item.unitPrice).toLocaleString()}
+                        Regimen: <span className="text-foreground font-medium">{item.dosage}</span> •{' '}
+                        <span className="text-foreground font-medium">{item.frequency}</span> •{' '}
+                        <span className="text-foreground font-medium">{item.duration}</span>
+                        {item.route && item.route !== 'oral' && ` • Route: ${item.route}`}
                       </p>
-                    )}
+
+                      {item.instructions && (
+                        <p className="text-xs italic text-muted-foreground mt-1.5 bg-muted/50 rounded-md px-2.5 py-1">
+                          Label Instructions: {item.instructions}
+                        </p>
+                      )}
+
+                      {item.pharmacistNote && (
+                        <p className="text-xs text-amber-800 dark:text-amber-300 mt-1 bg-amber-50 dark:bg-amber-950/20 rounded-md px-2.5 py-1">
+                          Pharmacist Note: {item.pharmacistNote}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <Badge variant={enoughStock ? 'outline' : 'destructive'} className="text-xs font-mono font-bold">
+                        Qty {item.quantity}
+                      </Badge>
+                      {item.unitPrice > 0 && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          @ Le {Number(item.unitPrice).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
               );
             })}
           </div>
         )}
 
         {rx.notes && (
-          <>
-            <Separator className="my-4" />
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                Doctor's Notes
-              </p>
-              <p className="text-sm">{rx.notes}</p>
-            </div>
-          </>
+          <div className="rounded-lg bg-muted/40 p-3 text-xs">
+            <p className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider mb-1">
+              Doctor's Clinical Notes
+            </p>
+            <p className="text-foreground">{rx.notes}</p>
+          </div>
         )}
 
         {rx.dispensingNotes && (
-          <>
-            <Separator className="my-4" />
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">
-                Dispensing Notes
-              </p>
-              <p className="text-sm">{rx.dispensingNotes}</p>
-            </div>
-          </>
+          <div className="rounded-lg bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200/50 p-3 text-xs">
+            <p className="font-semibold text-emerald-800 dark:text-emerald-300 uppercase text-[10px] tracking-wider mb-1">
+              Pharmacist Dispensing Log
+            </p>
+            <p className="text-foreground">{rx.dispensingNotes}</p>
+          </div>
         )}
 
-        <Separator className="my-4" />
+        <Separator />
 
-        {/* Total + action */}
-        <div className="flex items-center justify-between">
+        {/* Footer actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
           <div>
-            <p className="text-xs text-muted-foreground">Total</p>
-            <p className="text-xl font-bold">Le {total.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">Prescription Total</p>
+            <p className="text-2xl font-extrabold text-foreground">Le {total.toLocaleString()}</p>
           </div>
-          {canDispense && (
-            <Button size="lg" onClick={onDispense} disabled={isPending}>
-              {isPending
-                ? <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                : <Pill className="w-4 h-4 mr-2" />}
-              Dispense & Deduct Stock
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="text-xs gap-1"
+              onClick={() => {
+                toast.success(`Printing label for prescription ${rx.prescriptionNumber}`);
+              }}
+            >
+              <Printer className="w-3.5 h-3.5" />
+              Print Label
             </Button>
-          )}
-          {isUnpaid && (
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Waiting on reception</p>
-              <p className="text-sm font-medium text-amber-700">Cannot dispense yet</p>
-            </div>
-          )}
-          {isDispensed && (
-            <div className="text-right">
-              <p className="text-xs text-muted-foreground">Dispensed</p>
-              <p className="text-sm font-medium text-green-700">
-                {new Date(rx.dispensedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-              </p>
-            </div>
-          )}
+
+            {canDispense && (
+              <Button size="default" className="font-bold gap-1.5 shadow-xs" onClick={onDispense} disabled={isPending}>
+                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Pill className="w-4 h-4" />}
+                Dispense & Deduct Stock
+              </Button>
+            )}
+
+            {isUnpaid && (
+              <div className="px-3 py-1.5 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 text-amber-800 dark:text-amber-300 rounded-lg text-xs font-medium">
+                Pending cashier payment
+              </div>
+            )}
+
+            {isDispensed && (
+              <div className="px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 text-emerald-800 dark:text-emerald-300 rounded-lg text-xs font-medium flex items-center gap-1.5">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Dispensed on {new Date(rx.dispensedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
-

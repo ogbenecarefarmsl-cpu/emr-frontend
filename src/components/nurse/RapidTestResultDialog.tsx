@@ -32,15 +32,28 @@ const TYPHOID_ANTIGENS = [
   { value: 'IgG', label: 'Salmonella IgG' },
 ];
 
+export const BED_SIDE_TEST_OPTIONS = [
+  { value: 'malaria', label: 'Malaria (Rapid Antigen)' },
+  { value: 'typhoid', label: 'Typhoid (IgM / IgG / Widal)' },
+  { value: 'blood_glucose', label: 'Bedside Blood Glucose (RBG / FBG)' },
+  { value: 'urine_dipstick', label: 'Urine Dipstick (Protein / Glucose / Ketones)' },
+  { value: 'pregnancy_test', label: 'Pregnancy Test (Urine hCG)' },
+  { value: 'hiv_rdt', label: 'HIV 1/2 Rapid Test' },
+  { value: 'hepb_rdt', label: 'Hepatitis B Surface Antigen (HBsAg)' },
+  { value: 'syphilis_rdt', label: 'Syphilis (VDRL / RPR Rapid)' },
+];
+
 export function RapidTestResultDialog({ visit, open, onOpenChange }: RapidTestResultDialogProps) {
   const qc = useQueryClient();
   const addResult = useAddRapidTestResult();
 
-  const requested = (visit?.rapidTestsRequested || []) as ('malaria' | 'typhoid')[];
-  const defaultTestType: 'malaria' | 'typhoid' = requested[0] || 'malaria';
-  const [testType, setTestType] = useState<'malaria' | 'typhoid'>(defaultTestType);
+  const requested = (visit?.rapidTestsRequested || []) as string[];
+  const defaultTestType: string = requested[0] || 'malaria';
+  const [testType, setTestType] = useState<string>(defaultTestType);
   const [result, setResult] = useState<'positive' | 'negative'>('negative');
   const [parasiteCount, setParasiteCount] = useState('');
+  const [glucoseValue, setGlucoseValue] = useState('');
+  const [glucoseUnit, setGlucoseUnit] = useState<'mg/dL' | 'mmol/L'>('mg/dL');
   const [antigen, setAntigen] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -52,20 +65,32 @@ export function RapidTestResultDialog({ visit, open, onOpenChange }: RapidTestRe
       toast.error('Parasite count out of range (0-1,000,000 /µL)');
       return;
     }
+    if (testType === 'blood_glucose' && !glucoseValue) {
+      toast.error('Enter blood glucose value');
+      return;
+    }
     try {
+      const fullNotes = [
+        testType === 'blood_glucose' && glucoseValue ? `Glucose: ${glucoseValue} ${glucoseUnit}` : '',
+        notes,
+      ].filter(Boolean).join('; ');
+
       await addResult.mutateAsync({
         visitId: visit._id,
         data: {
           testType,
-          result,
+          result: testType === 'blood_glucose' 
+            ? (Number(glucoseValue) >= 200 || Number(glucoseValue) <= 70 ? 'positive' : 'negative')
+            : result,
           parasiteCount: testType === 'malaria' && parasiteCount ? Number(parasiteCount) : undefined,
           antigen: antigen || undefined,
-          notes: notes || undefined,
+          notes: fullNotes || undefined,
         },
       });
-      toast.success(`Rapid ${testType} test (${result}) recorded`);
+      toast.success(`Rapid test recorded successfully`);
       qc.invalidateQueries({ queryKey: ['visits'] });
       setParasiteCount('');
+      setGlucoseValue('');
       setAntigen('');
       setNotes('');
     } catch (e: any) {
@@ -79,7 +104,7 @@ export function RapidTestResultDialog({ visit, open, onOpenChange }: RapidTestRe
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <TestTube className="w-5 h-5 text-primary" />
-            Rapid Test - {testType.charAt(0).toUpperCase() + testType.slice(1)}
+            Bedside Rapid Diagnostic Test
           </DialogTitle>
         </DialogHeader>
         <div className="text-xs text-muted-foreground">
@@ -92,12 +117,13 @@ export function RapidTestResultDialog({ visit, open, onOpenChange }: RapidTestRe
             {[...existing].reverse().slice(0, 3).map((r: any, i: number) => (
               <div key={i} className="text-xs flex items-center justify-between gap-2">
                 <div>
-                  <span className="font-medium capitalize">{r.testType}</span> -{' '}
+                  <span className="font-medium capitalize">{r.testType.replace(/_/g, ' ')}</span> -{' '}
                   <span className={r.result === 'positive' ? 'text-red-600 font-semibold' : 'text-emerald-600 font-semibold'}>
                     {r.result}
                   </span>
                   {r.parasiteCount != null && <span className="text-muted-foreground"> - {r.parasiteCount}/µL</span>}
                   {r.antigen && <span className="text-muted-foreground"> - {r.antigen}</span>}
+                  {r.notes && <span className="text-muted-foreground"> ({r.notes})</span>}
                 </div>
                 <Badge variant="outline" className="text-[10px]">{new Date(r.performedAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</Badge>
               </div>
@@ -108,11 +134,14 @@ export function RapidTestResultDialog({ visit, open, onOpenChange }: RapidTestRe
         <div className="space-y-3">
           <div>
             <Label>Test type</Label>
-            <Select value={testType} onValueChange={(v) => { setTestType(v as any); setAntigen(''); }}>
+            <Select value={testType} onValueChange={(v) => { setTestType(v); setAntigen(''); }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="malaria">Malaria (rapid antigen)</SelectItem>
-                <SelectItem value="typhoid">Typhoid (IgM/IgG/TOG/TH)</SelectItem>
+                {BED_SIDE_TEST_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -174,6 +203,32 @@ export function RapidTestResultDialog({ visit, open, onOpenChange }: RapidTestRe
                 {Number(parasiteCount) > 0 && Number(parasiteCount) < 1000 && 'Low parasitemia'}
                 {Number(parasiteCount) >= 1000 && Number(parasiteCount) < 10000 && 'Moderate parasitemia'}
                 {Number(parasiteCount) >= 10000 && 'High parasitemia — severe malaria protocol'}
+              </p>
+            </div>
+          )}
+
+          {testType === 'blood_glucose' && (
+            <div className="space-y-2 p-3 bg-slate-50 border border-slate-200 rounded-lg">
+              <Label className="text-xs font-semibold text-slate-800">Blood Glucose Reading *</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  step="0.1"
+                  value={glucoseValue}
+                  onChange={(e) => setGlucoseValue(e.target.value)}
+                  placeholder="e.g., 110"
+                  className="flex-1 bg-white"
+                />
+                <Select value={glucoseUnit} onValueChange={(v) => setGlucoseUnit(v as any)}>
+                  <SelectTrigger className="w-28 bg-white"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="mg/dL">mg/dL</SelectItem>
+                    <SelectItem value="mmol/L">mmol/L</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Normal fasting: 70–100 mg/dL · Postprandial: &lt;140 mg/dL · Random &gt;200 indicates hyperglycemia
               </p>
             </div>
           )}

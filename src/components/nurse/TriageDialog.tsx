@@ -3,16 +3,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useDoctors } from '@/hooks/useDoctors';
-import { useCompleteTriage } from '@/hooks/useVisits';
+import { useCompleteTriage, useDoctorQueue } from '@/hooks/useVisits';
 import { admissionsAPI } from '@/services/api';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Activity, AlertCircle, BedDouble, Heart, Loader2, Send } from 'lucide-react';
+import { Activity, AlertCircle, BedDouble, Heart, Loader2, Send, Users } from 'lucide-react';
 import { ESI_LEVELS, checkAbnormalVitals, patientName, triagePriorityFromEsi } from './nurseUtils';
 
 interface TriageDialogProps {
@@ -36,6 +37,7 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
   const qc = useQueryClient();
   const completeTriage = useCompleteTriage();
   const { data: doctors = [], isLoading: doctorsLoading, error: doctorsError } = useDoctors();
+  const { data: globalDoctorQueue = [] } = useDoctorQueue();
   const [vitals, setVitals] = useState(EMPTY_VITALS);
   const [triageEsiLevel, setTriageEsiLevel] = useState('3');
   const [triageNotes, setTriageNotes] = useState('');
@@ -163,6 +165,20 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
     }
   };
 
+  // Calculate live waiting queue count per doctor
+  const doctorQueueCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    if (Array.isArray(globalDoctorQueue)) {
+      for (const q of globalDoctorQueue) {
+        const dId = typeof q.doctorId === 'object' ? q.doctorId?._id : q.doctorId;
+        if (dId) {
+          counts[dId] = (counts[dId] || 0) + 1;
+        }
+      }
+    }
+    return counts;
+  }, [globalDoctorQueue]);
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -250,12 +266,25 @@ export function TriageDialog({ visit, open, onOpenChange, onCompleted }: TriageD
                     <SelectValue placeholder="Select receiving doctor" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableDoctors.map((doctor: any) => (
-                      <SelectItem key={doctor._id} value={doctor._id}>
-                        {doctor.fullName}
-                        {doctor.specialty ? ` - ${String(doctor.specialty).replace(/_/g, ' ')}` : ''}
-                      </SelectItem>
-                    ))}
+                    {availableDoctors.map((doctor: any) => {
+                      const waitingCount = doctorQueueCounts[doctor._id] || 0;
+                      return (
+                        <SelectItem key={doctor._id} value={doctor._id}>
+                          <div className="flex items-center justify-between w-full gap-3">
+                            <span>
+                              {doctor.fullName}
+                              {doctor.specialty ? ` (${String(doctor.specialty).replace(/_/g, ' ')})` : ''}
+                            </span>
+                            <span className={cn(
+                              "text-[10px] font-medium px-1.5 py-0.5 rounded",
+                              waitingCount === 0 ? "text-emerald-700 bg-emerald-50" : "text-amber-700 bg-amber-50"
+                            )}>
+                              {waitingCount === 0 ? 'Available' : `${waitingCount} waiting`}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">

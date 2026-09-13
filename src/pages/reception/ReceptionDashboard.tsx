@@ -1,14 +1,28 @@
+import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { RoleLayout } from '@/components/layout/RoleLayout';
 import { useAuth } from '@/context/AuthContext';
-import { useRecentPatients } from '@/hooks/usePatients';
-import { usePaymentStats, useDailyIncome } from '@/hooks/useOrders';
+import { useRecentPatients, useSearchPatients } from '@/hooks/usePatients';
 import { useRealtimePatients } from '@/hooks/useRealtimePatients';
+import { useReceptionDashboard, useMarkConsultationPaid } from '@/hooks/useVisits';
+import { useDailyIncome } from '@/hooks/useOrders';
+import { useDoctors } from '@/hooks/useDoctors';
 import { PendingOrders } from '@/components/reception/PendingOrders';
+import api, { ordersAPI } from '@/services/api';
+import { getPatientFullName } from '@/utils/orderHelpers';
+import { cn } from '@/lib/utils';
+
+// UI Components
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { getPatientFullName } from '@/utils/orderHelpers';
-import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toast } from 'sonner';
+
+// Icons
 import {
   Users,
   CreditCard,
@@ -20,62 +34,63 @@ import {
   ClipboardCheck,
   AlertTriangle,
   Phone,
+  Search,
+  Banknote,
+  Smartphone,
+  Wallet,
+  Calendar,
+  Clock,
+  Stethoscope,
+  ShoppingBag,
+  Receipt,
+  Printer,
+  RefreshCw,
+  Check,
+  Building2,
+  ChevronRight,
+  Activity,
 } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { ordersAPI } from '@/services/api';
-import { useReceptionDashboard } from '@/hooks/useVisits';
-import { cn } from '@/lib/utils';
 
 export default function ReceptionDashboard() {
   const { profile } = useAuth();
-  
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
   useRealtimePatients();
 
-  const { data: patients = [], isLoading: patientsLoading } = useRecentPatients(5);
-  const navigate = useNavigate();
+  // State
+  const [activeTab, setActiveTab] = useState('care_flow');
+  const [patientSearchTerm, setPatientSearchTerm] = useState('');
+  const [collectVisit, setCollectVisit] = useState<any>(null);
+  const [paymentMethod, setPaymentMethod] = useState('cash');
 
-  const recentRegistrations = useMemo(() => {
-    if (!Array.isArray(patients)) return [];
+  // Queries
+  const { data: patients = [], isLoading: patientsLoading, refetch: refetchPatients } = useRecentPatients(8);
+  const { data: searchResults = [], isLoading: searchLoading } = useSearchPatients(patientSearchTerm);
+  const { data: receptionSnapshot, refetch: refetchReception } = useReceptionDashboard();
+  const { data: dailyIncomeData = [], refetch: refetchIncome } = useDailyIncome();
+  const { data: doctors = [] } = useDoctors();
 
-    const getPatientTimestamp = (patient: any) => {
-      const timestampValue = patient?.createdAt || patient?.registeredAt || patient?.updatedAt;
-      if (!timestampValue) return 0;
-      const parsed = new Date(timestampValue).getTime();
-      return Number.isNaN(parsed) ? 0 : parsed;
-    };
-
-    return [...patients]
-      .sort((a: any, b: any) => getPatientTimestamp(b) - getPatientTimestamp(a))
-      .slice(0, 5);
-  }, [patients]);
-
-  const formatRegistrationTimestamp = (patient: any) => {
-    const timestampValue = patient?.createdAt || patient?.registeredAt || patient?.updatedAt;
-    if (!timestampValue) return 'Time unavailable';
-
-    const date = new Date(timestampValue);
-    if (Number.isNaN(date.getTime())) return 'Time unavailable';
-
-    return date.toLocaleString([], {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const { data: receptionSnapshot } = useReceptionDashboard();
-  const doctorQueue = receptionSnapshot?.doctorQueue ?? [];
-  const visitStats = receptionSnapshot?.todayStats;
-  
-  const { data: patientOutstandingData } = useQuery({
+  const { data: patientOutstandingData, refetch: refetchOutstanding } = useQuery({
     queryKey: ['patient-outstanding'],
     queryFn: () => ordersAPI.getPatientOutstanding(),
     staleTime: 30_000,
   });
 
+  const { data: appointments = [], refetch: refetchAppointments } = useQuery({
+    queryKey: ['appointments', 'today'],
+    queryFn: async () => {
+      const res = await api.get('/appointments');
+      return res.data || [];
+    },
+    refetchInterval: 30 * 1000,
+  });
+
+  const markConsultationPaid = useMarkConsultationPaid();
+
+  // Snapshot extractions
+  const doctorQueue = receptionSnapshot?.doctorQueue ?? [];
+  const visitStats = receptionSnapshot?.todayStats;
   const pendingConsultationVisits = Array.isArray(receptionSnapshot?.pendingConsultationPayments)
     ? receptionSnapshot.pendingConsultationPayments
     : [];
@@ -88,376 +103,784 @@ export default function ReceptionDashboard() {
   const pendingPharmacyVisits = Array.isArray(receptionSnapshot?.pendingPharmacyPayments)
     ? receptionSnapshot.pendingPharmacyPayments
     : [];
-  
+
   const awaitingTriageCount = visitStats?.awaitingTriage ?? awaitingTriageVisits.length;
   const pendingClinicalPayments = pendingLabVisits.length + pendingPharmacyVisits.length;
-  
+
+  // Today's Cash Drawer Balance
+  const todayIncome = useMemo(() => {
+    if (!Array.isArray(dailyIncomeData) || dailyIncomeData.length === 0) {
+      return { totalIncome: 0, cashPayments: 0, orangeMoneyPayments: 0, afrimoneyPayments: 0 };
+    }
+    // First entry is today's aggregated income
+    const today = dailyIncomeData[0];
+    return {
+      totalIncome: Number(today.totalIncome || 0),
+      cashPayments: Number(today.cashPayments || 0),
+      orangeMoneyPayments: Number(today.orangeMoneyPayments || 0),
+      afrimoneyPayments: Number(today.afrimoneyPayments || 0),
+    };
+  }, [dailyIncomeData]);
+
+  // Doctor load map
+  const doctorLoad = useMemo(() => {
+    const map: Record<string, { doctor: any; waiting: number }> = {};
+    for (const d of doctors) {
+      const docId = d._id || d.id;
+      map[docId] = { doctor: d, waiting: 0 };
+    }
+    for (const v of doctorQueue) {
+      const docId = v.doctorId?._id || v.doctorId?.id || v.doctorId;
+      if (docId && map[docId]) {
+        map[docId].waiting += 1;
+      }
+    }
+    return Object.values(map);
+  }, [doctors, doctorQueue]);
+
+  // Handle consultation fee collection
+  const handleConfirmConsultationPayment = async () => {
+    if (!collectVisit) return;
+    const visitId = collectVisit._id || collectVisit.id;
+
+    try {
+      await markConsultationPaid.mutateAsync({
+        visitId,
+        paymentMethod,
+      });
+      toast.success(`Consultation fee collected via ${paymentMethod.replace('_', ' ').toUpperCase()}. Patient queued for nurse vitals.`);
+      setCollectVisit(null);
+      setPaymentMethod('cash');
+      refetchReception();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to record consultation payment');
+    }
+  };
+
   const scrollToClinicalPayments = () => {
-    if (typeof document === 'undefined') return;
-    document.getElementById('pending-clinical-payments')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveTab('billing');
+    if (typeof document !== 'undefined') {
+      setTimeout(() => {
+        document.getElementById('pending-clinical-payments')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  };
+
+  const handleRefreshAll = () => {
+    refetchPatients();
+    refetchReception();
+    refetchIncome();
+    refetchOutstanding();
+    refetchAppointments();
+    toast.success('Front-desk queues refreshed');
   };
 
   return (
     <RoleLayout
-      title="Reception Home"
-      subtitle="Guide patients through registration, payment, and care"
+      title="Receptionist Station"
+      subtitle="Patient check-in, triage queue management, cashier collections, and billing clearance"
       role="receptionist"
       userName={profile?.fullName}
     >
-      {/* PRIMARY TASK ROW */}
-      <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <ReceptionActionCard
-          icon={UserPlus}
-          title="Register patient"
-          description="Create a new patient record"
-          actionLabel="Register"
-          tone="primary"
-          onClick={() => navigate('/reception/register')}
-        />
-        <ReceptionActionCard
-          icon={ClipboardCheck}
-          title="Start visit"
-          description="Begin a new or renewal visit"
-          actionLabel="Start"
-          tone="blue"
-          onClick={() => navigate('/reception/visit-registration')}
-        />
-        <ReceptionActionCard
-          icon={CreditCard}
-          title="Collect payment"
-          description="Process any payment due"
-          actionLabel="Open billing"
-          tone="green"
-          onClick={() => navigate('/reception/payments')}
-        />
-        <ReceptionActionCard
-          icon={Users}
-          title="Find patient"
-          description="Search records and history"
-          actionLabel="Search"
-          tone="slate"
+      {/* ───────── TOP HIGH-DENSITY RECEPTION PULSE RIBBON ───────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 mb-5">
+        {/* Total Check-ins */}
+        <div
           onClick={() => navigate('/reception/patients')}
-        />
-      </div>
-
-      {/* COMPACT PATIENT JOURNEY STRIP */}
-      <div className="mb-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Patient journey — today</h2>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 gap-1 text-xs text-muted-foreground"
-            onClick={() => navigate('/reception/reconciliation')}
-          >
-            End-of-day report <ArrowRight className="h-3 w-3" />
-          </Button>
+          className="cursor-pointer rounded-xl border bg-card p-3 flex flex-col justify-between hover:shadow-xs transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total Visits</span>
+            <Users className="w-4 h-4 text-primary" />
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-2xl font-bold">{visitStats?.totalVisits ?? 0}</span>
+            <span className="text-[10px] text-muted-foreground">checked in</span>
+          </div>
         </div>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <CompactJourneyCard
-            label="Total visits"
-            count={visitStats?.totalVisits ?? 0}
-            onClick={() => navigate('/reception/patients')}
-          />
-          <CompactJourneyCard
-            label="Awaiting payment"
-            count={pendingConsultationVisits.length}
-            tone={pendingConsultationVisits.length > 0 ? 'amber' : 'muted'}
-            onClick={() => navigate('/reception/payments')}
-          />
-          <CompactJourneyCard
-            label="Ready for vitals"
-            count={awaitingTriageCount}
-            tone={awaitingTriageCount > 0 ? 'blue' : 'muted'}
-            onClick={() => navigate('/reception/patients')}
-          />
-          <CompactJourneyCard
-            label="With doctor"
-            count={doctorQueue.length}
-            tone={doctorQueue.length > 0 ? 'primary' : 'muted'}
-            onClick={() => navigate('/reception/patients')}
-          />
-          <CompactJourneyCard
-            label="Lab/Pharmacy due"
-            count={pendingClinicalPayments}
-            tone={pendingClinicalPayments > 0 ? 'green' : 'muted'}
-            onClick={scrollToClinicalPayments}
-          />
+
+        {/* Entrance Queue (Awaiting Consultation Fee) */}
+        <div
+          onClick={() => setActiveTab('care_flow')}
+          className={cn(
+            'cursor-pointer rounded-xl border p-3 flex flex-col justify-between hover:shadow-xs transition-all',
+            pendingConsultationVisits.length > 0
+              ? 'border-amber-300 bg-amber-50/70 dark:bg-amber-950/20 text-amber-900 dark:text-amber-200'
+              : 'border bg-card text-foreground',
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Entrance Pay</span>
+            <CreditCard className={cn('w-4 h-4', pendingConsultationVisits.length > 0 ? 'text-amber-600' : 'text-muted-foreground')} />
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className={cn('text-2xl font-bold', pendingConsultationVisits.length > 0 ? 'text-amber-600' : '')}>
+              {pendingConsultationVisits.length}
+            </span>
+            <span className="text-[10px] text-muted-foreground">consult fee</span>
+          </div>
         </div>
-      </div>
 
-      {/* NEEDS ATTENTION NOW */}
-      <NeedsAttentionList
-        pendingConsultations={pendingConsultationVisits}
-        pendingClinical={pendingClinicalPayments}
-        owingPatients={patientOutstandingData?.patients || []}
-        onNavigatePayments={() => navigate('/reception/payments')}
-        onNavigateClinical={scrollToClinicalPayments}
-        onNavigateOwing={() => navigate('/reception/accounts-receivable')}
-      />
-
-      {/* Order and medicine payments (detailed) */}
-      <div id="pending-clinical-payments" className="mb-6 scroll-mt-20">
-        <PendingOrders />
-      </div>
-
-      {/* RECENT REGISTRATIONS (limited to 3) */}
-      <div className="bg-card border rounded-xl shadow-sm">
-        <div className="px-5 py-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold text-sm">Recent registrations</h3>
-          <Button variant="ghost" size="sm" className="text-xs gap-1" onClick={() => navigate('/reception/patients')}>
-            View all <ArrowRight className="w-3.5 h-3.5" />
-          </Button>
+        {/* Ready for Nurse Vitals */}
+        <div
+          onClick={() => setActiveTab('care_flow')}
+          className={cn(
+            'cursor-pointer rounded-xl border p-3 flex flex-col justify-between hover:shadow-xs transition-all',
+            awaitingTriageCount > 0 ? 'border-blue-300 bg-blue-50/70 dark:bg-blue-950/20' : 'border bg-card',
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">For Vitals</span>
+            <Activity className="w-4 h-4 text-blue-600" />
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className={cn('text-2xl font-bold', awaitingTriageCount > 0 ? 'text-blue-600' : '')}>
+              {awaitingTriageCount}
+            </span>
+            <span className="text-[10px] text-muted-foreground">with nurses</span>
+          </div>
         </div>
-        <div className="divide-y">
-          {patientsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+
+        {/* Doctor Consultation Queue */}
+        <div
+          onClick={() => setActiveTab('care_flow')}
+          className="cursor-pointer rounded-xl border bg-card p-3 flex flex-col justify-between hover:shadow-xs transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">With Doctor</span>
+            <Stethoscope className="w-4 h-4 text-purple-600" />
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className="text-2xl font-bold">{doctorQueue.length}</span>
+            <span className="text-[10px] text-muted-foreground">in consult/wait</span>
+          </div>
+        </div>
+
+        {/* Clinical Bills Due (Labs & Pharmacy) */}
+        <div
+          onClick={() => setActiveTab('billing')}
+          className={cn(
+            'cursor-pointer rounded-xl border p-3 flex flex-col justify-between hover:shadow-xs transition-all',
+            pendingClinicalPayments > 0 ? 'border-emerald-300 bg-emerald-50/70 dark:bg-emerald-950/20' : 'border bg-card',
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Clinical Bills</span>
+            <FlaskConical className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="mt-2 flex items-baseline justify-between">
+            <span className={cn('text-2xl font-bold', pendingClinicalPayments > 0 ? 'text-emerald-600' : '')}>
+              {pendingClinicalPayments}
+            </span>
+            <span className="text-[10px] text-muted-foreground">lab / rx due</span>
+          </div>
+        </div>
+
+        {/* Live Cash Till Drawer Position */}
+        <div
+          onClick={() => navigate('/reception/reconciliation')}
+          className="cursor-pointer rounded-xl border border-primary/30 bg-primary/5 p-3 flex flex-col justify-between hover:shadow-xs transition-all"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Today's Till</span>
+            <Banknote className="w-4 h-4 text-primary" />
+          </div>
+          <div className="mt-1">
+            <p className="text-lg font-extrabold text-foreground truncate">
+              Le {todayIncome.totalIncome.toLocaleString()}
+            </p>
+            <div className="flex items-center gap-1.5 mt-0.5 text-[9px] text-muted-foreground">
+              <span>Cash: Le {todayIncome.cashPayments.toLocaleString()}</span>
+              <span>• MoMo: Le {(todayIncome.orangeMoneyPayments + todayIncome.afrimoneyPayments).toLocaleString()}</span>
             </div>
-          ) : (
-            <>
-              {recentRegistrations.slice(0, 3).map((patient: any) => {
-                const patientId = patient._id || patient.id;
-                const patientCode = patient.patientId || patient.patient_id || 'N/A';
-                const phone = patient.phone || patient.phoneNumber || patient.contact;
-                return (
-                  <div key={patient.id || patient._id} className="px-5 py-3.5 hover:bg-muted/30 transition-colors">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-sm">{getPatientFullName(patient)}</p>
-                          <Badge variant="outline" className="text-[10px] font-mono">{patientCode}</Badge>
-                        </div>
-                        <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">
-                          {phone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{phone}</span>}
-                          <span>{formatRegistrationTimestamp(patient)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ───────── UNIVERSAL PATIENT SEARCH & FAST ACTION COMMAND BAR ───────── */}
+      <div className="mb-5 bg-card border rounded-xl p-3.5 shadow-xs space-y-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          {/* Live Patient Search Input */}
+          <div className="relative flex-1 max-w-xl">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Instant patient lookup by name, phone number, or patient code..."
+              value={patientSearchTerm}
+              onChange={(e) => setPatientSearchTerm(e.target.value)}
+              className="pl-9 h-9 text-sm"
+            />
+            {patientSearchTerm && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1 h-7 px-2 text-xs"
+                onClick={() => setPatientSearchTerm('')}
+              >
+                Clear
+              </Button>
+            )}
+          </div>
+
+          {/* Quick Jump Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button
+              size="sm"
+              className="h-9 text-xs gap-1.5 font-semibold"
+              onClick={() => navigate('/reception/register')}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              Register Patient
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs gap-1.5"
+              onClick={() => navigate('/reception/visit-registration')}
+            >
+              <ClipboardCheck className="w-3.5 h-3.5 text-blue-600" />
+              Start Visit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs gap-1.5"
+              onClick={() => navigate('/reception/payments')}
+            >
+              <CreditCard className="w-3.5 h-3.5 text-emerald-600" />
+              Cash Desk
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 text-xs gap-1.5"
+              onClick={() => navigate('/reception/orders')}
+            >
+              <ShoppingBag className="w-3.5 h-3.5 text-amber-600" />
+              Walk-in Sale
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 text-xs gap-1 text-muted-foreground"
+              onClick={handleRefreshAll}
+              title="Refresh all front-desk queues"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Live Search Results Dropdown */}
+        {patientSearchTerm.trim().length >= 2 && (
+          <div className="border rounded-xl bg-muted/20 p-3 space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Search Results ({searchResults.length})
+            </p>
+            {searchLoading ? (
+              <div className="py-4 flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin text-primary" /> Searching patient registry...
+              </div>
+            ) : searchResults.length === 0 ? (
+              <p className="text-xs text-muted-foreground py-2">
+                No patient matching "{patientSearchTerm}". You can click "Register Patient" above to enroll them.
+              </p>
+            ) : (
+              <div className="divide-y max-h-56 overflow-y-auto">
+                {searchResults.slice(0, 5).map((p: any) => {
+                  const pid = p._id || p.id;
+                  const code = p.patientId || p.patient_id || 'N/A';
+                  return (
+                    <div key={pid} className="py-2.5 flex items-center justify-between text-xs hover:bg-muted/40 px-2 rounded-lg transition-colors">
+                      <div>
+                        <span className="font-bold text-sm text-foreground">{getPatientFullName(p)}</span>
+                        <span className="ml-2 font-mono text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                          {code}
+                        </span>
+                        <div className="mt-0.5 text-muted-foreground flex items-center gap-2">
+                          {p.gender && <span>{p.gender}</span>}
+                          {p.age && <span>• {p.age} yrs</span>}
+                          {p.phone && <span>• {p.phone}</span>}
                         </div>
                       </div>
+                      <div className="flex items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs"
+                          onClick={() => navigate(`/reception/patients/${pid}`)}
+                        >
+                          View
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs gap-1 font-semibold"
+                          onClick={() => navigate(`/reception/visit-registration?patient=${pid}`)}
+                        >
+                          <ClipboardCheck className="w-3 h-3" />
+                          Start Visit
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ───────── MAIN RECEPTION OPERATIONAL TABS ───────── */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+        <div className="border-b bg-card rounded-t-xl px-4 pt-2 shadow-xs">
+          <TabsList className="bg-transparent h-auto p-0 gap-2">
+            <TabsTrigger
+              value="care_flow"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none pb-3 text-xs gap-1.5 font-medium"
+            >
+              <Users className="w-3.5 h-3.5" />
+              Entrance & Clinic Care Flow
+              {pendingConsultationVisits.length > 0 && (
+                <Badge className="ml-1 text-[10px] h-4.5 bg-amber-600">
+                  {pendingConsultationVisits.length} Unpaid
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="billing"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none pb-3 text-xs gap-1.5 font-medium"
+            >
+              <CreditCard className="w-3.5 h-3.5" />
+              Clinical Orders Cashier
+              {pendingClinicalPayments > 0 && (
+                <Badge variant="secondary" className="ml-1 text-[10px] h-4.5">
+                  {pendingClinicalPayments} Due
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger
+              value="debtors_appointments"
+              className="data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:bg-transparent rounded-none pb-3 text-xs gap-1.5 font-medium"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              Debtors & Appointments
+              {(patientOutstandingData?.patients?.length || 0) > 0 && (
+                <span className="text-[10px] text-muted-foreground ml-1">
+                  ({patientOutstandingData?.patients?.length})
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        {/* ───────── TAB 1: ENTRANCE & CLINIC CARE FLOW ───────── */}
+        <TabsContent value="care_flow" className="space-y-5 mt-0">
+          {/* Urgent Entrance Action List: Consultation Payment Collection */}
+          {pendingConsultationVisits.length > 0 && (
+            <div className="rounded-xl border-2 border-amber-400/40 bg-amber-50/40 dark:bg-amber-950/20 p-4 shadow-xs">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-600" />
+                  <h3 className="font-bold text-sm text-amber-950 dark:text-amber-200">
+                    Awaiting Consultation Fee at Entrance ({pendingConsultationVisits.length})
+                  </h3>
+                </div>
+                <p className="text-xs text-amber-800 dark:text-amber-300">
+                  Collect fee to clear patient into nurse triage
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {pendingConsultationVisits.map((v: any) => {
+                  const p = v.patientId;
+                  const visitId = v._id || v.id;
+                  const fee = v.consultationFee || 150;
+
+                  return (
+                    <div
+                      key={visitId}
+                      className="bg-card border rounded-xl p-3.5 shadow-xs flex flex-col justify-between space-y-3"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-sm text-foreground">{getPatientFullName(p)}</p>
+                          <Badge variant="outline" className="font-mono text-[10px]">
+                            #{v.visitNumber}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {p?.gender} • {p?.age} yrs • {p?.phone || 'No phone'}
+                        </p>
+                        {v.chiefComplaint && (
+                          <p className="text-xs text-foreground mt-1 truncate italic">
+                            "{v.chiefComplaint}"
+                          </p>
+                        )}
+                        <div className="mt-2 flex items-center justify-between text-xs pt-2 border-t">
+                          <span className="text-muted-foreground">Fee Due:</span>
+                          <span className="font-bold text-sm text-amber-700">Le {fee.toLocaleString()}</span>
+                        </div>
+                      </div>
+
                       <Button
-                        variant="outline"
                         size="sm"
-                        className="text-xs flex-shrink-0"
-                        onClick={() => navigate(`/reception/visit-registration?patient=${patientId}`)}
+                        className="w-full h-8 text-xs font-semibold gap-1 bg-amber-600 hover:bg-amber-700 text-white shadow-xs"
+                        onClick={() => setCollectVisit(v)}
                       >
-                        Start visit
+                        <Banknote className="w-3.5 h-3.5" />
+                        Collect Fee (Le {fee})
                       </Button>
                     </div>
-                  </div>
-                );
-              })}
-              {(!Array.isArray(patients) || patients.length === 0) && (
-                <div className="px-5 py-10 text-center text-muted-foreground text-sm">
-                  No patients registered yet
-                </div>
-              )}
-            </>
+                  );
+                })}
+              </div>
+            </div>
           )}
-        </div>
-      </div>
-    </RoleLayout>
-  );
-}
 
-/* ==================== COMPACT JOURNEY CARD ==================== */
-function CompactJourneyCard({
-  label,
-  count,
-  tone = 'muted',
-  onClick,
-}: {
-  label: string;
-  count: number;
-  tone?: ReceptionTone;
-  onClick: () => void;
-}) {
-  const styles = toneStyles[tone];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'flex flex-col items-start rounded-lg border p-3 text-left transition-all hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-        styles.card,
-      )}
-    >
-      <div className={cn('text-2xl font-bold leading-none', styles.count)}>{count}</div>
-      <div className="mt-1.5 text-xs text-muted-foreground">{label}</div>
-    </button>
-  );
-}
+          {/* Doctor Queue Load Board */}
+          <div className="bg-card border rounded-xl shadow-xs p-4">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <h3 className="font-semibold text-sm flex items-center gap-2 text-foreground">
+                  <Stethoscope className="w-4 h-4 text-primary" />
+                  Consultation Rooms & On-Duty Doctors
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Real-time patient wait queues per consultation room to help route arriving patients evenly
+                </p>
+              </div>
+              <Badge variant="outline" className="text-xs font-mono">
+                {doctorQueue.length} Active in Queue
+              </Badge>
+            </div>
 
-/* ==================== NEEDS ATTENTION LIST ==================== */
-function NeedsAttentionList({
-  pendingConsultations,
-  pendingClinical,
-  owingPatients,
-  onNavigatePayments,
-  onNavigateClinical,
-  onNavigateOwing,
-}: {
-  pendingConsultations: any[];
-  pendingClinical: number;
-  owingPatients: any[];
-  onNavigatePayments: () => void;
-  onNavigateClinical: () => void;
-  onNavigateOwing: () => void;
-}) {
-  const items = [
-    {
-      id: 'consultations',
-      label: 'Consultation payments',
-      count: pendingConsultations.length,
-      icon: CreditCard,
-      tone: 'amber' as ReceptionTone,
-      action: 'Collect now',
-      onClick: onNavigatePayments,
-    },
-    {
-      id: 'clinical',
-      label: 'Lab/Pharmacy payments',
-      count: pendingClinical,
-      icon: FlaskConical,
-      tone: 'green' as ReceptionTone,
-      action: 'Review orders',
-      onClick: onNavigateClinical,
-    },
-    {
-      id: 'owing',
-      label: 'Outstanding balances',
-      count: owingPatients.length,
-      icon: AlertTriangle,
-      tone: 'amber' as ReceptionTone,
-      action: 'View patients',
-      onClick: onNavigateOwing,
-    },
-  ].filter((item) => item.count > 0);
-
-  if (items.length === 0) {
-    return (
-      <div className="mb-6 rounded-xl border border-green-200 bg-green-50/50 p-6 text-center dark:border-green-800 dark:bg-green-950/20">
-        <CheckCircle2 className="mx-auto h-8 w-8 text-green-600 dark:text-green-400" />
-        <p className="mt-2 text-sm font-medium text-green-800 dark:text-green-300">All caught up</p>
-        <p className="mt-1 text-xs text-green-700/70 dark:text-green-400/70">
-          No urgent payment actions right now
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="mb-6">
-      <h2 className="mb-3 text-sm font-semibold text-foreground">Needs attention now</h2>
-      <div className="space-y-2">
-        {items.map((item) => {
-          const styles = toneStyles[item.tone];
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={item.onClick}
-              className={cn(
-                'group flex w-full items-center justify-between rounded-lg border p-4 text-left transition-all hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                styles.card,
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <span className={cn('flex h-10 w-10 items-center justify-center rounded-lg', styles.icon)}>
-                  <Icon className="h-5 w-5" />
-                </span>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-foreground">{item.label}</span>
-                    <Badge className={cn('text-xs', styles.count)}>{item.count}</Badge>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+              {doctorLoad.map(({ doctor, waiting }) => (
+                <div
+                  key={doctor._id || doctor.id}
+                  className={cn(
+                    'rounded-xl border p-3 flex flex-col justify-between transition-all',
+                    waiting > 3
+                      ? 'border-amber-300 bg-amber-50/50 dark:bg-amber-950/20'
+                      : 'border bg-muted/20',
+                  )}
+                >
+                  <div>
+                    <p className="font-bold text-xs text-foreground truncate">{doctor.fullName}</p>
+                    <p className="text-[10px] text-muted-foreground truncate">{doctor.specialty || doctor.department || 'General Practice'}</p>
                   </div>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
-                    {item.count === 1 ? '1 item' : `${item.count} items`} waiting
+                  <div className="mt-2 flex items-center justify-between pt-1 border-t">
+                    <span className="text-[10px] text-muted-foreground">Waiting:</span>
+                    <Badge
+                      variant={waiting === 0 ? 'secondary' : waiting > 3 ? 'destructive' : 'default'}
+                      className="text-[10px] h-4.5 px-1.5"
+                    >
+                      {waiting === 0 ? 'Available' : `${waiting} waiting`}
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+              {doctorLoad.length === 0 && (
+                <p className="text-xs text-muted-foreground col-span-full py-4 text-center">
+                  No doctor consultation rooms registered
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Dual Column: Patients Ready for Triage + Recent Registrations */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Ready for Nurse Triage */}
+            <div className="bg-card border rounded-xl shadow-xs overflow-hidden">
+              <div className="px-5 py-3.5 border-b bg-muted/20 flex items-center justify-between">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <Activity className="w-4 h-4 text-blue-600" />
+                  Ready for Nurse Triage (Vitals)
+                </h3>
+                <Badge variant="secondary" className="text-xs font-mono">
+                  {awaitingTriageVisits.length}
+                </Badge>
+              </div>
+
+              <div className="divide-y max-h-72 overflow-y-auto">
+                {awaitingTriageVisits.map((v: any) => {
+                  const p = v.patientId;
+                  const visitId = v._id || v.id;
+                  return (
+                    <div key={visitId} className="p-3.5 flex items-center justify-between hover:bg-muted/20 transition-colors text-xs">
+                      <div>
+                        <p className="font-semibold text-sm text-foreground">{getPatientFullName(p)}</p>
+                        <p className="text-muted-foreground mt-0.5">
+                          #{v.visitNumber} • {p?.phone || 'No phone'} • Checked in {new Date(v.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-[10px]">
+                        Waiting for Vitals
+                      </Badge>
+                    </div>
+                  );
+                })}
+                {awaitingTriageVisits.length === 0 && (
+                  <div className="py-12 text-center text-muted-foreground text-xs">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-500/60 mx-auto mb-1" />
+                    All checked-in patients have completed triage vitals
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Recent Registrations */}
+            <div className="bg-card border rounded-xl shadow-xs overflow-hidden">
+              <div className="px-5 py-3.5 border-b bg-muted/20 flex items-center justify-between">
+                <h3 className="font-semibold text-sm flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-primary" />
+                  Recent Patient Registrations
+                </h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs h-7 gap-1"
+                  onClick={() => navigate('/reception/patients')}
+                >
+                  All Patients <ArrowRight className="w-3 h-3" />
+                </Button>
+              </div>
+
+              <div className="divide-y max-h-72 overflow-y-auto">
+                {patientsLoading ? (
+                  <div className="py-12 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : (
+                  patients.slice(0, 5).map((patient: any) => {
+                    const patientId = patient._id || patient.id;
+                    const patientCode = patient.patientId || patient.patient_id || 'N/A';
+                    const phone = patient.phone || patient.phoneNumber;
+                    return (
+                      <div key={patientId} className="p-3.5 flex items-center justify-between hover:bg-muted/20 transition-colors text-xs">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-foreground">{getPatientFullName(patient)}</span>
+                            <Badge variant="outline" className="font-mono text-[10px]">{patientCode}</Badge>
+                          </div>
+                          <p className="text-muted-foreground mt-0.5">
+                            {phone && <span>{phone} • </span>}
+                            <span>Registered {new Date(patient.createdAt || Date.now()).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                          </p>
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs shrink-0 gap-1"
+                          onClick={() => navigate(`/reception/visit-registration?patient=${patientId}`)}
+                        >
+                          <ClipboardCheck className="w-3 h-3" />
+                          Start Visit
+                        </Button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+
+        {/* ───────── TAB 2: CLINICAL ORDERS CASHIER ───────── */}
+        <TabsContent value="billing" className="space-y-4 mt-0">
+          <div id="pending-clinical-payments">
+            <PendingOrders />
+          </div>
+        </TabsContent>
+
+        {/* ───────── TAB 3: DEBTORS & APPOINTMENTS ───────── */}
+        <TabsContent value="debtors_appointments" className="space-y-5 mt-0">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Outstanding Patient Balances */}
+            <div className="bg-card border rounded-xl shadow-xs overflow-hidden">
+              <div className="px-5 py-3.5 border-b bg-muted/20 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-500" />
+                    Outstanding Patient Balances
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Patients with unsettled credit bills or partial payments
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8 gap-1"
+                  onClick={() => navigate('/reception/accounts-receivable')}
+                >
+                  Full AR Ledger <ArrowRight className="w-3 h-3" />
+                </Button>
+              </div>
+
+              <div className="divide-y max-h-80 overflow-y-auto">
+                {patientOutstandingData?.patients && patientOutstandingData.patients.length > 0 ? (
+                  patientOutstandingData.patients.map((item: any) => (
+                    <div key={item.patientId} className="p-3.5 flex items-center justify-between hover:bg-muted/20 transition-colors text-xs">
+                      <div>
+                        <p className="font-semibold text-sm text-foreground">
+                          {item.firstName} {item.lastName}
+                        </p>
+                        <p className="text-muted-foreground mt-0.5 font-mono">
+                          {item.patientCode} • {item.billCount} bill(s) pending
+                        </p>
+                      </div>
+                      <div className="text-right flex items-center gap-3">
+                        <div>
+                          <p className="font-extrabold text-sm text-red-600">Le {item.totalOwed.toLocaleString()}</p>
+                          <span className="text-[10px] text-muted-foreground">Balance Due</span>
+                        </div>
+                        <Button
+                          size="sm"
+                          className="h-7 text-xs"
+                          onClick={() => navigate(`/reception/payments?search=${item.patientCode}`)}
+                        >
+                          Collect
+                        </Button>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-12 text-center text-muted-foreground text-xs">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-500/60 mx-auto mb-1" />
+                    No outstanding debtor balances recorded
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Scheduled Appointments Today */}
+            <div className="bg-card border rounded-xl shadow-xs overflow-hidden">
+              <div className="px-5 py-3.5 border-b bg-muted/20 flex items-center justify-between">
+                <div>
+                  <h3 className="font-semibold text-sm flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-primary" />
+                    Appointments & Scheduled Follow-ups
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Pre-booked consultations for today
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs h-8 gap-1"
+                  onClick={() => navigate('/reception/appointments')}
+                >
+                  Appointments Hub <ArrowRight className="w-3 h-3" />
+                </Button>
+              </div>
+
+              <div className="divide-y max-h-80 overflow-y-auto">
+                {Array.isArray(appointments) && appointments.length > 0 ? (
+                  appointments.map((apt: any) => (
+                    <div key={apt._id || apt.id} className="p-3.5 flex items-center justify-between hover:bg-muted/20 transition-colors text-xs">
+                      <div>
+                        <p className="font-semibold text-sm text-foreground">{apt.patientName || apt.patient?.fullName || 'Patient'}</p>
+                        <p className="text-muted-foreground mt-0.5">
+                          {apt.doctorName || apt.doctor?.fullName ? `Dr. ${apt.doctorName || apt.doctor?.fullName}` : 'Any Doctor'} • {apt.time || 'Scheduled'}
+                        </p>
+                        {apt.reason && <p className="italic text-muted-foreground/80 mt-0.5">"{apt.reason}"</p>}
+                      </div>
+                      <Button
+                        size="sm"
+                        className="h-7 text-xs gap-1 font-semibold"
+                        onClick={() => navigate(`/reception/visit-registration?patient=${apt.patientId || apt.patient?._id}`)}
+                      >
+                        <Check className="w-3 h-3" />
+                        Check-In
+                      </Button>
+                    </div>
+                  ))
+                ) : (
+                  <div className="py-12 text-center text-muted-foreground text-xs">
+                    <Calendar className="w-8 h-8 text-muted-foreground/40 mx-auto mb-1" />
+                    No pre-booked appointments scheduled for today
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </TabsContent>
+      </Tabs>
+
+      {/* ───────── INLINE 1-CLICK CONSULTATION FEE PAYMENT MODAL ───────── */}
+      <Dialog open={!!collectVisit} onOpenChange={(open) => { if (!open) setCollectVisit(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-primary" />
+              Collect Consultation Fee
+            </DialogTitle>
+            <DialogDescription>
+              Record patient consultation payment to immediately clear them for nursing triage.
+            </DialogDescription>
+          </DialogHeader>
+
+          {collectVisit && (
+            <div className="space-y-4 py-2 text-xs">
+              <div className="rounded-xl border bg-muted/30 p-3 space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Patient:</span>
+                  <span className="font-bold text-sm text-foreground">{getPatientFullName(collectVisit.patientId)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Visit #:</span>
+                  <span className="font-mono text-foreground">#{collectVisit.visitNumber}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Service:</span>
+                  <span className="text-foreground capitalize">{collectVisit.serviceType?.replace('_', ' ') || 'Normal Consultation'}</span>
+                </div>
+                <div className="pt-2 border-t flex justify-between items-baseline">
+                  <span className="font-semibold text-muted-foreground">Amount Due:</span>
+                  <span className="font-extrabold text-lg text-primary">
+                    Le {Number(collectVisit.consultationFee || 150).toLocaleString()}
                   </span>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">
-                {item.action}
-                <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
 
-type ReceptionTone = 'primary' | 'blue' | 'green' | 'amber' | 'slate' | 'muted';
+              <div>
+                <label className="font-semibold text-foreground block mb-1.5">Payment Method</label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">💵 Cash Payment (Till Drawer)</SelectItem>
+                    <SelectItem value="orange_money">🍊 Orange Money</SelectItem>
+                    <SelectItem value="afrimoney">🔴 Afrimoney</SelectItem>
+                    <SelectItem value="wallet">👛 Patient E-Wallet</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
 
-const toneStyles: Record<ReceptionTone, { card: string; icon: string; count: string }> = {
-  primary: {
-    card: 'border-primary/25 bg-primary/5 hover:border-primary/45',
-    icon: 'bg-primary/10 text-primary',
-    count: 'text-primary',
-  },
-  blue: {
-    card: 'border-blue-200 bg-blue-50/70 hover:border-blue-300 dark:border-blue-900 dark:bg-blue-950/20',
-    icon: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
-    count: 'text-blue-700 dark:text-blue-300',
-  },
-  green: {
-    card: 'border-emerald-200 bg-emerald-50/70 hover:border-emerald-300 dark:border-emerald-900 dark:bg-emerald-950/20',
-    icon: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300',
-    count: 'text-emerald-700 dark:text-emerald-300',
-  },
-  amber: {
-    card: 'border-amber-200 bg-amber-50/80 hover:border-amber-300 dark:border-amber-900 dark:bg-amber-950/20',
-    icon: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
-    count: 'text-amber-700 dark:text-amber-300',
-  },
-  slate: {
-    card: 'border-slate-200 bg-slate-50/80 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/20',
-    icon: 'bg-slate-100 text-slate-700 dark:bg-slate-900 dark:text-slate-300',
-    count: 'text-slate-700 dark:text-slate-300',
-  },
-  muted: {
-    card: 'border-border bg-muted/20 hover:bg-muted/30',
-    icon: 'bg-muted text-muted-foreground',
-    count: 'text-muted-foreground',
-  },
-};
-
-function ReceptionActionCard({
-  icon: Icon,
-  title,
-  description,
-  actionLabel,
-  tone,
-  onClick,
-}: {
-  icon: LucideIcon;
-  title: string;
-  description: string;
-  actionLabel: string;
-  tone: ReceptionTone;
-  onClick: () => void;
-}) {
-  const styles = toneStyles[tone];
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        'group flex min-h-[132px] flex-col items-start justify-between rounded-lg border p-4 text-left transition-all hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-        styles.card,
-      )}
-    >
-      <span className={cn('flex h-10 w-10 items-center justify-center rounded-lg', styles.icon)}>
-        <Icon className="h-5 w-5" />
-      </span>
-      <span className="mt-3 block">
-        <span className="block text-sm font-semibold text-foreground">{title}</span>
-        <span className="mt-1 block text-xs leading-5 text-muted-foreground">{description}</span>
-      </span>
-      <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-primary">
-        {actionLabel}
-        <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
-      </span>
-    </button>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setCollectVisit(null)}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              className="gap-1.5 font-bold"
+              disabled={markConsultationPaid.isPending}
+              onClick={handleConfirmConsultationPayment}
+            >
+              {markConsultationPaid.isPending ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Check className="w-3.5 h-3.5" />
+              )}
+              Confirm & Send to Nurse
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </RoleLayout>
   );
 }

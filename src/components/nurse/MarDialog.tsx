@@ -31,6 +31,7 @@ const ROUTE_OPTIONS = [
 
 export function MarDialog({ prescription, open, onOpenChange }: MarDialogProps) {
   const qc = useQueryClient();
+  const [selectedItemIndex, setSelectedItemIndex] = useState(0);
   const [form, setForm] = useState({
     medicationName: '',
     dosage: '',
@@ -41,22 +42,26 @@ export function MarDialog({ prescription, open, onOpenChange }: MarDialogProps) 
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset form when prescription changes
+  // Reset form when prescription changes or selected item changes
   useEffect(() => {
     if (prescription) {
-      const firstItem = prescription.items?.[0];
+      const items = prescription.items || [];
+      const item = items[selectedItemIndex] || items[0];
       setForm({
-        medicationName: firstItem?.medicationName || '',
-        dosage: firstItem?.strengthPerDose || firstItem?.dosage || '',
-        route: firstItem?.route || 'oral',
+        medicationName: item?.medicationName || '',
+        dosage: item?.strengthPerDose || item?.dosage || '',
+        route: item?.route || 'oral',
         refused: false,
         refusalReason: '',
         notes: '',
       });
     }
-  }, [prescription?._id]);
+  }, [prescription?._id, selectedItemIndex]);
 
   if (!prescription) return null;
+
+  const items = prescription.items || [];
+  const currentItem = items[selectedItemIndex] || items[0];
 
   const patient = prescription.patientId;
   const firstItem = prescription.items?.[0];
@@ -119,8 +124,37 @@ export function MarDialog({ prescription, open, onOpenChange }: MarDialogProps) 
         <div className="text-xs text-muted-foreground">
           {prescription.prescriptionNumber}
           {prescription.isAdmitted && ` — ${prescription.admissionNumber}`}
-          {` — ${firstItem?.route?.toUpperCase() || 'PO'}`}
+          {` — ${currentItem?.route?.toUpperCase() || 'PO'}`}
         </div>
+
+        {/* Multi-Item Selector if prescription contains more than 1 item */}
+        {items.length > 1 && (
+          <div className="space-y-1.5 pt-1">
+            <Label className="text-xs font-semibold text-slate-700">Prescription Items ({items.length})</Label>
+            <div className="flex flex-wrap gap-2">
+              {items.map((item: any, idx: number) => {
+                const isSelected = selectedItemIndex === idx;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedItemIndex(idx)}
+                    className={cn(
+                      "px-3 py-1.5 rounded-lg border text-xs font-medium text-left transition-all flex items-center gap-2",
+                      isSelected
+                        ? "border-emerald-600 bg-emerald-50 text-emerald-900 shadow-2xs font-semibold"
+                        : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    )}
+                  >
+                    <Pill className={cn("h-3.5 w-3.5", isSelected ? "text-emerald-600" : "text-slate-400")} />
+                    <span>{item.medicationName || `Item #${idx + 1}`}</span>
+                    <span className="text-[10px] opacity-75 font-mono">({item.strengthPerDose || item.dosage || '1 dose'})</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div className="space-y-5">
           {/* Progress */}
